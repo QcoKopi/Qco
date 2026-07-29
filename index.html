@@ -410,8 +410,13 @@
    ============================================================ */
 const CONFIG = {
   // GANTI dengan URL deployment Web App GAS Anda
+  // Setelah merge QSales, GAS_URL ini sudah support semua endpoint QSystem + QSales
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbwz4VRNnlPWw_JmfZg45sZzLfRJqTvX5t_odlC4M5i5dfZz7buwK4fM0SnsqUhKEOU/exec',
+  // URL QSales Portal (frontend lengkap — terpisah atau sama)
+  QSALES_PORTAL_URL: 'https://script.google.com/macros/s/AKfycbyNuh-E6Lutp5jC5_25YAvF2e_4fk2O7AzdbU_Sa3CSOFs2SmhhzC5urEgvsQt7hAQ/exec',
+};
   // Cara dapat: Deploy GAS → Web app → copy URL
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbzTVe4M2ftfT0nOep3kFnZPUIwDGnOV1PBBUsu04S6eXE9i5wWtriJoDtCoXHIy/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbyNuh-E6Lutp5jC5_25YAvF2e_4fk2O7AzdbU_Sa3CSOFs2SmhhzC5urEgvsQt7hAQ/exec',
 };
 
 /* ============================================================
@@ -550,7 +555,7 @@ const JOBDESK = {
 const APPS = [
   { id:'qtask', name:'QTask', desc:'Tracker tugas & progress tim', icon:'📋', status:'live', color:'qtask' },
   { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'soon', color:'qfin' },
-  { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'soon', color:'qsales' },
+  { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'live', color:'qsales' },
   { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
 ];
 
@@ -571,6 +576,10 @@ let state = {
   appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
   // QTask sub-state
   qtaskTab: 'home',
+  // QSales sub-state
+  qsalesData: null,
+  qsalesLoading: false,
+  qsalesTab: 'dashboard', // dashboard | leads | kunjungan
   data: defaultData(),
   syncStatus: 'idle',
   lastSyncedAt: null,
@@ -1449,6 +1458,166 @@ function qtaskSettingsHTML(){
 /* ============================================================
    RENDER — Mockup Apps (QFinance, QSales, QAffiliator)
    ============================================================ */
+
+
+/* ============================================================
+   QSALES — Dashboard Integration
+   ============================================================ */
+
+async function fetchQSalesData(){
+  state.qsalesLoading = true;
+  render();
+  try {
+    const data = await apiCall('qsales_getDashboard');
+    state.qsalesData = data;
+    state.qsalesLoading = false;
+  } catch(e) {
+    state.qsalesLoading = false;
+    showToast('Gagal memuat data QSales: ' + (e.message || 'Cek koneksi'));
+  }
+  render();
+}
+
+function qsalesSubNavHTML(){
+  const tabBtn = (tab, label) => `
+    <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
+  `;
+  return `
+    <div class="row gap-6 wrap" style="margin-bottom:14px;">
+      ${tabBtn('dashboard','📊 Dashboard')}
+      ${tabBtn('leads','🎯 Leads')}
+      ${tabBtn('kunjungan','📅 Kunjungan')}
+    </div>
+  `;
+}
+
+function qsalesDashboardHTML(){
+  if (state.qsalesLoading){
+    return `
+      <div class="empty-state"><div class="loader-bean" style="margin:0 auto 12px;"></div><p>Menyeduh data QSales...</p></div>
+    `;
+  }
+  const d = state.qsalesData;
+  if (!d){
+    fetchQSalesData();
+    return `<div class="empty-state"><p>Memuat data QSales...</p></div>`;
+  }
+
+  const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
+
+  return `
+    <div class="greeting">QSales Intelligence 🎯</div>
+    <div class="greeting-sub">Ringkasan leads, reminder, &amp; pipeline penjualan</div>
+
+    ${qsalesSubNavHTML()}
+
+    <div class="section-title">KPI Leads</div>
+    <div class="quick-stats">
+      <div class="qstat"><div class="qnum">${d.total || 0}</div><div class="qlbl">Total Coffee Shop</div></div>
+      <div class="qstat"><div class="qnum" style="color:var(--po);">${d.ongoing || 0}</div><div class="qlbl">On Going</div></div>
+      <div class="qstat"><div class="qnum" style="color:var(--success);">${d.closing || 0}</div><div class="qlbl">Jadi Klien</div></div>
+      <div class="qstat"><div class="qnum" style="color:var(--danger);">${d.stop || 0}</div><div class="qlbl">Stop</div></div>
+    </div>
+
+    <div class="section-title">Follow-up Pipeline</div>
+    <div class="quick-stats">
+      <div class="qstat"><div class="qnum" style="color:#B8863B;">${d.needV2 || 0}</div><div class="qlbl">Butuh V2</div></div>
+      <div class="qstat"><div class="qnum" style="color:#BC6C4A;">${d.needV3 || 0}</div><div class="qlbl">Butuh V3</div></div>
+      <div class="qstat"><div class="qnum" style="color:#7B6B4D;">${d.v3Ongoing || 0}</div><div class="qlbl">V3 On Going</div></div>
+      <div class="qstat"><div class="qnum" style="color:var(--accent-dark);">${d.sampling || 0}</div><div class="qlbl">Sampling</div></div>
+    </div>
+
+    ${reminderTotal > 0 ? `
+    <div class="card" style="background:var(--warning-soft); border-color:#E6C68E; margin-bottom:16px;">
+      <div class="row gap-8" style="margin-bottom:8px;"><b style="color:var(--warning);">⚠ ${reminderTotal} coffee shop perlu ditindaklanjuti</b></div>
+      <div style="font-size:13px; color:var(--ink-soft);">
+        ${d.needV2 > 0 ? `<div>• ${d.needV2} butuh Visit Ke-2 (V1→V2)</div>` : ''}
+        ${d.needV3 > 0 ? `<div>• ${d.needV3} butuh Visit Ke-3 (V2→V3)</div>` : ''}
+        ${d.v3Ongoing > 0 ? `<div>• ${d.v3Ongoing} V3 selesai tapi belum closing</div>` : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="section-title">Aksi Cepat</div>
+    <div class="app-grid" style="grid-template-columns:repeat(2,1fr);">
+      <div class="app-card" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">
+        <div class="app-icon qsales">🎯</div>
+        <div class="app-info">
+          <div class="app-name">Buka Portal QSales</div>
+          <div class="app-desc">Akses fitur lengkap: peta, chart, AI analysis, entry form</div>
+        </div>
+      </div>
+      <div class="app-card" data-action="qsales-refresh">
+        <div class="app-icon" style="background:var(--surface-alt); color:var(--ink-soft);">🔄</div>
+        <div class="app-info">
+          <div class="app-name">Refresh Data</div>
+          <div class="app-desc">Muat ulang data leads terbaru dari Google Sheet</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Coffee Shop Terbaru (${Math.min(d.shops?.length || 0, 50)})</div>
+    ${qsalesShopListHTML(d.shops || [])}
+  `;
+}
+
+function qsalesShopListHTML(shops){
+  if (!shops.length){
+    return `<div class="empty-state"><span class="icon">🗂️</span>Belum ada data coffee shop.</div>`;
+  }
+  const rows = shops.map(s => {
+    let statusColor = 'var(--honey)';
+    let statusLabel = 'On Going';
+    if (s.status === 'stop') { statusColor = 'var(--danger)'; statusLabel = 'Stop'; }
+    else if (s.status === 'closing') { statusColor = 'var(--success)'; statusLabel = 'Jadi Klien'; }
+    const visitLabel = s.latestVisit || 'Pertama';
+    const vBadge = visitLabel === 'Pertama' ? 'badge-reguler' : visitLabel === 'Kedua' ? 'badge-due' : 'badge-insidentil';
+    return `
+      <div class="task-card" style="margin-bottom:8px;">
+        <div class="row between" style="margin-bottom:6px;">
+          <div class="task-title" style="font-size:14px;">${escapeHTML(s.name)}</div>
+          <span class="badge" style="background:${statusColor}20; color:${statusColor};">${statusLabel}</span>
+        </div>
+        <div class="task-owner">${escapeHTML(s.sales)} · ${escapeHTML(s.area || 'Area tidak diketahui')}</div>
+        <div class="task-badges">
+          <span class="badge ${vBadge}">${visitLabel}</span>
+          ${s.bahan ? `<span class="badge badge-active">${escapeHTML(s.bahan)}</span>` : ''}
+          ${s.kopi ? `<span class="badge badge-active">${escapeHTML(s.kopi)}</span>` : ''}
+        </div>
+        ${s.daysSinceV1 !== null ? `<div class="faint mono" style="font-size:10.5px;">V1: ${s.v1Date || '-'} (${s.daysSinceV1}h lalu)</div>` : ''}
+        ${s.daysSinceV2 !== null ? `<div class="faint mono" style="font-size:10.5px;">V2: ${s.v2Date || '-'} (${s.daysSinceV2}h lalu)</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  return rows;
+}
+
+function qsalesLeadsHTML(){
+  const d = state.qsalesData;
+  if (!d) return `<div class="empty-state">Memuat...</div>`;
+  const needFollowUp = (d.shops || []).filter(s => s.status !== 'stop' && s.status !== 'closing');
+  return `
+    <div class="greeting">Daftar Leads</div>
+    <div class="greeting-sub">${needFollowUp.length} coffee shop sedang di-follow up</div>
+    ${qsalesSubNavHTML()}
+    ${qsalesShopListHTML(needFollowUp)}
+  `;
+}
+
+function qsalesKunjunganHTML(){
+  return `
+    <div class="greeting">Jadwal Kunjungan</div>
+    <div class="greeting-sub">Rencana kunjungan dari QSales</div>
+    ${qsalesSubNavHTML()}
+    <div class="card" style="text-align:center; padding:40px 20px;">
+      <span class="icon" style="font-size:32px; margin-bottom:12px; display:block;">📅</span>
+      <p style="color:var(--ink-soft); font-size:13px; margin-bottom:16px;">Jadwal kunjungan lengkap tersedia di Portal QSales.</p>
+      <button class="btn btn-primary" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">Buka Portal QSales</button>
+    </div>
+  `;
+}
+
+
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -1733,7 +1902,10 @@ function render(){
   } else if (state.appTab === 'qfin'){
     body = mockupHTML('qfin');
   } else if (state.appTab === 'qsales'){
-    body = mockupHTML('qsales');
+    if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
+    else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
+    else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
+    else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
   } else if (state.appTab === 'qaff'){
     body = mockupHTML('qaff');
   } else {
@@ -1887,6 +2059,13 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'open-sheet'){
     openSheet();
+  }
+  else if (el.dataset.action === 'switch-qsales-tab'){
+    state.qsalesTab = el.dataset.tab;
+    render();
+  }
+  else if (el.dataset.action === 'qsales-refresh'){
+    fetchQSalesData();
   }
   else if (el.dataset.action === 'reset-filter'){
     state.filter = { dept:'all', nama:'all' };
