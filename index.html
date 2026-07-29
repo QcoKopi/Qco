@@ -400,6 +400,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -457,6 +458,20 @@ async function gsFetch(fnName, ...args){
   }
   else if (fnName === 'toggleTaskStatus') {
     params.set('taskId', args[0]);
+  }
+  else if (fnName === 'qsales_getDashboard') {
+    const emp = findEmp(state.currentUser);
+    if (emp) {
+      params.set('salesName', emp.name);
+      params.set('userRole', emp.role);
+    }
+  }
+  else if (fnName === 'qsales_getKPI') {
+    const emp = findEmp(state.currentUser);
+    if (emp) {
+      params.set('salesName', emp.name);
+      params.set('userRole', emp.role);
+    }
   }
   else if (args.length === 1) {
     // For object payloads (addTask, addProgress), stringify to JSON
@@ -1460,19 +1475,21 @@ function qtaskSettingsHTML(){
 
 
 /* ============================================================
-   QSALES — Dashboard Integration
+   QSALES — Dashboard Integration [REVISI: Role Filter + 50 Limit]
    ============================================================ */
 
 async function fetchQSalesData(){
-  if (state.qsalesLoading) return; // prevent double fetch
+  if (state.qsalesLoading) return;
   state.qsalesLoading = true;
   state.qsalesError = null;
   render();
   try {
-    console.log('[QSales] Fetching dashboard from:', CONFIG.GAS_URL + '?action=qsales_getDashboard');
+    const emp = findEmp(state.currentUser);
+    const salesName = emp ? emp.name : '';
+    const userRole = emp ? emp.role : 'staff';
+    console.log('[QSales] Fetching dashboard for:', salesName, '| role:', userRole);
     const result = await apiCall('qsales_getDashboard');
     console.log('[QSales] Response:', result);
-    // Handle both formats: wrapped {success, data} or flat response
     if (result && typeof result === 'object') {
       state.qsalesData = result;
     } else {
@@ -1483,7 +1500,7 @@ async function fetchQSalesData(){
     console.error('[QSales] Fetch error:', e);
     state.qsalesLoading = false;
     state.qsalesError = e.message || 'Gagal memuat data QSales. Pastikan GAS sudah deploy dengan file 06_QSales.gs';
-    showToast('QSales: ' + state.qsalesError, 'error');
+    showToast('QSales: ' + state.qsalesError);
   }
   render();
 }
@@ -1504,7 +1521,7 @@ function qsalesSubNavHTML(){
 function qsalesDashboardHTML(){
   if (state.qsalesLoading){
     return `
-      <div class="empty-state"><div class="loader-bean" style="margin:0 auto 12px;"></div><p>Menyeduh data QSales...</p></div>
+      <div class="empty-state"><span class="icon">☕</span><p>Menyeduh data QSales...</p></div>
     `;
   }
   if (state.qsalesError){
@@ -1517,7 +1534,7 @@ function qsalesDashboardHTML(){
         </div>
         <div style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">
           Penyebab umum:<br>
-          1. GAS belum deploy dengan file 06_QSales.gs<br>
+          1. GAS belum deploy dengan file 06_QSales.gs (revisi role-filter)<br>
           2. URL GAS belum diupdate di CONFIG<br>
           3. Sheet ENTRY belum ada di spreadsheet
         </div>
@@ -1531,11 +1548,16 @@ function qsalesDashboardHTML(){
     return `<div class="empty-state"><p>Memuat data QSales...</p></div>`;
   }
 
+  const emp = findEmp(state.currentUser);
+  const isStaff = emp && emp.role === 'staff';
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
 
   return `
     <div class="greeting">QSales Intelligence 🎯</div>
-    <div class="greeting-sub">Ringkasan leads, reminder, &amp; pipeline penjualan</div>
+    <div class="greeting-sub">
+      Ringkasan leads, reminder, &amp; pipeline penjualan
+      ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)} only</span>` : ''}
+    </div>
 
     ${qsalesSubNavHTML()}
 
@@ -1584,7 +1606,10 @@ function qsalesDashboardHTML(){
       </div>
     </div>
 
-    <div class="section-title">Coffee Shop Terbaru (${Math.min(d.shops?.length || 0, 50)})</div>
+    <div class="section-title">
+      Coffee Shop Terbaru 
+      <span class="faint" style="font-size:11px; font-weight:400;">(50 data terakhir${d.filteredBy && d.filteredBy !== 'all' ? ' · Filter: ' + escapeHTML(d.filteredBy) : ''})</span>
+    </div>
     ${qsalesShopListHTML(d.shops || [])}
   `;
 }
@@ -1594,7 +1619,7 @@ function qsalesShopListHTML(shops){
     return `<div class="empty-state"><span class="icon">🗂️</span>Belum ada data coffee shop.</div>`;
   }
   const rows = shops.map(s => {
-    let statusColor = 'var(--honey)';
+    let statusColor = 'var(--po)';
     let statusLabel = 'On Going';
     if (s.status === 'stop') { statusColor = 'var(--danger)'; statusLabel = 'Stop'; }
     else if (s.status === 'closing') { statusColor = 'var(--success)'; statusLabel = 'Jadi Klien'; }
@@ -1623,10 +1648,18 @@ function qsalesShopListHTML(shops){
 function qsalesLeadsHTML(){
   const d = state.qsalesData;
   if (!d) return `<div class="empty-state">Memuat...</div>`;
-  const needFollowUp = (d.shops || []).filter(s => s.status !== 'stop' && s.status !== 'closing');
+  let needFollowUp = (d.shops || []).filter(s => s.status !== 'stop' && s.status !== 'closing');
+  const totalLeads = needFollowUp.length;
+  needFollowUp = needFollowUp.slice(0, 50);
+  const emp = findEmp(state.currentUser);
+  const isStaff = emp && emp.role === 'staff';
   return `
     <div class="greeting">Daftar Leads</div>
-    <div class="greeting-sub">${needFollowUp.length} coffee shop sedang di-follow up</div>
+    <div class="greeting-sub">
+      ${needFollowUp.length} coffee shop sedang di-follow up
+      ${totalLeads > 50 ? '<span class="faint">(ditampilkan 50 terakhir dari ' + totalLeads + ')</span>' : ''}
+      ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)}</span>` : ''}
+    </div>
     ${qsalesSubNavHTML()}
     ${qsalesShopListHTML(needFollowUp)}
   `;
@@ -1644,8 +1677,6 @@ function qsalesKunjunganHTML(){
     </div>
   `;
 }
-
-
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
