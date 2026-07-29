@@ -577,6 +577,7 @@ let state = {
   // QSales sub-state
   qsalesData: null,
   qsalesLoading: false,
+  qsalesError: null,
   qsalesTab: 'dashboard', // dashboard | leads | kunjungan
   data: defaultData(),
   syncStatus: 'idle',
@@ -1463,15 +1464,26 @@ function qtaskSettingsHTML(){
    ============================================================ */
 
 async function fetchQSalesData(){
+  if (state.qsalesLoading) return; // prevent double fetch
   state.qsalesLoading = true;
+  state.qsalesError = null;
   render();
   try {
-    const data = await apiCall('qsales_getDashboard');
-    state.qsalesData = data;
+    console.log('[QSales] Fetching dashboard from:', CONFIG.GAS_URL + '?action=qsales_getDashboard');
+    const result = await apiCall('qsales_getDashboard');
+    console.log('[QSales] Response:', result);
+    // Handle both formats: wrapped {success, data} or flat response
+    if (result && typeof result === 'object') {
+      state.qsalesData = result;
+    } else {
+      throw new Error('Response tidak valid dari server');
+    }
     state.qsalesLoading = false;
   } catch(e) {
+    console.error('[QSales] Fetch error:', e);
     state.qsalesLoading = false;
-    showToast('Gagal memuat data QSales: ' + (e.message || 'Cek koneksi'));
+    state.qsalesError = e.message || 'Gagal memuat data QSales. Pastikan GAS sudah deploy dengan file 06_QSales.gs';
+    showToast('QSales: ' + state.qsalesError, 'error');
   }
   render();
 }
@@ -1493,6 +1505,24 @@ function qsalesDashboardHTML(){
   if (state.qsalesLoading){
     return `
       <div class="empty-state"><div class="loader-bean" style="margin:0 auto 12px;"></div><p>Menyeduh data QSales...</p></div>
+    `;
+  }
+  if (state.qsalesError){
+    return `
+      <div class="greeting">QSales Intelligence 🎯</div>
+      <div class="greeting-sub">Gagal memuat data</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;">
+          <b>⚠ Error:</b> ${escapeHTML(state.qsalesError)}
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">
+          Penyebab umum:<br>
+          1. GAS belum deploy dengan file 06_QSales.gs<br>
+          2. URL GAS belum diupdate di CONFIG<br>
+          3. Sheet ENTRY belum ada di spreadsheet
+        </div>
+        <button class="btn btn-primary" data-action="qsales-refresh">🔄 Coba Lagi</button>
+      </div>
     `;
   }
   const d = state.qsalesData;
@@ -1979,6 +2009,9 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'switch-app'){
     state.appTab = el.dataset.app;
+    if (state.appTab === 'qsales' && !state.qsalesData && !state.qsalesLoading) {
+      fetchQSalesData();
+    }
     render();
   }
   else if (el.dataset.action === 'switch-qtask-tab'){
@@ -2063,6 +2096,8 @@ document.addEventListener('click', function(e){
     render();
   }
   else if (el.dataset.action === 'qsales-refresh'){
+    state.qsalesError = null;
+    state.qsalesData = null;
     fetchQSalesData();
   }
   else if (el.dataset.action === 'reset-filter'){
