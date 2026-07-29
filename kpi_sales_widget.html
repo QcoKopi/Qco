@@ -1,0 +1,339 @@
+<!-- ============================================================
+     QSYSTEM — Widget KPI Sales (Dashboard Integration)
+     ============================================================ -->
+
+<style>
+  .kpi-sales-container {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .kpi-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .kpi-header h2 {
+    margin: 0 0 8px 0;
+    color: #1a1a2e;
+    font-size: 22px;
+  }
+  .kpi-header .kpi-subtitle {
+    color: #666;
+    font-size: 13px;
+  }
+
+  /* Summary Cards */
+  .kpi-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-top: 3px solid #ddd;
+  }
+  .kpi-card.achieved { border-top-color: #28a745; }
+  .kpi-card.warning { border-top-color: #ffc107; }
+  .kpi-card.danger { border-top-color: #dc3545; }
+  .kpi-card.info { border-top-color: #17a2b8; }
+
+  .kpi-card .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 4px 0;
+  }
+  .kpi-card .kpi-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .kpi-card .kpi-rate {
+    font-size: 12px;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-block;
+  }
+  .kpi-card.achieved .kpi-rate { background: #d4edda; color: #155724; }
+  .kpi-card.warning .kpi-rate { background: #fff3cd; color: #856404; }
+  .kpi-card.danger .kpi-rate { background: #f8d7da; color: #721c24; }
+
+  /* Tables */
+  .kpi-section {
+    background: white;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .kpi-section h3 {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kpi-section h3 .target-badge {
+    font-size: 11px;
+    background: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 8px;
+    color: #495057;
+  }
+
+  .kpi-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .kpi-table th {
+    background: #f1f3f5;
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .kpi-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  .kpi-table tr:hover { background: #f8f9fa; }
+
+  .status-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .status-TERCAPAI { background: #d4edda; color: #155724; }
+  .status-BELUM { background: #f8d7da; color: #721c24; }
+
+  .gap-text {
+    color: #dc3545;
+    font-size: 12px;
+  }
+
+  .visit-bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+    max-width: 80px;
+  }
+  .visit-bar span {
+    height: 100%;
+  }
+  .visit-1 { background: #4a90d9; }
+  .visit-2 { background: #f5a623; }
+  .visit-3 { background: #7ed321; }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #888;
+  }
+  .error-msg {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  @media (max-width: 600px) {
+    .kpi-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<div class="kpi-sales-container" id="kpiSalesContainer">
+  <div class="loading">Memuat data KPI Sales...</div>
+</div>
+
+<script>
+(function() {
+  const container = document.getElementById('kpiSalesContainer');
+  const GAS_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+
+  // Mock data for preview (will be replaced by actual fetch)
+  const mockData = {
+    firstEntryDate: "2026-07-01",
+    dailyTarget: 5,
+    weeklyTarget: 30,
+    summary: {
+      totalDaysTracked: 12,
+      daysAchieved: 8,
+      daysAchievementRate: 67,
+      totalWeeksTracked: 2,
+      weeksAchieved: 1,
+      weeksAchievementRate: 50
+    },
+    daily: [
+      { date: "2026-07-01", totalVisit: 5, visit1: 3, visit2: 1, visit3: 1, target: 5, status: "TERCAPAI", gap: 0 },
+      { date: "2026-07-02", totalVisit: 4, visit1: 2, visit2: 2, visit3: 0, target: 5, status: "BELUM TERCAPAI", gap: 1 },
+      { date: "2026-07-03", totalVisit: 6, visit1: 4, visit2: 1, visit3: 1, target: 5, status: "TERCAPAI", gap: 0 },
+      { date: "2026-07-04", totalVisit: 3, visit1: 2, visit2: 1, visit3: 0, target: 5, status: "BELUM TERCAPAI", gap: 2 },
+      { date: "2026-07-05", totalVisit: 5, visit1: 3, visit2: 2, visit3: 0, target: 5, status: "TERCAPAI", gap: 0 },
+      { date: "2026-07-07", totalVisit: 7, visit1: 4, visit2: 2, visit3: 1, target: 5, status: "TERCAPAI", gap: 0 },
+      { date: "2026-07-08", totalVisit: 2, visit1: 1, visit2: 1, visit3: 0, target: 5, status: "BELUM TERCAPAI", gap: 3 }
+    ],
+    weekly: [
+      { week: "2026-W27", totalVisit: 32, target: 30, status: "TERCAPAI", gap: 0, bySales: [
+        { sales: "Budi", count: 18, status: "TERCAPAI" },
+        { sales: "Ani", count: 14, status: "BELUM TERCAPAI" }
+      ]},
+      { week: "2026-W28", totalVisit: 24, target: 30, status: "BELUM TERCAPAI", gap: 6, bySales: [
+        { sales: "Budi", count: 15, status: "BELUM TERCAPAI" },
+        { sales: "Ani", count: 9, status: "BELUM TERCAPAI" }
+      ]}
+    ]
+  };
+
+  function renderKPI(data) {
+    if (data.error) {
+      container.innerHTML = '<div class="error-msg">' + data.error + '</div>';
+      return;
+    }
+
+    const s = data.summary;
+    const dayClass = s.daysAchievementRate >= 80 ? 'achieved' : s.daysAchievementRate >= 50 ? 'warning' : 'danger';
+    const weekClass = s.weeksAchievementRate >= 80 ? 'achieved' : s.weeksAchievementRate >= 50 ? 'warning' : 'danger';
+
+    let html = `
+      <div class="kpi-header">
+        <h2>📊 KPI Sales Performance</h2>
+        <div class="kpi-subtitle">Dimulai dari tanggal: <strong>${data.firstEntryDate || '-'}</strong></div>
+      </div>
+
+      <div class="kpi-summary-grid">
+        <div class="kpi-card ${dayClass}">
+          <div class="kpi-label">Hari Tercapai</div>
+          <div class="kpi-value">${s.daysAchieved}/${s.totalDaysTracked}</div>
+          <div class="kpi-rate">${s.daysAchievementRate}%</div>
+        </div>
+        <div class="kpi-card ${weekClass}">
+          <div class="kpi-label">Minggu Tercapai</div>
+          <div class="kpi-value">${s.weeksAchieved}/${s.totalWeeksTracked}</div>
+          <div class="kpi-rate">${s.weeksAchievementRate}%</div>
+        </div>
+        <div class="kpi-card info">
+          <div class="kpi-label">Target Harian</div>
+          <div class="kpi-value">${data.dailyTarget}</div>
+          <div class="kpi-rate">Visit/Hari</div>
+        </div>
+        <div class="kpi-card info">
+          <div class="kpi-label">Target Mingguan</div>
+          <div class="kpi-value">${data.weeklyTarget}</div>
+          <div class="kpi-rate">Visit/Minggu</div>
+        </div>
+      </div>
+
+      <div class="kpi-section">
+        <h3>📅 KPI Harian <span class="target-badge">Target: ${data.dailyTarget} Visit/Hari</span></h3>
+        <table class="kpi-table">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Total Visit</th>
+              <th>V1</th>
+              <th>V2</th>
+              <th>V3</th>
+              <th>Status</th>
+              <th>Selisih</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.daily.map(d => {
+              const barWidth = d.target > 0 ? (d.totalVisit / d.target * 100) : 0;
+              return `
+              <tr>
+                <td><strong>${d.date}</strong></td>
+                <td>
+                  ${d.totalVisit}
+                  <div class="visit-bar">
+                    <span class="visit-1" style="width:${(d.visit1/d.totalVisit*100)||0}%"></span>
+                    <span class="visit-2" style="width:${(d.visit2/d.totalVisit*100)||0}%"></span>
+                    <span class="visit-3" style="width:${(d.visit3/d.totalVisit*100)||0}%"></span>
+                  </div>
+                </td>
+                <td>${d.visit1}</td>
+                <td>${d.visit2}</td>
+                <td>${d.visit3}</td>
+                <td><span class="status-badge status-${d.status === 'TERCAPAI' ? 'TERCAPAI' : 'BELUM'}">${d.status}</span></td>
+                <td>${d.gap > 0 ? '<span class="gap-text">-' + d.gap + '</span>' : '<span style="color:#28a745;">✓</span>'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="kpi-section">
+        <h3>📆 KPI Mingguan <span class="target-badge">Target: ${data.weeklyTarget} Visit/Minggu</span></h3>
+        <table class="kpi-table">
+          <thead>
+            <tr>
+              <th>Minggu</th>
+              <th>Total Visit</th>
+              <th>Status</th>
+              <th>Selisih</th>
+              <th>Detail per Sales</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.weekly.map(w => `
+              <tr>
+                <td><strong>${w.week}</strong></td>
+                <td>${w.totalVisit}</td>
+                <td><span class="status-badge status-${w.status === 'TERCAPAI' ? 'TERCAPAI' : 'BELUM'}">${w.status}</span></td>
+                <td>${w.gap > 0 ? '<span class="gap-text">-' + w.gap + '</span>' : '<span style="color:#28a745;">✓</span>'}</td>
+                <td>
+                  ${w.bySales.map(s => `
+                    <div style="margin-bottom:4px;">
+                      <span style="font-weight:600;">${s.sales}:</span> ${s.count} visit
+                      <span class="status-badge status-${s.status === 'TERCAPAI' ? 'TERCAPAI' : 'BELUM'}" style="font-size:10px;padding:1px 6px;">${s.status}</span>
+                    </div>
+                  `).join('')}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  // Try to fetch from GAS, fallback to mock for preview
+  async function loadData() {
+    try {
+      const response = await fetch(GAS_URL + '?action=getSalesKPI');
+      const data = await response.json();
+      renderKPI(data);
+    } catch (e) {
+      // Fallback to mock data for preview
+      console.log('Using mock data for preview');
+      renderKPI(mockData);
+    }
+  }
+
+  loadData();
+})();
+</script>
