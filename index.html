@@ -401,6 +401,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -602,12 +603,13 @@ function filterQSalesByUser(data, userId) {
   if (!emp) return data;
   if (emp.role === 'spv') {
     const teamIds = TEAM_OF[userId] || [userId];
-    const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-    const filteredShops = data.shops.filter(s => teamNames.includes(s.sales));
+    const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name.toLowerCase().trim());
+    const filteredShops = data.shops.filter(s => teamNames.includes(String(s.sales || '').toLowerCase().trim()));
     return { ...data, shops: filteredShops, total: filteredShops.length };
   }
   if (emp.role === 'owner') return data;
-  const filteredShops = data.shops.filter(s => s.sales === emp.name);
+  const empNameLower = emp.name.toLowerCase().trim();
+  const filteredShops = data.shops.filter(s => String(s.sales || '').toLowerCase().trim() === empNameLower);
   return { ...data, shops: filteredShops, total: filteredShops.length };
 }
 
@@ -627,27 +629,28 @@ function filterKPIByUser(kpiData, userId) {
   const emp = findEmp(userId);
   if (!emp) return kpiData;
   if (emp.role === 'owner') return kpiData;
+  const empNameLower = emp.name.toLowerCase().trim();
   const filteredWeekly = kpiData.weekly.map(w => {
     if (emp.role === 'spv') {
       const teamIds = TEAM_OF[userId] || [userId];
-      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-      const filteredBySales = w.bySales.filter(bs => teamNames.includes(bs.sales));
+      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name.toLowerCase().trim());
+      const filteredBySales = w.bySales.filter(bs => teamNames.includes(String(bs.sales || '').toLowerCase().trim()));
       const totalCount = filteredBySales.reduce((sum, bs) => sum + bs.count, 0);
       return { ...w, bySales: filteredBySales, totalVisit: totalCount };
     }
-    const mySales = w.bySales.filter(bs => bs.sales === emp.name);
+    const mySales = w.bySales.filter(bs => String(bs.sales || '').toLowerCase().trim() === empNameLower);
     const myCount = mySales.reduce((sum, bs) => sum + bs.count, 0);
     return { ...w, bySales: mySales, totalVisit: myCount };
   });
   const filteredMonthly = kpiData.monthly.map(m => {
     if (emp.role === 'spv') {
       const teamIds = TEAM_OF[userId] || [userId];
-      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-      const filteredBySales = m.bySales.filter(bs => teamNames.includes(bs.sales));
+      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name.toLowerCase().trim());
+      const filteredBySales = m.bySales.filter(bs => teamNames.includes(String(bs.sales || '').toLowerCase().trim()));
       const totalCount = filteredBySales.reduce((sum, bs) => sum + bs.count, 0);
       return { ...m, bySales: filteredBySales, totalVisit: totalCount };
     }
-    const mySales = m.bySales.filter(bs => bs.sales === emp.name);
+    const mySales = m.bySales.filter(bs => String(bs.sales || '').toLowerCase().trim() === empNameLower);
     const myCount = mySales.reduce((sum, bs) => sum + bs.count, 0);
     return { ...m, bySales: mySales, totalVisit: myCount };
   });
@@ -1558,28 +1561,49 @@ function qtaskSettingsHTML(){
    ============================================================ */
 
 async function fetchQSalesData(){
-  if (state.qsalesLoading) return; // prevent double fetch
+  if (state.qsalesLoading) return;
   state.qsalesLoading = true;
   state.qsalesError = null;
   render();
-  try {
-    console.log('[QSales] Fetching dashboard from:', CONFIG.GAS_URL + '?action=qsales_getDashboard');
-    const result = await apiCall('qsales_getDashboard');
-    console.log('[QSales] Response:', result);
-    // Handle both formats: wrapped {success, data} or flat response
-    if (result && typeof result === 'object') {
-      state.qsalesData = result;
-    } else {
-      throw new Error('Response tidak valid dari server');
+
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 20000; // 20 detik
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log('[QSales] Fetch attempt ' + attempt + '...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      // Manual fetch dengan timeout (bypass apiCall untuk support AbortController)
+      const url = CONFIG.GAS_URL + '?action=qsales_getDashboard';
+      const resp = await fetch(url, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      const json = await resp.json();
+      const result = json.data || json;
+
+      console.log('[QSales] Response:', result);
+      if (result && typeof result === 'object') {
+        state.qsalesData = result;
+        state.qsalesLoading = false;
+        render();
+        return;
+      } else {
+        throw new Error('Response tidak valid');
+      }
+    } catch(e) {
+      console.error('[QSales] Attempt ' + attempt + ' failed:', e);
+      if (attempt === MAX_RETRIES) {
+        state.qsalesLoading = false;
+        state.qsalesError = 'Gagal memuat setelah ' + MAX_RETRIES + ' kali. ' + (e.name === 'AbortError' ? 'Timeout (20 detik).' : e.message);
+        showToast('QSales: ' + state.qsalesError);
+        render();
+        return;
+      }
+      await new Promise(r => setTimeout(r, 2000));
     }
-    state.qsalesLoading = false;
-  } catch(e) {
-    console.error('[QSales] Fetch error:', e);
-    state.qsalesLoading = false;
-    state.qsalesError = e.message || 'Gagal memuat data QSales. Pastikan GAS sudah deploy dengan file 06_QSales.gs';
-    showToast('QSales: ' + state.qsalesError, 'error');
   }
-  render();
 }
 
 function qsalesSubNavHTML(){
@@ -1697,16 +1721,35 @@ async function fetchSalesKPI(){
   kpiState.loading = true;
   kpiState.error = null;
   render();
-  try {
-    const result = await apiCall('qsales_getKPI');
-    kpiState.data = result;
-    kpiState.loading = false;
-  } catch(e) {
-    kpiState.loading = false;
-    kpiState.error = e.message || 'Gagal memuat KPI Sales';
-    showToast('KPI: ' + kpiState.error);
+
+  const MAX_RETRIES = 2;
+  const TIMEOUT_MS = 20000;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      const url = CONFIG.GAS_URL + '?action=qsales_getKPI';
+      const resp = await fetch(url, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      const json = await resp.json();
+      kpiState.data = json.data || json;
+      kpiState.loading = false;
+      render();
+      return;
+    } catch(e) {
+      if (attempt === MAX_RETRIES) {
+        kpiState.loading = false;
+        kpiState.error = 'Gagal memuat KPI. ' + (e.name === 'AbortError' ? 'Timeout (20 detik).' : e.message);
+        showToast('KPI: ' + kpiState.error);
+        render();
+        return;
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
   }
-  render();
 }
 
 function qsalesKPIHTML(){
