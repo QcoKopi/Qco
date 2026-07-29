@@ -1625,6 +1625,7 @@ function qsalesDashboardHTML(){
     fetchQSalesData();
     return `<div class="empty-state"><p>Memuat data QSales...</p></div>`;
   }
+  const rawData = d;
   d = filterQSalesByUser(d, state.currentUser);
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
 
@@ -1636,7 +1637,7 @@ function qsalesDashboardHTML(){
 
     <div class="section-title">KPI Leads</div>
     <div class="quick-stats">
-      <div class="qstat"><div class="qnum">${d.total || 0}</div><div class="qlbl">Total Coffee Shop</div></div>
+      <div class="qstat"><div class="qnum">${rawData.total || 0}</div><div class="qlbl">Total Coffee Shop</div></div>
       <div class="qstat"><div class="qnum" style="color:var(--po);">${d.ongoing || 0}</div><div class="qlbl">On Going</div></div>
       <div class="qstat"><div class="qnum" style="color:var(--success);">${d.closing || 0}</div><div class="qlbl">Jadi Klien</div></div>
       <div class="qstat"><div class="qnum" style="color:var(--danger);">${d.stop || 0}</div><div class="qlbl">Stop</div></div>
@@ -1732,13 +1733,18 @@ function qsalesKPIHTML(){
     return `<div class="empty-state"><p>Memuat KPI Sales...</p></div>`;
   }
   d = filterKPIByUser(d, state.currentUser);
+  
   const s = d.summary;
+  const currentMonth = s.currentMonth;
   const dayClass = s.daysAchievementRate >= 80 ? 'achieved' : s.daysAchievementRate >= 50 ? 'warning' : 'danger';
-  const weekClass = s.weeksAchievementRate >= 80 ? 'achieved' : s.weeksAchievementRate >= 50 ? 'warning' : 'danger';
-  const monthClass = s.monthsAchievementRate >= 80 ? 'achieved' : s.monthsAchievementRate >= 50 ? 'warning' : 'danger';
 
-  const recentDaily = d.daily.slice(-14);
-  const dailyRows = recentDaily.map(day => {
+  // Filter weekly hanya untuk bulan berjalan
+  const currentWeekly = d.weekly.filter(w => w.month === (currentMonth ? currentMonth.monthName.split(' ')[0] : ''));
+  
+  // Filter monthly hanya yang ada data atau bulan berjalan
+  const activeMonthly = d.monthly.filter(m => m.isCurrentMonth || m.totalVisit > 0);
+
+  const dailyRows = d.daily.slice(-14).map(day => {
     const barW = day.target > 0 ? Math.min(100, (day.totalVisit / day.target * 100)) : 0;
     return `
       <tr>
@@ -1758,9 +1764,9 @@ function qsalesKPIHTML(){
     `;
   }).join('');
 
-  const weeklyRows = d.weekly.map(w => `
+  const weeklyRows = currentWeekly.map(w => `
     <tr>
-      <td><strong>${w.week}</strong></td>
+      <td><strong>${w.weekLabel}</strong></td>
       <td style="font-weight:700;">${w.totalVisit}</td>
       <td><span class="badge ${w.status==='TERCAPAI'?'badge-done':'badge-overdue'}" style="font-size:10px;">${w.status}</span></td>
       <td style="text-align:right;">${w.gap > 0 ? '<span style="color:var(--danger);font-size:12px;">-' + w.gap + '</span>' : '<span style="color:var(--success);">✓</span>'}</td>
@@ -1775,11 +1781,11 @@ function qsalesKPIHTML(){
     </tr>
   `).join('');
 
-  const monthlyRows = d.monthly.map(m => `
+  const monthlyRows = activeMonthly.map(m => `
     <tr>
-      <td><strong>${m.monthName}</strong></td>
+      <td><strong>${m.monthName}</strong>${m.isCurrentMonth ? ' <span style="font-size:10px;color:var(--accent);">(Berjalan)</span>' : ''}</td>
       <td style="font-weight:700;">${m.totalVisit}</td>
-      <td>${m.workingDays} hari</td>
+      <td>${m.effectiveDays} / ${m.workingDays} hari</td>
       <td>${m.target}</td>
       <td><span class="badge ${m.status==='TERCAPAI'?'badge-done':'badge-overdue'}" style="font-size:10px;">${m.status}</span></td>
       <td style="text-align:right;">${m.gap > 0 ? '<span style="color:var(--danger);font-size:12px;">-' + m.gap + '</span>' : '<span style="color:var(--success);">✓</span>'}</td>
@@ -1787,6 +1793,7 @@ function qsalesKPIHTML(){
         ${m.bySales.map(bs => `
           <div style="font-size:11px;margin-bottom:2px;">
             <span style="font-weight:600;">${bs.sales}:</span> ${bs.count}
+            ${bs.firstEntryDate ? '<span style="font-size:10px;color:var(--ink-faint);">(mulai ' + bs.firstEntryDate + ')</span>' : ''}
           </div>
         `).join('')}
       </td>
@@ -1795,26 +1802,26 @@ function qsalesKPIHTML(){
 
   return `
     <div class="greeting">📈 KPI Sales Performance</div>
-    <div class="greeting-sub">Target: ${d.dailyTarget} visit/hari · ${d.weeklyTarget} visit/minggu · ${d.workDaysDescription}</div>
+    <div class="greeting-sub">${d.currentMonth || ''} · Target: ${d.dailyTarget} visit/hari · ${d.workDaysDescription}</div>
 
     ${qsalesSubNavHTML()}
 
-    <div class="section-title">Ringkasan Pencapaian</div>
+    <div class="section-title">Ringkasan Bulan Berjalan</div>
     <div class="quick-stats">
       <div class="qstat" style="border-top:3px solid ${dayClass==='achieved'?'var(--success)':dayClass==='warning'?'var(--warning)':'var(--danger)'};">
         <div class="qnum" style="color:${dayClass==='achieved'?'var(--success)':dayClass==='warning'?'var(--warning)':'var(--danger)'};">${s.daysAchieved}/${s.totalDaysTracked}</div>
         <div class="qlbl">Hari Tercapai</div>
         <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.daysAchievementRate}%</div>
       </div>
-      <div class="qstat" style="border-top:3px solid ${weekClass==='achieved'?'var(--success)':weekClass==='warning'?'var(--warning)':'var(--danger)'};">
-        <div class="qnum" style="color:${weekClass==='achieved'?'var(--success)':weekClass==='warning'?'var(--warning)':'var(--danger)'};">${s.weeksAchieved}/${s.totalWeeksTracked}</div>
-        <div class="qlbl">Minggu Tercapai</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.weeksAchievementRate}%</div>
+      <div class="qstat" style="border-top:3px solid var(--accent);">
+        <div class="qnum" style="color:var(--accent-dark);">${currentMonth ? currentMonth.effectiveDays : '-'}</div>
+        <div class="qlbl">Hari Kerja Efektif</div>
+        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">dari ${currentMonth ? currentMonth.workingDays : '-'} hari</div>
       </div>
-      <div class="qstat" style="border-top:3px solid ${monthClass==='achieved'?'var(--success)':monthClass==='warning'?'var(--warning)':'var(--danger)'};">
-        <div class="qnum" style="color:${monthClass==='achieved'?'var(--success)':monthClass==='warning'?'var(--warning)':'var(--danger)'};">${s.monthsAchieved}/${s.totalMonthsTracked}</div>
-        <div class="qlbl">Bulan Tercapai</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.monthsAchievementRate}%</div>
+      <div class="qstat" style="border-top:3px solid ${currentMonth && currentMonth.status==='TERCAPAI'?'var(--success)':'var(--warning)'};">
+        <div class="qnum" style="color:${currentMonth && currentMonth.status==='TERCAPAI'?'var(--success)':'var(--warning)'};">${currentMonth ? currentMonth.totalVisit : '-'}</div>
+        <div class="qlbl">Total Visit</div>
+        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">Target: ${currentMonth ? currentMonth.target : '-'}</div>
       </div>
       <div class="qstat" style="border-top:3px solid var(--accent);">
         <div class="qnum" style="color:var(--accent-dark);">${d.dailyTarget}</div>
@@ -1823,14 +1830,16 @@ function qsalesKPIHTML(){
       </div>
     </div>
 
+    ${currentMonth ? `
     <div class="card" style="background:var(--accent-soft); border-color:var(--accent); margin-bottom:16px;">
-      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💰 Info Upah Harian Sales</div>
+      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💰 Info Upah Harian Sales — ${currentMonth.monthName}</div>
       <p style="font-size:13px; color:var(--ink-soft); margin:0; line-height:1.5;">
-        Sales bekerja <b>6 hari/minggu (Senin–Sabtu)</b>. Jumlah hari kerja per bulan otomatis dihitung dari kalender (exclude Minggu).<br>
-        <b>Rumus:</b> Upah Harian = Total Gaji Bulanan ÷ Jumlah Hari Kerja (Senin–Sabtu) pada bulan tersebut.<br>
-        <span style="font-size:11px; color:var(--ink-faint);">Contoh: Juli 2026 = ${d.monthly && d.monthly[0] ? d.monthly[0].workingDays : 27} hari kerja.}</span>
+        Sales bekerja <b>6 hari/minggu (Senin–Sabtu)</b>. Hari kerja efektif bulan ini: <b>${currentMonth.effectiveDays} hari</b> (dari total ${currentMonth.workingDays} hari kerja).<br>
+        <b>Rumus:</b> Upah Harian = Total Gaji Bulanan ÷ ${currentMonth.effectiveDays} hari kerja efektif.<br>
+        <span style="font-size:11px; color:var(--ink-faint);">Jika gaji Rp 5.000.000 → Upah harian ≈ Rp ${Math.round(5000000 / currentMonth.effectiveDays).toLocaleString('id-ID')}</span>
       </p>
     </div>
+    ` : ''}
 
     <div class="section-title">📅 KPI Harian (14 hari terakhir)</div>
     <div class="table-wrap">
@@ -1842,17 +1851,17 @@ function qsalesKPIHTML(){
       </table>
     </div>
 
-    <div class="section-title">📆 KPI Mingguan</div>
+    <div class="section-title">📆 KPI Mingguan — ${d.currentMonth || ''}</div>
     <div class="table-wrap">
       <table class="task-table" style="min-width:500px;">
         <thead>
           <tr><th>Minggu</th><th>Total Visit</th><th>Status</th><th>Selisih</th><th>Detail Sales</th></tr>
         </thead>
-        <tbody>${weeklyRows}</tbody>
+        <tbody>${weeklyRows.length ? weeklyRows : '<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);">Belum ada data mingguan</td></tr>'}</tbody>
       </table>
     </div>
 
-    <div class="section-title">🗓️ KPI Bulanan & Hari Kerja</div>
+    <div class="section-title">🗓️ KPI Bulanan</div>
     <div class="table-wrap">
       <table class="task-table" style="min-width:600px;">
         <thead>
