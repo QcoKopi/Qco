@@ -465,12 +465,12 @@ function apiCall(fnName, ...args){
    QSYSTEM — Konfigurasi & Data Master
    ============================================================ */
 const EMPLOYEES = [
-  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative', pin:'1234' },
-  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist', pin:'1234' },
-  { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor', pin:'1234' },
-  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff', pin:'1234' },
-  { id:'umay',  name:'Umay',  dept:'po', role:'spv',  jabatan:'Operations Supervisor', pin:'1234' },
-  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director', pin:'1234' },
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist' },
+  { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff' },
+  { id:'umay',  name:'Umay',  dept:'po', role:'spv',  jabatan:'Operations Supervisor' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director' },
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
@@ -1351,7 +1351,11 @@ function qtaskSettingsHTML(){
     <div class="card">
       <div class="settings-row">
         <span>Masuk sebagai <b>${emp.name}</b></span>
-        <button class="btn btn-ghost btn-sm" data-action="switch-user">Ganti</button>
+        <button class="btn btn-ghost btn-sm" data-action="switch-user">Ganti Akun</button>
+      </div>
+      <div class="settings-row">
+        <span>Keamanan PIN</span>
+        <button class="btn btn-primary btn-sm" data-action="open-pin-modal">🔐 Ganti PIN</button>
       </div>
     </div>
 
@@ -1475,6 +1479,37 @@ function qtaskSubNavHTML(){
 function modalHTML(){
   if (!state.modal.open) return '';
   const mode = state.modal.mode;
+
+  // PIN Change modal
+  if (mode === 'pin') {
+    return `
+    <div class="sheet-overlay" data-action="overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>🔐 Ganti PIN</h3>
+          <button class="sheet-close" data-action="close-modal">✕</button>
+        </div>
+        <form id="form-pin">
+          <div class="field">
+            <label>PIN Lama</label>
+            <input type="password" name="old-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" required style="text-align:center;letter-spacing:8px;font-family:var(--font-mono);">
+          </div>
+          <div class="field">
+            <label>PIN Baru (4 digit)</label>
+            <input type="password" name="new-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" required style="text-align:center;letter-spacing:8px;font-family:var(--font-mono);">
+          </div>
+          <div class="field">
+            <label>Konfirmasi PIN Baru</label>
+            <input type="password" name="confirm-pin" placeholder="••••" maxlength="4" inputmode="numeric" pattern="[0-9]*" required style="text-align:center;letter-spacing:8px;font-family:var(--font-mono);">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Simpan PIN Baru</button>
+          <p class="hint" style="text-align:center;margin-top:10px;">PIN akan tersinkron di semua perangkat.</p>
+        </form>
+      </div>
+    </div>`;
+  }
+
   const myTeamIds = hasTeamView(state.currentUser) ? TEAM_OF[state.currentUser] : [state.currentUser];
   const assignablePool = EMPLOYEES.filter(e=>e.role!=='owner');
   const eligibleEmployees = hasTeamView(state.currentUser) ? assignablePool : assignablePool.filter(e=>e.id===state.currentUser);
@@ -1635,7 +1670,6 @@ function closeModal(){
 
 async function selectUser(id){
   state.currentUser = id;
-  try { localStorage.setItem(USER_KEY, id); } catch(e){}
   state.appTab = 'dashboard';
   state.qtaskTab = 'home';
   await initData();
@@ -1655,11 +1689,30 @@ document.addEventListener('click', function(e){
     const empId = sel ? sel.value : '';
     const pin = pinInput ? pinInput.value.trim() : '';
     if (!empId) { showToast('Pilih nama dulu'); return; }
-    if (!pin || pin.length !== 4) { showToast('Masukkan PIN 4 digit'); return; }
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { showToast('Masukkan PIN 4 digit angka'); return; }
     const emp = findEmp(empId);
     if (!emp) { showToast('Nama tidak ditemukan'); return; }
-    if (emp.pin !== pin) { showToast('PIN salah'); pinInput.value = ''; pinInput.focus(); return; }
-    selectUser(empId);
+    // Validate PIN via GAS (sync across devices)
+    showToast('Memverifikasi…');
+    apiCall('validatePin', empId, pin).then(result => {
+      if (result.valid) {
+        selectUser(empId);
+      } else {
+        showToast('PIN salah');
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    }).catch(err => {
+      // Fallback: if offline, check local cache
+      const cachedPin = state.data.userPins && state.data.userPins[empId];
+      if (cachedPin && cachedPin === pin) {
+        selectUser(empId);
+      } else {
+        showToast('Gagal memverifikasi PIN. Coba lagi.');
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    });
   }
   else if (el.dataset.action === 'switch-app'){
     state.appTab = el.dataset.app;
@@ -1671,6 +1724,9 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'open-add'){
     openModal(el.dataset.mode, el.dataset.task);
+  }
+  else if (el.dataset.action === 'open-pin-modal'){
+    openModal('pin');
   }
   else if (el.dataset.action === 'close-modal'){
     closeModal();
@@ -1764,7 +1820,37 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-task'){
+  if (e.target.id === 'form-pin'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const oldPin = String(fd.get('old-pin')||'').trim();
+    const newPin = String(fd.get('new-pin')||'').trim();
+    const confirmPin = String(fd.get('confirm-pin')||'').trim();
+    if (!/^\d{4}$/.test(oldPin) || !/^\d{4}$/.test(newPin)) {
+      showToast('PIN harus 4 digit angka'); return;
+    }
+    if (newPin !== confirmPin) {
+      showToast('PIN baru dan konfirmasi tidak cocok'); return;
+    }
+    // Verify old PIN first
+    const currentPin = state.data.userPins && state.data.userPins[state.currentUser];
+    if (currentPin && currentPin !== oldPin) {
+      showToast('PIN lama salah'); return;
+    }
+    closeModal();
+    showToast('Menyimpan PIN…');
+    apiCall('updatePin', state.currentUser, newPin).then(result => {
+      // Update local cache
+      if (!state.data.userPins) state.data.userPins = {};
+      state.data.userPins[state.currentUser] = newPin;
+      state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+      render();
+      showToast(result.message || 'PIN berhasil diperbarui');
+    }).catch(err => {
+      showToast('Gagal memperbarui PIN: ' + (err.message || 'Coba lagi'));
+    });
+  }
+  else if (e.target.id === 'form-task'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const employeeId = fd.get('employee');
@@ -1811,16 +1897,16 @@ document.addEventListener('submit', function(e){
    Init
    ============================================================ */
 async function init(){
+  // Always show login screen — PIN required every time
+  // Pre-load data in background for faster validation
   try {
-    const last = localStorage.getItem(USER_KEY);
-    if (last && findEmp(last)) state.currentUser = last;
-  } catch(e){}
-
-  if (state.currentUser){
-    await initData();
-  } else {
-    render();
+    state.data = await apiCall('getData');
+    state.syncStatus = 'synced';
+    state.lastSyncedAt = Date.now();
+  } catch(e){
+    state.syncStatus = 'offline';
   }
+  render();
 }
 init();
 </script>
