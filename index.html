@@ -1828,7 +1828,7 @@ function qsalesKPIHTML(){
       <p style="font-size:13px; color:var(--ink-soft); margin:0; line-height:1.5;">
         Sales bekerja <b>6 hari/minggu (Senin–Sabtu)</b>. Jumlah hari kerja per bulan otomatis dihitung dari kalender (exclude Minggu).<br>
         <b>Rumus:</b> Upah Harian = Total Gaji Bulanan ÷ Jumlah Hari Kerja (Senin–Sabtu) pada bulan tersebut.<br>
-        <span style="font-size:11px; color:var(--ink-faint);">Contoh: Juli 2026 = ${d.monthly && d.monthly[0] ? d.monthly[0].workingDays : 27} hari kerja. Jika gaji Rp 5.000.000 → Upah harian ≈ Rp ${d.monthly && d.monthly[0] ? Math.round(5000000 / d.monthly[0].workingDays).toLocaleString('id-ID') : '-'}</span>
+        <span style="font-size:11px; color:var(--ink-faint);">Contoh: Juli 2026 = ${d.monthly && d.monthly[0] ? d.monthly[0].workingDays : 27} hari kerja.}</span>
       </p>
     </div>
 
