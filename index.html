@@ -400,7 +400,6 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -487,19 +486,18 @@ function apiCall(fnName, ...args){
    QSYSTEM — Konfigurasi & Data Master
    ============================================================ */
 const EMPLOYEES = [
-  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser' },
-  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design' },
-  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv',  jabatan:'Marketing & Sales' },
-  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development' },
-  { id:'umay',  name:'Fahmi Maulana',  dept:'po', role:'spv',  jabatan:'Ops & Product Development' },
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist' },
+  { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff' },
+  { id:'umay',  name:'Umay',  dept:'po', role:'spv',  jabatan:'Operations Supervisor' },
   { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director' },
-  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Canvaser' },
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
-  rizky: ['reza','nanda','rasya','rizky'],
+  rizky: ['reza','nanda','rizky'],
   umay: ['razak','umay'],
-  owner: ['reza','nanda','rasya','rizky','razak','umay'],
+  owner: ['reza','nanda','rizky','razak','umay'],
 };
 const USER_KEY = 'qsystem-current-user';
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -548,13 +546,6 @@ const JOBDESK = {
     'Review laporan keuangan & operasional',
     'Business development & partnership',
     'Final call untuk rekrutmen & investasi'
-  ],
-  rasya: [
-    'Kunjungan cafe & prospecting (target: 113+ cafe)',
-    'Tracking status: On Going, Stop, dan Order',
-    'Catatan & temuan kunjungan cafe',
-    'Clustering & prioritas cafe',
-    'Input data ke QSales'
   ]
 };
 
@@ -574,85 +565,6 @@ function findEmp(id){
 }
 function isSpv(id){ const e=findEmp(id); return !!e && e.role==='spv'; }
 function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || e.role==='owner'); }
-
-/* ============================================================
-   PERMISSION SYSTEM — Role-Based Access Control (RBAC)
-   ============================================================ */
-
-function canAccessApp(userId, appId) {
-  const emp = findEmp(userId);
-  if (!emp) return false;
-  if (emp.role === 'spv' || emp.role === 'owner') return true;
-  if (emp.role === 'staff') {
-    if (appId === 'dashboard') return true;
-    if (appId === 'qtask') return true;
-    if (appId === 'qsales' && emp.dept === 'sm') return true;
-    return false;
-  }
-  return false;
-}
-
-function getAllowedApps(userId) {
-  return APPS.filter(app => canAccessApp(userId, app.id));
-}
-
-function filterQSalesByUser(data, userId) {
-  if (!data || !data.shops) return data;
-  const emp = findEmp(userId);
-  if (!emp) return data;
-  if (emp.role === 'spv') {
-    const teamIds = TEAM_OF[userId] || [userId];
-    const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-    const filteredShops = data.shops.filter(s => teamNames.includes(s.sales));
-    return { ...data, shops: filteredShops, total: filteredShops.length };
-  }
-  if (emp.role === 'owner') return data;
-  const filteredShops = data.shops.filter(s => s.sales === emp.name);
-  return { ...data, shops: filteredShops, total: filteredShops.length };
-}
-
-function filterTasksByUser(tasks, userId) {
-  const emp = findEmp(userId);
-  if (!emp) return tasks;
-  if (emp.role === 'owner') return tasks;
-  if (emp.role === 'spv') {
-    const teamIds = TEAM_OF[userId] || [userId];
-    return tasks.filter(t => teamIds.includes(t.employeeId));
-  }
-  return tasks.filter(t => t.employeeId === userId);
-}
-
-function filterKPIByUser(kpiData, userId) {
-  if (!kpiData || kpiData.error) return kpiData;
-  const emp = findEmp(userId);
-  if (!emp) return kpiData;
-  if (emp.role === 'owner') return kpiData;
-  const filteredWeekly = kpiData.weekly.map(w => {
-    if (emp.role === 'spv') {
-      const teamIds = TEAM_OF[userId] || [userId];
-      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-      const filteredBySales = w.bySales.filter(bs => teamNames.includes(bs.sales));
-      const totalCount = filteredBySales.reduce((sum, bs) => sum + bs.count, 0);
-      return { ...w, bySales: filteredBySales, totalVisit: totalCount };
-    }
-    const mySales = w.bySales.filter(bs => bs.sales === emp.name);
-    const myCount = mySales.reduce((sum, bs) => sum + bs.count, 0);
-    return { ...w, bySales: mySales, totalVisit: myCount };
-  });
-  const filteredMonthly = kpiData.monthly.map(m => {
-    if (emp.role === 'spv') {
-      const teamIds = TEAM_OF[userId] || [userId];
-      const teamNames = teamIds.map(id => findEmp(id)).filter(Boolean).map(e => e.name);
-      const filteredBySales = m.bySales.filter(bs => teamNames.includes(bs.sales));
-      const totalCount = filteredBySales.reduce((sum, bs) => sum + bs.count, 0);
-      return { ...m, bySales: filteredBySales, totalVisit: totalCount };
-    }
-    const mySales = m.bySales.filter(bs => bs.sales === emp.name);
-    const myCount = mySales.reduce((sum, bs) => sum + bs.count, 0);
-    return { ...m, bySales: mySales, totalVisit: myCount };
-  });
-  return { ...kpiData, weekly: filteredWeekly, monthly: filteredMonthly };
-}
 
 /* ============================================================
    QSYSTEM State
@@ -1207,12 +1119,6 @@ function sidebarHTML(){
       <span class="navicon">${icon}</span>${label}
     </button>
   `;
-  const navItems = [];
-  if (canAccessApp(state.currentUser, 'dashboard')) navItems.push(navItem('dashboard','🏠','Dashboard'));
-  if (canAccessApp(state.currentUser, 'qtask')) navItems.push(navItem('qtask','📋','QTask'));
-  if (canAccessApp(state.currentUser, 'qfin')) navItems.push(navItem('qfin','💰','QFinance'));
-  if (canAccessApp(state.currentUser, 'qsales')) navItems.push(navItem('qsales','🎯','QSales'));
-  if (canAccessApp(state.currentUser, 'qaff')) navItems.push(navItem('qaff','🤝','QAffiliator'));
   return `
     <aside class="sidebar">
       <div class="sidebar-brand">
@@ -1223,7 +1129,11 @@ function sidebarHTML(){
         </div>
       </div>
       <nav class="sidebar-nav">
-        ${navItems.join('')}
+        ${navItem('dashboard','🏠','Dashboard')}
+        ${navItem('qtask','📋','QTask')}
+        ${navItem('qfin','💰','QFinance')}
+        ${navItem('qsales','🎯','QSales')}
+        ${navItem('qaff','🤝','QAffiliator')}
       </nav>
       <div class="sidebar-fab">
         <button data-action="open-add" data-mode="task">＋ Tambah Tugas</button>
@@ -1237,19 +1147,16 @@ function bottomNavHTML(){
       <span class="navicon">${icon}</span>${label}
     </button>
   `;
-  const navItems = [];
-  if (canAccessApp(state.currentUser, 'dashboard')) navItems.push(item('dashboard','🏠','Beranda'));
-  if (canAccessApp(state.currentUser, 'qtask')) navItems.push(item('qtask','📋','QTask'));
-  const fabHTML = `<div class="navitem-fab"><button class="fab-circle" data-action="open-add" data-mode="task" title="Tambah">＋</button></div>`;
-  const navItems2 = [];
-  if (canAccessApp(state.currentUser, 'qfin')) navItems2.push(item('qfin','💰','Fin'));
-  if (canAccessApp(state.currentUser, 'qsales')) navItems2.push(item('qsales','🎯','Sales'));
-  if (canAccessApp(state.currentUser, 'qaff')) navItems2.push(item('qaff','🤝','Aff'));
   return `
     <nav class="bottomnav">
-      ${navItems.join('')}
-      ${fabHTML}
-      ${navItems2.join('')}
+      ${item('dashboard','🏠','Beranda')}
+      ${item('qtask','📋','QTask')}
+      <div class="navitem-fab">
+        <button class="fab-circle" data-action="open-add" data-mode="task" title="Tambah">＋</button>
+      </div>
+      ${item('qfin','💰','Fin')}
+      ${item('qsales','🎯','Sales')}
+      ${item('qaff','🤝','Aff')}
     </nav>
   `;
 }
@@ -1284,7 +1191,7 @@ function dashboardHTML(){
 
     <div class="section-title">Aplikasi Tersedia</div>
     <div class="app-grid">
-      ${APPS.filter(app => canAccessApp(state.currentUser, app.id)).map(app=>`
+      ${APPS.map(app=>`
         <div class="app-card ${app.status==='live'?'active-app':''}" data-action="switch-app" data-app="${app.id}">
           <div class="app-icon ${app.color}">${app.icon}</div>
           <div class="app-info">
@@ -1321,12 +1228,11 @@ function dashboardHTML(){
    ============================================================ */
 function qtaskHomeHTML(){
   const emp = findEmp(state.currentUser);
-  const allMyTasks = filterTasksByUser(tasksOf(state.currentUser), state.currentUser);
-  const myTasks = allMyTasks.filter(t=>t.status==='aktif');
+  const myTasks = tasksOf(state.currentUser).filter(t=>t.status==='aktif');
   const myDue = myTasks.filter(isDue);
   const spv = hasTeamView(state.currentUser);
   const teamIds = spv ? TEAM_OF[state.currentUser].filter(id=>id!==state.currentUser) : [];
-  const teamDue = teamIds.flatMap(id => filterTasksByUser(tasksOf(id), state.currentUser).filter(t=>t.status==='aktif' && isDue(t)));
+  const teamDue = teamIds.flatMap(id => tasksOf(id).filter(t=>t.status==='aktif' && isDue(t)));
   const m = state.data.meeting;
   const nextMeeting = nextWeekdayDate(m.weekday, m.hour, m.minute);
   const daysToMeeting = Math.ceil((nextMeeting - new Date()) / 86400000);
@@ -1377,7 +1283,7 @@ function qtaskHomeHTML(){
   `;
 }
 function qtaskTasksHTML(){
-  const all = filterTasksByUser(tasksOf(state.currentUser), state.currentUser);
+  const all = tasksOf(state.currentUser);
   const aktifCount = all.filter(t=>t.status==='aktif').length;
   const selesaiCount = all.length - aktifCount;
   return `
@@ -1389,7 +1295,7 @@ function qtaskTasksHTML(){
 function qtaskTeamHTML(){
   const memberIds = TEAM_OF[state.currentUser] || [state.currentUser];
   const crossDept = findEmp(state.currentUser).role === 'owner';
-  const allTasksRaw = memberIds.flatMap(id => filterTasksByUser(tasksOf(id), state.currentUser));
+  const allTasksRaw = memberIds.flatMap(id => tasksOf(id));
   const allTasks = applyFilter(allTasksRaw);
   const aktif = allTasks.filter(t=>t.status==='aktif');
   const due = aktif.filter(isDue);
@@ -1411,7 +1317,7 @@ function qtaskReportHTML(){
   const crossDept = findEmp(state.currentUser).role === 'owner';
   const memberIds = spv ? TEAM_OF[state.currentUser] : [state.currentUser];
   const scopeIds = spv ? TEAM_OF[state.currentUser] : [state.currentUser];
-  const tasks = applyFilter(scopeIds.flatMap(id=>filterTasksByUser(tasksOf(id), state.currentUser)).filter(t=>t.status==='aktif'));
+  const tasks = applyFilter(scopeIds.flatMap(id=>tasksOf(id)).filter(t=>t.status==='aktif'));
   const ongoingTasks = tasks.filter(t=>latestProgressStatus(t.id)==='ongoing');
   const stopTasks = tasks.filter(t=>latestProgressStatus(t.id)==='stop');
   const noProgressTasks = tasks.filter(t=>!latestProgressStatus(t.id));
@@ -1589,7 +1495,6 @@ function qsalesSubNavHTML(){
   return `
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
       ${tabBtn('dashboard','📊 Dashboard')}
-      ${tabBtn('kpi','📈 KPI')}
       ${tabBtn('leads','🎯 Leads')}
       ${tabBtn('kunjungan','📅 Kunjungan')}
     </div>
@@ -1620,12 +1525,12 @@ function qsalesDashboardHTML(){
       </div>
     `;
   }
-  let d = state.qsalesData;
+  const d = state.qsalesData;
   if (!d){
     fetchQSalesData();
     return `<div class="empty-state"><p>Memuat data QSales...</p></div>`;
   }
-  d = filterQSalesByUser(d, state.currentUser);
+
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
 
   return `
@@ -1684,186 +1589,6 @@ function qsalesDashboardHTML(){
   `;
 }
 
-/* ---------- KPI Sales ---------- */
-let kpiState = {
-  data: null,
-  loading: false,
-  error: null
-};
-
-async function fetchSalesKPI(){
-  if (kpiState.loading) return;
-  kpiState.loading = true;
-  kpiState.error = null;
-  render();
-  try {
-    const result = await apiCall('qsales_getKPI');
-    kpiState.data = result;
-    kpiState.loading = false;
-  } catch(e) {
-    kpiState.loading = false;
-    kpiState.error = e.message || 'Gagal memuat KPI Sales';
-    showToast('KPI: ' + kpiState.error);
-  }
-  render();
-}
-
-function qsalesKPIHTML(){
-  if (kpiState.loading){
-    return `
-      <div class="greeting">📈 KPI Sales Performance</div>
-      <div class="greeting-sub">Menghitung kunjungan harian, mingguan & bulanan...</div>
-      <div class="empty-state"><span class="icon">⏳</span>Memuat data KPI...</div>
-    `;
-  }
-  if (kpiState.error){
-    return `
-      <div class="greeting">📈 KPI Sales Performance</div>
-      <div class="greeting-sub">Gagal memuat data</div>
-      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
-        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;"><b>⚠ Error:</b> ${escapeHTML(kpiState.error)}</div>
-        <button class="btn btn-primary" data-action="kpi-refresh">🔄 Coba Lagi</button>
-      </div>
-    `;
-  }
-  let d = kpiState.data;
-  if (!d) {
-    fetchSalesKPI();
-    return `<div class="empty-state"><p>Memuat KPI Sales...</p></div>`;
-  }
-  d = filterKPIByUser(d, state.currentUser);
-  const s = d.summary;
-  const dayClass = s.daysAchievementRate >= 80 ? 'achieved' : s.daysAchievementRate >= 50 ? 'warning' : 'danger';
-  const weekClass = s.weeksAchievementRate >= 80 ? 'achieved' : s.weeksAchievementRate >= 50 ? 'warning' : 'danger';
-  const monthClass = s.monthsAchievementRate >= 80 ? 'achieved' : s.monthsAchievementRate >= 50 ? 'warning' : 'danger';
-
-  const recentDaily = d.daily.slice(-14);
-  const dailyRows = recentDaily.map(day => {
-    const barW = day.target > 0 ? Math.min(100, (day.totalVisit / day.target * 100)) : 0;
-    return `
-      <tr>
-        <td><strong>${day.date}</strong>${day.isWorkingDay ? '' : ' <span style="font-size:10px;color:var(--ink-faint);">(Libur)</span>'}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-weight:700;min-width:20px;">${day.totalVisit}</span>
-            <div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden;max-width:60px;">
-              <div style="width:${barW}%;height:100%;background:${day.status==='TERCAPAI'?'var(--success)':'var(--accent)'};border-radius:3px;"></div>
-            </div>
-          </div>
-        </td>
-        <td style="font-size:11px;"><span style="color:#4a90d9;">${day.visit1}</span> / <span style="color:#f5a623;">${day.visit2}</span> / <span style="color:#7ed321;">${day.visit3}</span></td>
-        <td><span class="badge ${day.status==='TERCAPAI'?'badge-done':'badge-overdue'}" style="font-size:10px;">${day.status}</span></td>
-        <td style="text-align:right;">${day.gap > 0 ? '<span style="color:var(--danger);font-size:12px;">-' + day.gap + '</span>' : '<span style="color:var(--success);">✓</span>'}</td>
-      </tr>
-    `;
-  }).join('');
-
-  const weeklyRows = d.weekly.map(w => `
-    <tr>
-      <td><strong>${w.week}</strong></td>
-      <td style="font-weight:700;">${w.totalVisit}</td>
-      <td><span class="badge ${w.status==='TERCAPAI'?'badge-done':'badge-overdue'}" style="font-size:10px;">${w.status}</span></td>
-      <td style="text-align:right;">${w.gap > 0 ? '<span style="color:var(--danger);font-size:12px;">-' + w.gap + '</span>' : '<span style="color:var(--success);">✓</span>'}</td>
-      <td>
-        ${w.bySales.map(bs => `
-          <div style="font-size:11px;margin-bottom:2px;">
-            <span style="font-weight:600;">${bs.sales}:</span> ${bs.count}
-            <span class="badge ${bs.status==='TERCAPAI'?'badge-done':'badge-due'}" style="font-size:9px;padding:1px 5px;">${bs.status}</span>
-          </div>
-        `).join('')}
-      </td>
-    </tr>
-  `).join('');
-
-  const monthlyRows = d.monthly.map(m => `
-    <tr>
-      <td><strong>${m.monthName}</strong></td>
-      <td style="font-weight:700;">${m.totalVisit}</td>
-      <td>${m.workingDays} hari</td>
-      <td>${m.target}</td>
-      <td><span class="badge ${m.status==='TERCAPAI'?'badge-done':'badge-overdue'}" style="font-size:10px;">${m.status}</span></td>
-      <td style="text-align:right;">${m.gap > 0 ? '<span style="color:var(--danger);font-size:12px;">-' + m.gap + '</span>' : '<span style="color:var(--success);">✓</span>'}</td>
-      <td>
-        ${m.bySales.map(bs => `
-          <div style="font-size:11px;margin-bottom:2px;">
-            <span style="font-weight:600;">${bs.sales}:</span> ${bs.count}
-          </div>
-        `).join('')}
-      </td>
-    </tr>
-  `).join('');
-
-  return `
-    <div class="greeting">📈 KPI Sales Performance</div>
-    <div class="greeting-sub">Target: ${d.dailyTarget} visit/hari · ${d.weeklyTarget} visit/minggu · ${d.workDaysDescription}</div>
-
-    ${qsalesSubNavHTML()}
-
-    <div class="section-title">Ringkasan Pencapaian</div>
-    <div class="quick-stats">
-      <div class="qstat" style="border-top:3px solid ${dayClass==='achieved'?'var(--success)':dayClass==='warning'?'var(--warning)':'var(--danger)'};">
-        <div class="qnum" style="color:${dayClass==='achieved'?'var(--success)':dayClass==='warning'?'var(--warning)':'var(--danger)'};">${s.daysAchieved}/${s.totalDaysTracked}</div>
-        <div class="qlbl">Hari Tercapai</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.daysAchievementRate}%</div>
-      </div>
-      <div class="qstat" style="border-top:3px solid ${weekClass==='achieved'?'var(--success)':weekClass==='warning'?'var(--warning)':'var(--danger)'};">
-        <div class="qnum" style="color:${weekClass==='achieved'?'var(--success)':weekClass==='warning'?'var(--warning)':'var(--danger)'};">${s.weeksAchieved}/${s.totalWeeksTracked}</div>
-        <div class="qlbl">Minggu Tercapai</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.weeksAchievementRate}%</div>
-      </div>
-      <div class="qstat" style="border-top:3px solid ${monthClass==='achieved'?'var(--success)':monthClass==='warning'?'var(--warning)':'var(--danger)'};">
-        <div class="qnum" style="color:${monthClass==='achieved'?'var(--success)':monthClass==='warning'?'var(--warning)':'var(--danger)'};">${s.monthsAchieved}/${s.totalMonthsTracked}</div>
-        <div class="qlbl">Bulan Tercapai</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">${s.monthsAchievementRate}%</div>
-      </div>
-      <div class="qstat" style="border-top:3px solid var(--accent);">
-        <div class="qnum" style="color:var(--accent-dark);">${d.dailyTarget}</div>
-        <div class="qlbl">Target/Hari</div>
-        <div style="font-size:11px;margin-top:4px;color:var(--ink-soft);">6 hari/mg</div>
-      </div>
-    </div>
-
-    <div class="card" style="background:var(--accent-soft); border-color:var(--accent); margin-bottom:16px;">
-      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💰 Info Upah Harian Sales</div>
-      <p style="font-size:13px; color:var(--ink-soft); margin:0; line-height:1.5;">
-        Sales bekerja <b>6 hari/minggu (Senin–Sabtu)</b>. Jumlah hari kerja per bulan otomatis dihitung dari kalender (exclude Minggu).<br>
-        <b>Rumus:</b> Upah Harian = Total Gaji Bulanan ÷ Jumlah Hari Kerja (Senin–Sabtu) pada bulan tersebut.<br>
-        <span style="font-size:11px; color:var(--ink-faint);">Contoh: Juli 2026 = ${d.monthly && d.monthly[0] ? d.monthly[0].workingDays : 27} hari kerja. Jika gaji Rp 5.000.000 → Upah harian ≈ Rp ${d.monthly && d.monthly[0] ? Math.round(5000000 / d.monthly[0].workingDays).toLocaleString('id-ID') : '-'}</span>
-      </p>
-    </div>
-
-    <div class="section-title">📅 KPI Harian (14 hari terakhir)</div>
-    <div class="table-wrap">
-      <table class="task-table" style="min-width:500px;">
-        <thead>
-          <tr><th>Tanggal</th><th>Total Visit</th><th>V1/V2/V3</th><th>Status</th><th>Selisih</th></tr>
-        </thead>
-        <tbody>${dailyRows}</tbody>
-      </table>
-    </div>
-
-    <div class="section-title">📆 KPI Mingguan</div>
-    <div class="table-wrap">
-      <table class="task-table" style="min-width:500px;">
-        <thead>
-          <tr><th>Minggu</th><th>Total Visit</th><th>Status</th><th>Selisih</th><th>Detail Sales</th></tr>
-        </thead>
-        <tbody>${weeklyRows}</tbody>
-      </table>
-    </div>
-
-    <div class="section-title">🗓️ KPI Bulanan & Hari Kerja</div>
-    <div class="table-wrap">
-      <table class="task-table" style="min-width:600px;">
-        <thead>
-          <tr><th>Bulan</th><th>Total Visit</th><th>Hari Kerja</th><th>Target</th><th>Status</th><th>Selisih</th><th>Detail Sales</th></tr>
-        </thead>
-        <tbody>${monthlyRows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
 function qsalesShopListHTML(shops){
   if (!shops.length){
     return `<div class="empty-state"><span class="icon">🗂️</span>Belum ada data coffee shop.</div>`;
@@ -1896,9 +1621,8 @@ function qsalesShopListHTML(shops){
 }
 
 function qsalesLeadsHTML(){
-  let d = state.qsalesData;
+  const d = state.qsalesData;
   if (!d) return `<div class="empty-state">Memuat...</div>`;
-  d = filterQSalesByUser(d, state.currentUser);
   const needFollowUp = (d.shops || []).filter(s => s.status !== 'stop' && s.status !== 'closing');
   return `
     <div class="greeting">Daftar Leads</div>
@@ -2193,10 +1917,6 @@ function render(){
     return;
   }
   let body = '';
-  if (!canAccessApp(state.currentUser, state.appTab)) {
-    state.appTab = 'dashboard';
-    showToast('Akses ditolak: Redirect ke Dashboard');
-  }
   if (state.appTab === 'dashboard'){
     body = dashboardHTML();
   } else if (state.appTab === 'qtask'){
@@ -2211,7 +1931,6 @@ function render(){
     body = mockupHTML('qfin');
   } else if (state.appTab === 'qsales'){
     if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
-    else if (state.qsalesTab === 'kpi') body = qsalesKPIHTML();
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
     else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
     else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
@@ -2289,12 +2008,7 @@ document.addEventListener('click', function(e){
     });
   }
   else if (el.dataset.action === 'switch-app'){
-    const targetApp = el.dataset.app;
-    if (!canAccessApp(state.currentUser, targetApp)) {
-      showToast('Akses ditolak: Anda tidak memiliki izin untuk modul ini');
-      return;
-    }
-    state.appTab = targetApp;
+    state.appTab = el.dataset.app;
     if (state.appTab === 'qsales' && !state.qsalesData && !state.qsalesLoading) {
       fetchQSalesData();
     }
@@ -2379,20 +2093,12 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'switch-qsales-tab'){
     state.qsalesTab = el.dataset.tab;
-    if (state.qsalesTab === 'kpi' && !kpiState.data && !kpiState.loading) {
-      fetchSalesKPI();
-    }
     render();
   }
   else if (el.dataset.action === 'qsales-refresh'){
     state.qsalesError = null;
     state.qsalesData = null;
     fetchQSalesData();
-  }
-  else if (el.dataset.action === 'kpi-refresh'){
-    kpiState.error = null;
-    kpiState.data = null;
-    fetchSalesKPI();
   }
   else if (el.dataset.action === 'reset-filter'){
     state.filter = { dept:'all', nama:'all' };
