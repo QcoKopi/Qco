@@ -446,6 +446,12 @@ async function gsFetch(fnName, ...args){
     params.set('userId', args[0]);
     params.set('newPin', args[1]);
   }
+  else if (fnName === 'addEmployee') {
+    params.set('payload', JSON.stringify(args[0]));
+  }
+  else if (fnName === 'deleteEmployee') {
+    params.set('userId', args[0]);
+  }
   else if (fnName === 'toggleTaskStatus') {
     params.set('taskId', args[0]);
   }
@@ -550,7 +556,10 @@ const APPS = [
 
 
 
-function findEmp(id){ return EMPLOYEES.find(e=>e.id===id); }
+function findEmp(id){ 
+  const pool = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : EMPLOYEES;
+  return pool.find(e=>e.id===id); 
+}
 function isSpv(id){ const e=findEmp(id); return !!e && e.role==='spv'; }
 function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || e.role==='owner'); }
 
@@ -1043,7 +1052,8 @@ function applyFilter(tasks){
    RENDER — Login Screen
    ============================================================ */
 function loginScreenHTML(){
-  const empOptions = EMPLOYEES.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
+  const emps = getEmployees();
+  const empOptions = emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
   return `
     <div class="login-wrap" style="position:relative;">
       <div class="login-brand">
@@ -1371,6 +1381,32 @@ function qtaskSettingsHTML(){
       </div>
     </div>
 
+    ${emp.role==='owner' ? `
+    <div class="section-title">👥 Manajemen Staff</div>
+    <div class="card">
+      <div style="margin-bottom:12px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Daftar Staff (${getEmployees().length} orang)</div>
+        <div class="table-wrap" style="max-height:300px;overflow-y:auto;">
+          <table class="task-table" style="min-width:0;">
+            <thead><tr><th>Nama</th><th>Jabatan</th><th>Dept</th><th>Role</th><th></th></tr></thead>
+            <tbody>
+              ${getEmployees().map(e=>`
+                <tr>
+                  <td style="font-weight:600;">${e.name}</td>
+                  <td>${e.jabatan}</td>
+                  <td><span class="badge badge-dept-${e.dept}">${DEPT_NAMES[e.dept]}</span></td>
+                  <td>${e.role}</td>
+                  <td><button class="btn btn-danger-ghost btn-sm" data-action="delete-employee" data-id="${e.id}" ${e.id===state.currentUser?'disabled':''}>🗑️</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" data-action="open-add-employee">＋ Tambah Staff Baru</button>
+    </div>
+    ` : ''}
+
     <div class="section-title">Jadwal Progress Meeting</div>
     <div class="card">
       <div class="settings-row">
@@ -1491,6 +1527,56 @@ function qtaskSubNavHTML(){
 function modalHTML(){
   if (!state.modal.open) return '';
   const mode = state.modal.mode;
+
+  // Add Employee modal
+  if (mode === 'addEmployee') {
+    return `
+    <div class="sheet-overlay" data-action="overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>＋ Tambah Staff Baru</h3>
+          <button class="sheet-close" data-action="close-modal">✕</button>
+        </div>
+        <form id="form-employee">
+          <div class="field">
+            <label>ID Staff (unique, lowercase, no space)</label>
+            <input type="text" name="emp-id" placeholder="contoh: budi" required pattern="[a-z0-9_]+" style="text-transform:lowercase;">
+            <div class="hint">Digunakan untuk login. Contoh: budi, agus, dina</div>
+          </div>
+          <div class="field">
+            <label>Nama Lengkap</label>
+            <input type="text" name="emp-name" placeholder="Contoh: Budi Santoso" required>
+          </div>
+          <div class="field">
+            <label>Jabatan</label>
+            <input type="text" name="emp-jabatan" placeholder="Contoh: Sales Representative" required>
+          </div>
+          <div class="field">
+            <label>Departemen</label>
+            <select name="emp-dept" required>
+              <option value="sm">Sales & Marketing</option>
+              <option value="po">Produk Development & Operasional</option>
+              <option value="mgmt">Manajemen</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <div class="segmented">
+              <input type="radio" name="emp-role" id="role-staff" value="staff" checked>
+              <label for="role-staff">Staff</label>
+              <input type="radio" name="emp-role" id="role-spv" value="spv">
+              <label for="role-spv">Supervisor</label>
+              <input type="radio" name="emp-role" id="role-owner" value="owner">
+              <label for="role-owner">Owner</label>
+            </div>
+          </div>
+          <div class="hint" style="margin-bottom:14px;">PIN default staff baru adalah <b>1234</b>. Staff dapat mengganti PIN setelah login.</div>
+          <button type="submit" class="btn btn-primary btn-block">Simpan Staff Baru</button>
+        </form>
+      </div>
+    </div>`;
+  }
 
   // PIN Change modal
   if (mode === 'pin') {
@@ -1735,6 +1821,23 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'open-pin-modal'){
     openModal('pin');
   }
+  else if (el.dataset.action === 'open-add-employee'){
+    openModal('addEmployee');
+  }
+  else if (el.dataset.action === 'delete-employee'){
+    const id = el.dataset.id;
+    if (!id) return;
+    if (!confirm('Hapus staff ' + (findEmp(id)||{}).name + '?')) return;
+    showToast('Menghapus…');
+    apiCall('deleteEmployee', id).then(data=>{
+      state.data = data;
+      state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+      render();
+      showToast('Staff dihapus');
+    }).catch(err=>{
+      showToast('Gagal: ' + (err.message || 'Coba lagi'));
+    });
+  }
   else if (el.dataset.action === 'close-modal'){
     closeModal();
   }
@@ -1827,7 +1930,31 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-pin'){
+  if (e.target.id === 'form-employee'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const emp = {
+      id: String(fd.get('emp-id')||'').trim().toLowerCase().replace(/\s+/g,''),
+      name: String(fd.get('emp-name')||'').trim(),
+      jabatan: String(fd.get('emp-jabatan')||'').trim(),
+      dept: fd.get('emp-dept') || 'sm',
+      role: fd.get('emp-role') || 'staff',
+    };
+    if (!emp.id || !/^[a-z0-9_]+$/.test(emp.id)) { showToast('ID hanya huruf kecil, angka, underscore'); return; }
+    if (!emp.name) { showToast('Nama wajib diisi'); return; }
+    if (!emp.jabatan) { showToast('Jabatan wajib diisi'); return; }
+    closeModal();
+    showToast('Menyimpan staff…');
+    apiCall('addEmployee', emp).then(data=>{
+      state.data = data;
+      state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+      render();
+      showToast('Staff ' + emp.name + ' ditambahkan (PIN: 1234)');
+    }).catch(err=>{
+      showToast('Gagal: ' + (err.message || 'ID mungkin sudah ada'));
+    });
+  }
+  else if (e.target.id === 'form-pin'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const oldPin = String(fd.get('old-pin')||'').trim();
@@ -1916,6 +2043,16 @@ async function init(){
   render();
 }
 init();
+
+// Helper: get active employees (from GAS data or fallback)
+function getEmployees(){
+  return (state.data && state.data.employees && state.data.employees.length) 
+    ? state.data.employees 
+    : EMPLOYEES;
+}
+function findEmpDynamic(id){ 
+  return getEmployees().find(e=>e.id===id); 
+}
 </script>
 </body>
 </html>
