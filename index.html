@@ -1,0 +1,1828 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QSystem — Integrated Business Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F7F2EA;
+    --surface:#FFFFFF;
+    --surface-alt:#F0E6D6;
+    --ink:#2B1D14;
+    --ink-soft:#78685A;
+    --ink-faint:#A79683;
+    --accent:#B4732E;
+    --accent-dark:#8A5620;
+    --accent-soft:#F1DEC0;
+    --sm:#B4732E;
+    --sm-soft:#F1DEC0;
+    --po:#5F7A4F;
+    --po-soft:#DEE7D4;
+    --success:#5F7A4F;
+    --success-soft:#DEE7D4;
+    --warning:#C07A17;
+    --warning-soft:#F5E1BE;
+    --danger:#A23E2A;
+    --danger-soft:#F1DBD3;
+    --line:#E6DACB;
+    --shadow: 0 1px 2px rgba(43,29,20,.06), 0 6px 20px -8px rgba(43,29,20,.18);
+    --radius:14px;
+    --radius-sm:10px;
+    --topbar-h:64px;
+    --nav-h:68px;
+    --font-display:'Fraunces', Georgia, serif;
+    --font-body:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono:'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    --sidebar-w:260px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:linear-gradient(180deg,#EFE6D6 0%,var(--bg) 220px);
+    color:var(--ink);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);position:relative;display:flex;flex-direction:column;}
+  @media (min-width:560px){
+    body{padding:24px 0;}
+    #app{min-height:calc(100vh - 48px); border-radius:28px; box-shadow:0 20px 60px -20px rgba(43,29,20,.35); overflow:hidden;}
+  }
+  @media (min-width:900px){
+    body{padding:0; background:var(--bg);}
+    #app{max-width:100%; min-height:100vh; border-radius:0; box-shadow:none; flex-direction:row;}
+    .sidebar{order:0; position:fixed; left:0; top:0; bottom:0; width:var(--sidebar-w); z-index:30; border-right:1px solid var(--line);}
+    .main-area{order:1; margin-left:var(--sidebar-w); flex:1; min-height:100vh; display:flex; flex-direction:column;}
+    .topbar{position:sticky; top:0;}
+    .content{padding:24px 32px 48px !important; max-width:1040px;}
+    .login-wrap{max-width:460px; margin:0 auto; width:100%;}
+    .table-wrap{min-width:0;}
+    .task-table{min-width:0; width:100%;}
+    .team-summary{max-width:640px;}
+    .app-grid{grid-template-columns:repeat(2,1fr) !important;}
+    .mockup-grid{grid-template-columns:repeat(3,1fr) !important;}
+  }
+  a{color:inherit;}
+  button{font-family:inherit;}
+  h1,h2,h3{font-family:var(--font-display); margin:0; letter-spacing:-0.01em;}
+  p{margin:0;}
+  .hidden{display:none !important;}
+  .muted{color:var(--ink-soft);}
+  .faint{color:var(--ink-faint);}
+  .mono{font-family:var(--font-mono);}
+  .row{display:flex; align-items:center;}
+  .between{justify-content:space-between;}
+  .gap-8{gap:8px;} .gap-6{gap:6px;} .gap-12{gap:12px;} .gap-16{gap:16px;}
+  .wrap{flex-wrap:wrap;}
+  :focus-visible{outline:2px solid var(--accent-dark); outline-offset:2px; border-radius:6px;}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important; transition-duration:.001ms !important;}}
+
+  /* ---------- Sidebar (desktop) ---------- */
+  .sidebar{
+    background:var(--surface);
+    display:none; flex-direction:column; padding:20px 16px;
+  }
+  @media (min-width:900px){
+    .sidebar{display:flex !important;}
+    .bottomnav{display:none !important;}
+  }
+  .sidebar-brand{display:flex; align-items:center; gap:10px; margin-bottom:28px; padding:0 8px;}
+  .sidebar-brand .brand-mark{width:36px; height:36px; border-radius:10px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:18px; color:#231508;}
+  .sidebar-brand .brand-name{font-family:var(--font-display); font-weight:700; font-size:20px;}
+  .sidebar-brand .brand-sub{font-size:10px; color:var(--ink-faint); letter-spacing:.04em; text-transform:uppercase; margin-top:1px;}
+  .sidebar-nav{flex:1; display:flex; flex-direction:column; gap:4px;}
+  .sidebar-item{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px;
+    border:none; background:none; color:var(--ink-soft); font-size:13.5px; font-weight:600; cursor:pointer; width:100%; text-align:left;
+  }
+  .sidebar-item:hover{background:var(--surface-alt);}
+  .sidebar-item.active{background:var(--accent-soft); color:var(--accent-dark);}
+  .sidebar-item .navicon{font-size:18px;}
+  .sidebar-fab{
+    margin-top:auto; padding:16px 8px 8px;
+  }
+  .sidebar-fab button{
+    width:100%; background:var(--accent); color:#2A1707; border:none; border-radius:10px; padding:11px; font-weight:700; font-size:13.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .sidebar-fab button:hover{background:var(--accent-dark); color:#fff;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    height:var(--topbar-h);
+    background:var(--ink);
+    color:#F7EFE2;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 16px;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px;
+    background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-weight:700; font-size:16px; color:#231508;
+  }
+  .brand-name{font-family:var(--font-display); font-weight:700; font-size:19px; line-height:1;}
+  .brand-sub{font-size:10.5px; color:#C9B79C; letter-spacing:.04em; text-transform:uppercase; margin-top:2px;}
+  .topbar-right{display:flex; align-items:center; gap:10px;}
+  .sync-pill{
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; padding:5px 9px; border-radius:99px;
+    background:rgba(255,255,255,.08); color:#E9DCC8; cursor:pointer; border:none;
+  }
+  .sync-dot{width:7px; height:7px; border-radius:50%; background:var(--ink-faint); flex:none;}
+  .sync-pill.synced .sync-dot{background:#8CB16E;}
+  .sync-pill.offline .sync-dot{background:#E0A15C;}
+  .sync-pill.syncing .sync-dot{background:#E9DCC8; animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .avatar{
+    width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent-dark);
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none;
+    border:none; cursor:pointer;
+  }
+
+  /* ---------- Content ---------- */
+  .content{flex:1; padding:16px 16px calc(var(--nav-h) + 24px); overflow-y:auto;}
+  .section-title{font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:22px 0 10px;}
+  .section-title:first-child{margin-top:2px;}
+  .greeting{font-size:23px; margin:4px 0 2px;}
+  .greeting-sub{font-size:13.5px; color:var(--ink-soft); margin-bottom:16px;}
+
+  /* ---------- Cards ---------- */
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:12px; box-shadow:var(--shadow);
+  }
+  .card-hero{
+    background:linear-gradient(135deg, var(--ink) 0%, #3A2A1C 100%);
+    color:#F7EFE2; border:none;
+  }
+  .card-hero .muted{color:#C9B79C;}
+  .hero-row{display:flex; align-items:flex-end; justify-content:space-between; gap:12px;}
+  .hero-big{font-family:var(--font-mono); font-size:34px; font-weight:500; line-height:1;}
+  .hero-label{font-size:12.5px; color:#C9B79C; margin-top:6px;}
+
+  .empty-state{
+    text-align:center; padding:34px 16px; color:var(--ink-soft);
+    background:var(--surface-alt); border-radius:var(--radius); border:1px dashed var(--line);
+  }
+  .empty-state .icon{font-size:26px; margin-bottom:8px; display:block;}
+
+  /* ---------- Badges ---------- */
+  .badge{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:99px; white-space:nowrap;}
+  .badge-reguler{background:var(--po-soft); color:var(--po);}
+  .badge-insidentil{background:var(--sm-soft); color:var(--accent-dark);}
+  .badge-due{background:var(--warning-soft); color:var(--warning);}
+  .badge-alert{background:var(--danger); color:#fff; animation:none;}
+  .badge-overdue{background:var(--danger-soft); color:var(--danger);}
+  .badge-done{background:var(--success-soft); color:var(--success);}
+  .badge-dept-sm{background:var(--sm-soft); color:var(--sm);}
+  .badge-dept-po{background:var(--po-soft); color:var(--po);}
+  .badge-active{background:var(--surface-alt); color:var(--ink-soft);}
+  .badge-ongoing{background:var(--po-soft); color:var(--po);}
+  .badge-stop{background:var(--danger-soft); color:var(--danger);}
+  .badge-mockup{background:linear-gradient(135deg,#E6DACB,#F0E6D6); color:var(--ink-soft); border:1px dashed var(--ink-faint);}
+
+  /* ---------- Task table ---------- */
+  .table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); margin-bottom:10px; -webkit-overflow-scrolling:touch;}
+  .task-table{width:100%; min-width:600px; border-collapse:collapse; font-size:12.5px;}
+  .task-table th{
+    background:var(--surface-alt); text-align:left; padding:9px 11px; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:700;
+    position:sticky; top:0; white-space:nowrap; z-index:1;
+  }
+  .task-table td{padding:9px 11px; border-top:1px solid var(--line); vertical-align:top;}
+  .task-table tr.task-row{cursor:pointer;}
+  .task-table tr.task-row:hover td{background:var(--surface-alt);}
+  .task-table tr.task-row.is-due td{background:#FBF3E4;}
+  .task-table tr.task-row.is-overdue td{background:#FBEAE4;}
+  .task-table td.col-task{font-weight:600; max-width:190px; white-space:normal; word-break:break-word; line-height:1.35;}
+  .task-table td.col-progress{max-width:190px; color:var(--ink-soft); position:relative;}
+  .task-table .cell-truncate{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;}
+  .task-table td.col-progress .cell-truncate{padding-right:14px;}
+  .task-table .chev{position:absolute; right:8px; top:9px; color:var(--ink-faint); font-size:12px;}
+  .task-detail-row td{background:var(--surface-alt); padding:14px 12px; border-top:none;}
+
+  /* ---------- Buttons ---------- */
+  .btn{
+    border:none; border-radius:10px; padding:10px 16px; font-weight:600; font-size:14px;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-primary{background:var(--accent); color:#2A1707;}
+  .btn-primary:hover{background:var(--accent-dark);}
+  .btn-ghost{background:transparent; color:var(--ink); border:1px solid var(--line);}
+  .btn-danger-ghost{background:transparent; color:var(--danger); border:1px solid var(--danger-soft);}
+  .btn-sm{padding:7px 11px; font-size:12.5px; border-radius:8px;}
+  .btn-block{width:100%;}
+  .btn:disabled{opacity:.5; cursor:default;}
+
+  /* ---------- Task card ---------- */
+  .task-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:10px;}
+  .task-card.is-due{border-color:#E6C68E;}
+  .task-card.is-overdue{border-color:#DBAA9B;}
+  .task-title{font-size:15px; font-weight:600; margin:2px 0 6px;}
+  .task-owner{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
+  .task-badges{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;}
+  .task-note{font-size:13px; color:var(--ink-soft); background:var(--surface-alt); padding:8px 10px; border-radius:8px; margin:8px 0;}
+  .task-actions{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .history{margin-top:10px; border-top:1px dashed var(--line); padding-top:10px;}
+  .history-item{font-size:12.5px; padding:6px 0; border-bottom:1px solid var(--line);}
+  .task-note a, .history-item a{color:var(--accent-dark); font-weight:600;}
+  .history-item:last-child{border-bottom:none;}
+  .history-date{font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); display:block; margin-bottom:2px;}
+
+  /* ---------- Bottom nav (mobile) ---------- */
+  .bottomnav{
+    position:sticky; bottom:0; z-index:20;
+    height:var(--nav-h); background:var(--surface); border-top:1px solid var(--line);
+    display:flex; align-items:stretch; padding:0 6px;
+  }
+  .navitem{
+    flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; color:var(--ink-faint); font-size:10.5px; font-weight:600; cursor:pointer; padding:4px 0;
+  }
+  .navitem .navicon{font-size:19px;}
+  .navitem.active{color:var(--accent-dark);}
+  .navitem-fab{flex:none; width:54px; margin-top:-22px;}
+  .fab-circle{
+    width:54px; height:54px; border-radius:50%; background:var(--accent); color:#2A1707;
+    display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 8px 16px -4px rgba(180,115,46,.55);
+    border:3px solid var(--surface);
+  }
+
+  /* ---------- Sheet / Modal ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(43,29,20,.45); z-index:40;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  @media (min-width:560px){.sheet-overlay{align-items:center;}}
+  .sheet{
+    background:var(--surface); width:100%; max-width:480px; max-height:88vh; overflow-y:auto;
+    border-radius:20px 20px 0 0; padding:18px 18px calc(env(safe-area-inset-bottom,0) + 20px);
+    animation:slideup .22s ease-out;
+  }
+  @media (min-width:560px){.sheet{border-radius:20px; margin-bottom:0;}}
+  @keyframes slideup{from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:99px; margin:0 auto 14px;}
+  .sheet-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .sheet-close{background:var(--surface-alt); border:none; width:30px; height:30px; border-radius:50%; font-size:15px; cursor:pointer; color:var(--ink-soft);}
+  .modetabs{display:flex; background:var(--surface-alt); border-radius:10px; padding:3px; margin-bottom:16px;}
+  .modetab{flex:1; text-align:center; padding:8px; border-radius:8px; border:none; background:none; font-weight:600; font-size:13px; color:var(--ink-soft); cursor:pointer;}
+  .modetab.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+
+  /* ---------- Forms ---------- */
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px;}
+  .field input[type=text],.field input[type=date],.field select,.field textarea{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
+    font-family:inherit; font-size:14.5px; background:var(--surface); color:var(--ink);
+  }
+  .field textarea{resize:vertical; min-height:76px;}
+  .hint{font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .segmented{display:flex; gap:8px;}
+  .segmented input{position:absolute; opacity:0; pointer-events:none;}
+  .segmented label{
+    flex:1; text-align:center; padding:10px 8px; border:1.5px solid var(--line); border-radius:10px;
+    font-weight:600; font-size:13.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .segmented input:checked + label{border-color:var(--accent); background:var(--accent-soft); color:var(--accent-dark);}
+  .dept-display{font-size:13px; padding:8px 10px; background:var(--surface-alt); border-radius:8px; display:inline-flex; gap:6px; align-items:center;}
+
+  /* ---------- Login screen ---------- */
+  .login-wrap{min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:32px 24px;}
+  .login-brand{text-align:center; margin-bottom:34px;}
+  .login-brand .brand-mark{width:56px; height:56px; font-size:26px; margin:0 auto 12px;}
+  .login-brand h1{font-size:27px;}
+  .login-brand p{color:var(--ink-soft); font-size:13.5px; margin-top:6px;}
+  .login-dept-label{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin:18px 0 8px;}
+  .login-btn{
+    width:100%; text-align:left; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:13px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; box-shadow:var(--shadow);
+  }
+  .login-btn .name{font-weight:600; font-size:15px;}
+  .login-btn .role{font-size:11px; color:var(--ink-soft);}
+
+  /* ---------- Team recap ---------- */
+  .team-summary{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;}
+  .stat{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 10px; text-align:center;}
+  .stat .num{font-family:var(--font-mono); font-size:22px; font-weight:500;}
+  .stat .lbl{font-size:10.5px; color:var(--ink-soft); margin-top:2px;}
+  .person-block{margin-bottom:20px;}
+  .person-head{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .person-head .avatar{width:26px; height:26px; font-size:11px;}
+  .person-head .pname{font-weight:700; font-size:14.5px;}
+
+  /* ---------- Toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:calc(var(--nav-h) + 14px); transform:translate(-50%,10px);
+    background:var(--ink); color:#F7EFE2; padding:10px 18px; border-radius:99px; font-size:13px;
+    opacity:0; pointer-events:none; transition:all .22s ease; z-index:60; max-width:88%; text-align:center;
+    box-shadow:0 10px 24px -8px rgba(0,0,0,.4);
+  }
+  .toast.show{opacity:1; transform:translate(-50%,0);}
+
+  .settings-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line);}
+  .settings-row:last-child{border-bottom:none;}
+  select.inline-select{padding:7px 10px; border-radius:8px; border:1px solid var(--line); font-family:inherit; font-size:13px; background:var(--surface);}
+
+  /* ---------- DASHBOARD STAFF ---------- */
+  .profile-card{
+    background:linear-gradient(135deg, var(--ink) 0%, #3A2A1C 100%);
+    color:#F7EFE2; border-radius:var(--radius); padding:20px; margin-bottom:16px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .profile-card .avatar-big{
+    width:56px; height:56px; border-radius:50%; background:var(--accent); color:#231508;
+    display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:22px; flex:none;
+  }
+  .profile-card .p-name{font-family:var(--font-display); font-size:20px; font-weight:700;}
+  .profile-card .p-role{font-size:12.5px; color:#C9B79C; margin-top:2px;}
+  .profile-card .p-dept{font-size:11px; color:#A79683; margin-top:4px; display:inline-block; padding:3px 10px; background:rgba(255,255,255,.08); border-radius:99px;}
+
+  .app-grid{display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:16px;}
+  .app-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+    box-shadow:var(--shadow); transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .app-card:hover{transform:translateY(-2px); box-shadow:0 8px 24px -8px rgba(43,29,20,.2);}
+  .app-card.active-app{border-color:var(--accent); background:linear-gradient(135deg, var(--surface), var(--accent-soft));}
+  .app-icon{
+    width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex:none;
+  }
+  .app-icon.qtask{background:var(--sm-soft); color:var(--sm);}
+  .app-icon.qfin{background:#E8F0FE; color:#1A73E8;}
+  .app-icon.qsales{background:#FCE8E6; color:#C5221F;}
+  .app-icon.qaff{background:#E6F4EA; color:#137333;}
+  .app-info{flex:1;}
+  .app-name{font-weight:700; font-size:15px;}
+  .app-desc{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .app-status{font-size:10.5px; font-weight:700; margin-top:6px; display:inline-block; padding:3px 8px; border-radius:99px;}
+  .app-status.live{background:var(--success-soft); color:var(--success);}
+  .app-status.beta{background:var(--warning-soft); color:var(--warning);}
+  .app-status.soon{background:var(--surface-alt); color:var(--ink-faint);}
+
+  .jobdesk-list{margin:0; padding:0; list-style:none;}
+  .jobdesk-list li{
+    padding:10px 0; border-bottom:1px solid var(--line);
+    display:flex; align-items:flex-start; gap:10px; font-size:13.5px;
+  }
+  .jobdesk-list li:last-child{border-bottom:none;}
+  .jobdesk-list .jd-num{
+    width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent-dark);
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex:none; margin-top:1px;
+  }
+
+  .mockup-hero{
+    text-align:center; padding:48px 24px; background:var(--surface); border-radius:var(--radius); border:1px dashed var(--line); margin-bottom:16px;
+  }
+  .mockup-hero .icon{font-size:48px; margin-bottom:12px; display:block;}
+  .mockup-hero h3{font-size:22px; margin-bottom:6px;}
+  .mockup-hero p{color:var(--ink-soft); font-size:13.5px; max-width:360px; margin:0 auto;}
+  .mockup-grid{display:grid; grid-template-columns:1fr; gap:10px;}
+  .mockup-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px;
+  }
+  .mockup-card .m-icon{font-size:24px; margin-bottom:8px; display:block;}
+  .mockup-card .m-title{font-weight:700; font-size:14px; margin-bottom:4px;}
+  .mockup-card .m-desc{font-size:12px; color:var(--ink-soft);}
+
+  .quick-stats{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:16px;}
+  .qstat{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 10px; text-align:center;}
+  .qstat .qnum{font-family:var(--font-mono); font-size:26px; font-weight:500; color:var(--accent-dark);}
+  .qstat .qlbl{font-size:11px; color:var(--ink-soft); margin-top:4px;}
+</style>
+<base target="_blank">
+<base target="_blank">
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   QSYSTEM — KONFIGURASI
+   ============================================================ */
+const CONFIG = {
+  // GANTI dengan URL deployment Web App GAS Anda
+  // Cara dapat: Deploy GAS → Web app → copy URL
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec',
+};
+
+/* ============================================================
+   API Layer — Dual Mode (GAS native vs GitHub Pages)
+   ============================================================ */
+function isGASNative(){
+  return (typeof google !== 'undefined' && google.script && google.script.run);
+}
+
+function gsNative(fnName, ...args){
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)[fnName].apply(null, args);
+  });
+}
+
+async function gsFetch(fnName, ...args){
+  let payload;
+  if (args.length === 1) payload = args[0];
+  else if (args.length === 2) payload = { key: args[0], value: args[1] };
+  else payload = args.length ? args[0] : undefined;
+
+  const body = payload !== undefined ? { action: fnName, payload: payload } : { action: fnName };
+  if (fnName === 'updateMeetingSetting') {
+    body.key = args[0];
+    body.value = args[1];
+    delete body.payload;
+  }
+
+  const resp = await fetch(CONFIG.GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const json = await resp.json();
+  if (!json.success) throw new Error(json.error || 'API Error');
+  return json.data;
+}
+
+function apiCall(fnName, ...args){
+  if (isGASNative()) {
+    return gsNative(fnName, ...args);
+  } else {
+    return gsFetch(fnName, ...args);
+  }
+}
+
+
+/* ============================================================
+   QSYSTEM — Konfigurasi & Data Master
+   ============================================================ */
+const EMPLOYEES = [
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative', pin:'1234' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist', pin:'1234' },
+  { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor', pin:'1234' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff', pin:'1234' },
+  { id:'umay',  name:'Umay',  dept:'po', role:'spv',  jabatan:'Operations Supervisor', pin:'1234' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director', pin:'1234' },
+];
+const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
+const TEAM_OF = {
+  rizky: ['reza','nanda','rizky'],
+  umay: ['razak','umay'],
+  owner: ['reza','nanda','rizky','razak','umay'],
+};
+const USER_KEY = 'qsystem-current-user';
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const DAYS_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+
+// Jobdesk per staff
+const JOBDESK = {
+  reza: [
+    'Kunjungan cafe & prospecting (target: 113+ cafe)',
+    'Tracking status: On Going, Stop, dan Order',
+    'Catatan & temuan kunjungan cafe',
+    'Clustering & prioritas cafe',
+    'Input data ke QSales'
+  ],
+  nanda: [
+    'Posting konten Instagram, TikTok, Facebook (5 akun)',
+    'Monitoring follower & engagement rate',
+    'Respons DM/Comment tanya produk',
+    'Produksi video & desain grafis (stiker, web afiliator)',
+    'Reporting media sosial ke Spv'
+  ],
+  rizky: [
+    'Rekap data tim Sales & Marketing (QSales)',
+    'KPI Konsumen: RO, jumlah outlet, follow-up',
+    'Rekrutmen: screening, interview, training',
+    'Koordinasi konten & iklan (FB, sewa mesin)',
+    'Supervisi tim SM & reporting ke Owner'
+  ],
+  razak: [
+    'Pencatatan barang masuk (Pembelian Green Bean)',
+    'Pencatatan barang keluar (Assembly, Roasting, Blending)',
+    'Stock opname setiap hari Jumat',
+    'Deep Cleaning area Roasting setiap Senin',
+    'Input data produksi ke QFinance'
+  ],
+  umay: [
+    'Rekap kerjaan tim Produksi (QFinance/QTask)',
+    'Monitoring dana masuk & keluar',
+    'Cek inventory & outstanding order',
+    'Deep Cleaning Bar setiap Senin',
+    'Koordinasi event & operasional'
+  ],
+  owner: [
+    'Overview seluruh departemen (SM, PO, MGMT)',
+    'Approval strategic decision',
+    'Review laporan keuangan & operasional',
+    'Business development & partnership',
+    'Final call untuk rekrutmen & investasi'
+  ]
+};
+
+// App config
+const APPS = [
+  { id:'qtask', name:'QTask', desc:'Tracker tugas & progress tim', icon:'📋', status:'live', color:'qtask' },
+  { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'soon', color:'qfin' },
+  { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'soon', color:'qsales' },
+  { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
+];
+
+
+
+function findEmp(id){ return EMPLOYEES.find(e=>e.id===id); }
+function isSpv(id){ const e=findEmp(id); return !!e && e.role==='spv'; }
+function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || e.role==='owner'); }
+
+/* ============================================================
+   QSYSTEM State
+   ============================================================ */
+let state = {
+  currentUser: null,
+  appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
+  // QTask sub-state
+  qtaskTab: 'home',
+  data: defaultData(),
+  syncStatus: 'idle',
+  lastSyncedAt: null,
+  modal: { open:false, mode:'task', presetTaskId:null },
+  expanded: {},
+  filter: { dept:'all', nama:'all' },
+};
+
+function defaultData(){
+  return { tasks: [], progress: [], meeting: { weekday:1, hour:19, minute:0, updateHour:9 } };
+}
+
+/* ============================================================
+   Util
+   ============================================================ */
+function uid(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9);
+}
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(dateStr){
+  if(!dateStr) return '-';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+}
+function daysSince(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today - d) / 86400000);
+}
+function daysUntil(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((d - today) / 86400000);
+}
+function escapeHTML(s){
+  return String(s==null?'':s).replace(/[&<>">']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> t.classList.remove('show'), 2400);
+}
+
+/* ============================================================
+   QTask — Perhitungan status
+   ============================================================ */
+function lastProgressDateFor(taskId){
+  const entries = state.data.progress.filter(p=>p.taskId===taskId);
+  if (!entries.length) return null;
+  return entries.reduce((max,e)=> e.date > max ? e.date : max, entries[0].date);
+}
+function progressEntriesFor(taskId){
+  return state.data.progress.filter(p=>p.taskId===taskId).sort((a,b)=> b.date===a.date ? b.createdAt-a.createdAt : (a.date < b.date ? 1 : -1));
+}
+function latestProgressStatus(taskId){
+  const entries = progressEntriesFor(taskId);
+  return entries[0] ? (entries[0].status || 'ongoing') : null;
+}
+function isDue(task){
+  if (task.status !== 'aktif') return false;
+  const last = lastProgressDateFor(task.id) || task.createdAt;
+  return daysSince(last) >= 2;
+}
+function currentCycleStart(){
+  const m = state.data.meeting;
+  const resetWeekday = (m.weekday + 1) % 7;
+  const now = new Date();
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = (today0.getDay() - resetWeekday + 7) % 7;
+  const start = new Date(today0);
+  start.setDate(today0.getDate() - diff);
+  return start;
+}
+function dateToISO(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+function weekLabel(d){
+  const startISO = dateToISO(d);
+  const endISO = cycleEndISO(startISO);
+  return fmtDate(startISO) + ' – ' + fmtDate(endISO);
+}
+function cycleStartForDate(dateStr){
+  const m = state.data.meeting;
+  const resetWeekday = (m.weekday + 1) % 7;
+  const d = new Date(dateStr + 'T00:00:00');
+  const diff = (d.getDay() - resetWeekday + 7) % 7;
+  const start = new Date(d);
+  start.setDate(d.getDate() - diff);
+  return start;
+}
+function cycleEndISO(startISO){
+  const end = new Date(startISO + 'T00:00:00');
+  end.setDate(end.getDate() + 6);
+  return dateToISO(end);
+}
+function weeklyMissCount(task){
+  const cycleStart = dateToISO(currentCycleStart());
+  const entries = progressEntriesFor(task.id).filter(e=>e.date >= cycleStart).sort((a,b)=> a.date<b.date?-1:1);
+  const points = [cycleStart, ...entries.map(e=>e.date)];
+  if (task.status === 'aktif') points.push(todayISO());
+  let missed = 0;
+  for (let i=0; i<points.length-1; i++){
+    const diff = daysBetweenDates(points[i], points[i+1]);
+    if (diff > 2) missed += Math.floor(diff/2);
+  }
+  return missed;
+}
+function isWeeklyDoubleMiss(task){
+  if (task.status !== 'aktif') return false;
+  return weeklyMissCount(task) >= 2;
+}
+function isOverdueInsidentil(task){
+  if (task.type !== 'insidentil' || !task.timeline || task.status !== 'aktif') return false;
+  return daysUntil(task.timeline) < 0;
+}
+function timelineBadge(task){
+  const du = daysUntil(task.timeline);
+  if (du < 0) return { cls:'badge-overdue', text:'Lewat ' + Math.abs(du) + 'h' };
+  if (du === 0) return { cls:'badge-due', text:'Deadline hari ini' };
+  if (du === 1) return { cls:'badge-due', text:'Besok deadline' };
+  return { cls:'badge-reguler', text:'H-' + du };
+}
+function tasksOf(employeeId){
+  return state.data.tasks.filter(t=>t.employeeId===employeeId).sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+}
+function daysBetweenDates(a,b){
+  const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
+  return Math.round((db - da) / 86400000);
+}
+function normalizeNote(s){
+  return String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+}
+function computeTaskReport(task){
+  const entries = state.data.progress.filter(p=>p.taskId===task.id).slice()
+    .sort((a,b)=> a.date===b.date ? a.createdAt-b.createdAt : (a.date < b.date ? -1 : 1));
+  const points = [task.createdAt, ...entries.map(e=>e.date)];
+  if (task.status === 'aktif') points.push(todayISO());
+  const gaps = [];
+  for (let i=0; i<points.length-1; i++){
+    const diff = daysBetweenDates(points[i], points[i+1]);
+    if (diff > 2) gaps.push({ from:points[i], to:points[i+1], days:diff });
+  }
+  const duplicates = [];
+  for (let i=1; i<entries.length; i++){
+    const prev = normalizeNote(entries[i-1].note);
+    const cur = normalizeNote(entries[i].note);
+    if (prev && cur && prev === cur){
+      duplicates.push({ date:entries[i].date, prevDate:entries[i-1].date, note:entries[i].note });
+    }
+  }
+  return { gaps, duplicates, totalEntries: entries.length };
+}
+
+/* ============================================================
+   Sync ke Google Sheet (lewat Apps Script)
+   ============================================================ */
+async function initData(){
+  state.syncStatus = 'syncing';
+  render();
+  try {
+    state.data = await apiCall('getData');
+    state.syncStatus = 'synced';
+    state.lastSyncedAt = Date.now();
+  } catch(e){
+    state.syncStatus = 'offline';
+  }
+  render();
+}
+async function refreshData(){
+  try {
+    state.data = await apiCall('getData');
+    state.syncStatus = 'synced';
+    state.lastSyncedAt = Date.now();
+  } catch(e){
+    state.syncStatus = 'offline';
+  }
+  if (!state.modal.open) render();
+  else {
+    const pill = document.querySelector('.sync-pill');
+    if (pill) {
+      const labelMap = { idle:'Memuat…', syncing:'Menyinkron…', synced:'Tersimpan', offline:'Gagal — tap utk coba lagi' };
+      pill.className = 'sync-pill ' + state.syncStatus;
+      const txt = pill.querySelector('.sync-label');
+      if (txt) txt.textContent = labelMap[state.syncStatus] || '';
+    }
+  }
+}
+setInterval(()=>{ if (state.currentUser) refreshData(); }, 30000);
+window.addEventListener('online', ()=>{ if (state.currentUser) refreshData(); });
+document.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState === 'visible' && state.currentUser) refreshData();
+});
+
+/* ============================================================
+   Kalender .ics
+   ============================================================ */
+function toICSDate(d){
+  return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + 'T' + pad(d.getHours()) + pad(d.getMinutes()) + '00';
+}
+function buildICS(events){
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//QSystem//ID','CALSCALE:GREGORIAN'];
+  events.forEach(ev=>{
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:' + ev.uid + '@qsystem.local');
+    lines.push('DTSTAMP:' + toICSDate(new Date()) + 'Z');
+    lines.push('DTSTART:' + toICSDate(ev.start));
+    lines.push('DTEND:' + toICSDate(ev.end));
+    if (ev.rrule) lines.push('RRULE:' + ev.rrule);
+    lines.push('SUMMARY:' + ev.summary);
+    if (ev.description) lines.push('DESCRIPTION:' + String(ev.description).replace(/\n/g,'\\n'));
+    if (ev.alarm != null){
+      lines.push('BEGIN:VALARM');
+      lines.push('TRIGGER:-PT' + ev.alarm + 'M');
+      lines.push('ACTION:DISPLAY');
+      lines.push('DESCRIPTION:' + ev.summary);
+      lines.push('END:VALARM');
+    }
+    lines.push('END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+function downloadICS(filename, events){
+  const content = buildICS(events);
+  const blob = new Blob([content], { type:'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function nextWeekdayDate(weekday, hour, minute){
+  const now = new Date();
+  const result = new Date(now);
+  result.setHours(hour, minute, 0, 0);
+  let diff = (weekday - now.getDay() + 7) % 7;
+  if (diff === 0 && result <= now) diff = 7;
+  result.setDate(now.getDate() + diff);
+  return result;
+}
+function downloadMeetingReminders(){
+  const m = state.data.meeting;
+  const meetingStart = nextWeekdayDate(m.weekday, m.hour, m.minute);
+  const meetingEnd = new Date(meetingStart.getTime() + 60*60000);
+  const updateStart = new Date(); updateStart.setHours(m.updateHour,0,0,0);
+  if (updateStart <= new Date()) updateStart.setDate(updateStart.getDate()+1);
+  const updateEnd = new Date(updateStart.getTime() + 15*60000);
+  downloadICS('qsystem-pengingat.ics', [
+    {
+      uid:'qsystem-meeting', start:meetingStart, end:meetingEnd,
+      rrule:'FREQ=WEEKLY;BYDAY=' + ['SU','MO','TU','WE','TH','FR','SA'][m.weekday],
+      summary:'Progress Meeting Mingguan (QSystem)',
+      description:'Meeting offline membahas progress task tim minggu ini.',
+      alarm:30,
+    },
+    {
+      uid:'qsystem-update', start:updateStart, end:updateEnd,
+      rrule:'FREQ=DAILY;INTERVAL=2',
+      summary:'Isi Progress Task (QSystem)',
+      description:'Waktunya update progress task kamu di aplikasi QSystem.',
+      alarm:0,
+    }
+  ]);
+  showToast('Pengingat kalender diunduh');
+}
+function openSheet(){
+  if (state.data.sheetUrl){
+    window.open(state.data.sheetUrl, '_blank');
+  } else {
+    showToast('Link Google Sheet belum tersedia');
+  }
+}
+function downloadTaskDeadlineReminder(taskId){
+  const task = state.data.tasks.find(t=>t.id===taskId);
+  if (!task || !task.timeline) return;
+  const start = new Date(task.timeline + 'T09:00:00');
+  const end = new Date(start.getTime()+30*60000);
+  downloadICS('qsystem-deadline-' + task.title.slice(0,20).replace(/[^a-z0-9]/gi,'-') + '.ics', [{
+    uid:'qsystem-task-' + task.id, start, end,
+    summary:'Deadline: ' + task.title,
+    description:'Task insidentil dari ' + (findEmp(task.employeeId)||{}).name + ' — timeline ' + fmtDate(task.timeline),
+    alarm:60*24,
+  }]);
+  showToast('Pengingat deadline diunduh');
+}
+
+/* ============================================================
+   RENDER — Helpers (badges, table, etc)
+   ============================================================ */
+function syncPillHTML(){
+  const labelMap = { idle:'Memuat…', syncing:'Menyinkron…', synced:'Tersimpan', offline:'Gagal — tap utk coba lagi' };
+  return `
+    <button class="sync-pill ${state.syncStatus}" data-action="manual-sync" title="Tap untuk refresh data">
+      <span class="sync-dot"></span><span class="sync-label">${labelMap[state.syncStatus] || ''}</span>
+    </button>
+  `;
+}
+function typeBadgeHTML(task){
+  return task.type==='insidentil' ? `<span class="badge badge-insidentil">Insidentil</span>` : `<span class="badge badge-reguler">Reguler</span>`;
+}
+function statusBadgesHTML(task){
+  let out = '';
+  const pstatus = latestProgressStatus(task.id);
+  if (pstatus === 'stop') out += `<span class="badge badge-stop">■ Stop</span>`;
+  else if (pstatus === 'ongoing') out += `<span class="badge badge-ongoing">▶ Ongoing</span>`;
+  if (task.status === 'selesai'){
+    out += `<span class="badge badge-done">Selesai</span>`;
+  } else {
+    if (!pstatus) out += `<span class="badge badge-active">Belum ada progress</span>`;
+    if (task.type==='insidentil' && task.timeline){
+      const b = timelineBadge(task);
+      out += `<span class="badge ${b.cls}">${b.text}</span>`;
+    }
+    if (isWeeklyDoubleMiss(task)) out += `<span class="badge badge-alert">⚠ 2x minggu ini</span>`;
+    else if (isDue(task)) out += `<span class="badge badge-due">Perlu update</span>`;
+  }
+  return out;
+}
+function taskTableHTML(tasks, opts){
+  opts = opts || {};
+  if (!tasks.length){
+    return `<div class="empty-state"><span class="icon">🗂️</span>Belum ada task.</div>`;
+  }
+  const colCount = (opts.showEmployee ? 1 : 0) + (opts.showDept ? 1 : 0) + 5;
+  const rows = tasks.map(t=>{
+    const emp = findEmp(t.employeeId);
+    const last = lastProgressDateFor(t.id);
+    const entries = progressEntriesFor(t.id);
+    const expanded = !!state.expanded[t.id];
+    const due = isDue(t);
+    const overdue = isOverdueInsidentil(t);
+    const latestNote = entries[0] ? entries[0].note : '';
+    return `
+      <tr class="task-row ${due?'is-due':''} ${overdue?'is-overdue':''}" data-action="toggle-history" data-task="${t.id}">
+        ${opts.showEmployee ? `<td>${emp.name}</td>` : ''}
+        ${opts.showDept ? `<td><span class="badge badge-dept-${emp.dept}">${DEPT_NAMES[emp.dept]}</span></td>` : ''}
+        <td class="col-task">${escapeHTML(t.title)}</td>
+        <td>${typeBadgeHTML(t)}</td>
+        <td>${t.type==='insidentil' && t.timeline ? `<span class="mono" style="font-size:11.5px;">${fmtDate(t.timeline)}</span>` : '<span class="faint">–</span>'}</td>
+        <td>${statusBadgesHTML(t)}</td>
+        <td class="col-progress">
+          <span class="cell-truncate">${entries[0] && entries[0].link ? '🔗 ' : ''}${latestNote ? escapeHTML(latestNote) : (last ? '' : 'Belum ada')}</span>
+          ${last ? `<div class="faint mono" style="font-size:10.5px;">${daysSince(last)}h lalu</div>` : ''}
+          <span class="chev">${expanded ? '⌃' : '⌄'}</span>
+        </td>
+      </tr>
+      ${expanded ? `
+      <tr class="task-detail-row">
+        <td colspan="${colCount}">
+          ${latestNote ? `<div class="task-note">${(entries[0].status==='stop') ? '■ ' : '▶ '}${escapeHTML(latestNote)}${entries[0].link ? ` — <a href="${escapeHTML(entries[0].link)}" target="_blank" rel="noopener noreferrer">🔗 Link</a>` : ''}</div>` : `<p class="muted" style="font-size:12.5px;">Belum ada progress dicatat.</p>`}
+          ${entries.length>1 ? `
+            <div class="history">
+              ${entries.slice(1).map(e=>`
+                <div class="history-item">
+                  <span class="history-date">${e.status==='stop'?'■':'▶'} ${fmtDate(e.date)} · ${(findEmp(e.loggedBy)||{}).name || e.loggedBy}</span>
+                  ${escapeHTML(e.note)}${e.link ? ` — <a href="${escapeHTML(e.link)}" target="_blank" rel="noopener noreferrer">🔗 Link</a>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+          <div class="task-actions">
+            ${t.status==='aktif' ? `<button class="btn btn-primary btn-sm" data-action="open-add" data-mode="progress" data-task="${t.id}">Isi Progress</button>` : ''}
+            ${t.type==='insidentil' && t.status==='aktif' ? `<button class="btn btn-ghost btn-sm" data-action="task-ics" data-task="${t.id}">📅 Kalender</button>` : ''}
+            <button class="btn btn-ghost btn-sm" data-action="toggle-status" data-task="${t.id}">${t.status==='aktif' ? 'Tandai Selesai' : 'Buka Lagi'}</button>
+          </div>
+        </td>
+      </tr>
+      ` : ''}
+    `;
+  }).join('');
+  return `
+    <div class="table-wrap">
+      <table class="task-table">
+        <thead>
+          <tr>
+            ${opts.showEmployee ? '<th>Nama</th>' : ''}
+            ${opts.showDept ? '<th>Departemen</th>' : ''}
+            <th>Task</th><th>Jenis</th><th>Timeline</th><th>Status</th><th>Progress Terakhir</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+function reportTableHTML(reports, opts){
+  opts = opts || {};
+  if (!reports.length){
+    return `<div class="empty-state"><span class="icon">✅</span>Tidak ada tanggal kosong atau progress duplikat saat ini.</div>`;
+  }
+  const colCount = opts.showEmployee ? 4 : 3;
+  const rows = reports.map(r=>{
+    const t = r.task;
+    const emp = findEmp(t.employeeId);
+    const key = 'report-' + t.id;
+    const expanded = !!state.expanded[key];
+    return `
+      <tr class="task-row" data-action="toggle-report" data-task="${t.id}">
+        ${opts.showEmployee ? `<td>${emp.name}</td>` : ''}
+        <td class="col-task">${escapeHTML(t.title)}</td>
+        <td>${r.gaps.length ? `<span class="badge badge-overdue">${r.gaps.length} kosong</span>` : `<span class="badge badge-done">Lengkap</span>`}</td>
+        <td>${r.duplicates.length ? `<span class="badge badge-due">${r.duplicates.length} duplikat</span>` : `<span class="faint">–</span>`}</td>
+      </tr>
+      ${expanded ? `
+      <tr class="task-detail-row">
+        <td colspan="${colCount}">
+          ${r.gaps.length ? `
+            <p class="muted" style="font-size:12px; font-weight:700; margin-bottom:6px;">📅 Tanggal kosong (tidak ada progress):</p>
+            ${r.gaps.map(g=>`<div class="history-item">${fmtDate(g.from)} → ${fmtDate(g.to)} <span class="faint">(${g.days} hari tanpa update)</span></div>`).join('')}
+          ` : ''}
+          ${r.duplicates.length ? `
+            <p class="muted" style="font-size:12px; font-weight:700; margin:10px 0 6px;">⧉ Progress sama seperti update sebelumnya:</p>
+            ${r.duplicates.map(d=>`
+              <div class="history-item">
+                <span class="history-date">${fmtDate(d.date)} — isinya sama dengan ${fmtDate(d.prevDate)}</span>
+                ${escapeHTML(d.note)}
+              </div>
+            `).join('')}
+          ` : ''}
+        </td>
+      </tr>
+      ` : ''}
+    `;
+  }).join('');
+  return `
+    <div class="table-wrap">
+      <table class="task-table">
+        <thead>
+          <tr>
+            ${opts.showEmployee ? '<th>Nama</th>' : ''}
+            <th>Task</th><th>Tanggal Kosong</th><th>Duplikat</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+function filterBarHTML(memberIds, showDeptFilter){
+  const namaOptions = memberIds.map(id=>{
+    const e = findEmp(id);
+    return `<option value="${id}" ${state.filter.nama===id?'selected':''}>${e.name}</option>`;
+  }).join('');
+  const active = state.filter.dept!=='all' || state.filter.nama!=='all';
+  return `
+    <div class="row gap-8 wrap" style="margin-bottom:14px;">
+      ${showDeptFilter ? `
+      <select class="inline-select" data-action="set-filter-dept">
+        <option value="all" ${state.filter.dept==='all'?'selected':''}>Semua Departemen</option>
+        <option value="sm" ${state.filter.dept==='sm'?'selected':''}>${DEPT_NAMES.sm}</option>
+        <option value="po" ${state.filter.dept==='po'?'selected':''}>${DEPT_NAMES.po}</option>
+      </select>
+      ` : ''}
+      <select class="inline-select" data-action="set-filter-nama">
+        <option value="all" ${state.filter.nama==='all'?'selected':''}>Semua Nama</option>
+        ${namaOptions}
+      </select>
+      ${active ? `<button class="btn btn-ghost btn-sm" data-action="reset-filter">✕ Reset</button>` : ''}
+    </div>
+  `;
+}
+function applyFilter(tasks){
+  return tasks.filter(t=>{
+    if (state.filter.dept!=='all' && t.dept!==state.filter.dept) return false;
+    if (state.filter.nama!=='all' && t.employeeId!==state.filter.nama) return false;
+    return true;
+  });
+}
+
+/* ============================================================
+   RENDER — Login Screen
+   ============================================================ */
+function loginScreenHTML(){
+  const empOptions = EMPLOYEES.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
+  return `
+    <div class="login-wrap" style="position:relative;">
+      <div class="login-brand">
+        <div class="brand-mark" style="width:72px;height:72px;font-size:32px;margin:0 auto 16px;">Q</div>
+        <h1 style="font-size:32px;">QSystem</h1>
+        <p style="font-size:14px;margin-top:8px;">Platform terpadu untuk tim QCoffee</p>
+      </div>
+      <div class="card" style="max-width:340px;margin:0 auto;padding:22px;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-weight:700;font-size:15px;">Masuk</div>
+          <div class="muted" style="font-size:12.5px;margin-top:4px;">Pilih nama & masukkan PIN</div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <select id="login-select" style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;background:var(--surface);color:var(--ink);cursor:pointer;">
+            <option value="">— Pilih nama —</option>
+            ${empOptions}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:18px;">
+          <input type="password" id="login-pin" placeholder="PIN (4 digit)" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;background:var(--surface);color:var(--ink);text-align:center;letter-spacing:8px;font-family:var(--font-mono);">
+        </div>
+        <button class="btn btn-primary btn-block" data-action="do-login" style="padding:12px;">Masuk</button>
+        <p class="hint" style="text-align:center;margin-top:14px;">QTask · QFinance · QSales · QAffiliator</p>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — Shell (Topbar, Sidebar, BottomNav)
+   ============================================================ */
+function topBarHTML(){
+  const emp = findEmp(state.currentUser);
+  const appName = APPS.find(a=>a.id===state.appTab)?.name || 'QSystem';
+  return `
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">Q</div>
+        <div>
+          <div class="brand-name">${appName}</div>
+          <div class="brand-sub">${emp.name} · ${DEPT_NAMES[emp.dept]}</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        ${syncPillHTML()}
+        <button class="avatar" data-action="switch-user" title="Ganti pengguna">${emp.name[0]}</button>
+      </div>
+    </header>
+  `;
+}
+function sidebarHTML(){
+  const emp = findEmp(state.currentUser);
+  const navItem = (tab, icon, label) => `
+    <button class="sidebar-item ${state.appTab===tab?'active':''}" data-action="switch-app" data-app="${tab}">
+      <span class="navicon">${icon}</span>${label}
+    </button>
+  `;
+  return `
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">Q</div>
+        <div>
+          <div class="brand-name">QSystem</div>
+          <div class="brand-sub">Integrated Platform</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        ${navItem('dashboard','🏠','Dashboard')}
+        ${navItem('qtask','📋','QTask')}
+        ${navItem('qfin','💰','QFinance')}
+        ${navItem('qsales','🎯','QSales')}
+        ${navItem('qaff','🤝','QAffiliator')}
+      </nav>
+      <div class="sidebar-fab">
+        <button data-action="open-add" data-mode="task">＋ Tambah Tugas</button>
+      </div>
+    </aside>
+  `;
+}
+function bottomNavHTML(){
+  const item = (tab, icon, label) => `
+    <button class="navitem ${state.appTab===tab?'active':''}" data-action="switch-app" data-app="${tab}">
+      <span class="navicon">${icon}</span>${label}
+    </button>
+  `;
+  return `
+    <nav class="bottomnav">
+      ${item('dashboard','🏠','Beranda')}
+      ${item('qtask','📋','QTask')}
+      <div class="navitem-fab">
+        <button class="fab-circle" data-action="open-add" data-mode="task" title="Tambah">＋</button>
+      </div>
+      ${item('qfin','💰','Fin')}
+      ${item('qsales','🎯','Sales')}
+      ${item('qaff','🤝','Aff')}
+    </nav>
+  `;
+}
+
+/* ============================================================
+   RENDER — Dashboard Staff
+   ============================================================ */
+function dashboardHTML(){
+  const emp = findEmp(state.currentUser);
+  const myTasks = tasksOf(state.currentUser).filter(t=>t.status==='aktif');
+  const myDueCount = myTasks.filter(isDue).length;
+  const myTotal = myTasks.length;
+  const jobdeskList = JOBDESK[emp.id] || [];
+
+  return `
+    <div class="greeting">Halo, ${emp.name} 👋</div>
+    <div class="greeting-sub">${emp.jabatan} · ${DEPT_NAMES[emp.dept]}</div>
+
+    <div class="profile-card">
+      <div class="avatar-big">${emp.name[0]}</div>
+      <div>
+        <div class="p-name">${emp.name}</div>
+        <div class="p-role">${emp.jabatan}</div>
+        <span class="p-dept">${DEPT_NAMES[emp.dept]}</span>
+      </div>
+    </div>
+
+    <div class="quick-stats">
+      <div class="qstat"><div class="qnum">${myTotal}</div><div class="qlbl">Tugas Aktif</div></div>
+      <div class="qstat"><div class="qnum" style="color:var(--danger);">${myDueCount}</div><div class="qlbl">Perlu Update</div></div>
+    </div>
+
+    <div class="section-title">Aplikasi Tersedia</div>
+    <div class="app-grid">
+      ${APPS.map(app=>`
+        <div class="app-card ${app.status==='live'?'active-app':''}" data-action="switch-app" data-app="${app.id}">
+          <div class="app-icon ${app.color}">${app.icon}</div>
+          <div class="app-info">
+            <div class="app-name">${app.name}</div>
+            <div class="app-desc">${app.desc}</div>
+            <span class="app-status ${app.status}">${app.status==='live'?'🟢 Live':(app.status==='beta'?'🟡 Beta':'🔜 Segera')}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="section-title">Jobdesk & Tanggung Jawab</div>
+    <div class="card">
+      <ul class="jobdesk-list">
+        ${jobdeskList.map((jd,i)=>`
+          <li><span class="jd-num">${i+1}</span><span>${jd}</span></li>
+        `).join('')}
+      </ul>
+    </div>
+
+    <div class="section-title">Jadwal Meeting</div>
+    <div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-weight:700; font-size:15px;">Progress Meeting Mingguan</div>
+        <div class="muted" style="font-size:13px; margin-top:4px;">${DAYS_ID[state.data.meeting.weekday]} ${pad(state.data.meeting.hour)}:${pad(state.data.meeting.minute)}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" data-action="download-meeting-ics">📅 ICS</button>
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — QTask Views (home, tasks, team, report, settings)
+   ============================================================ */
+function qtaskHomeHTML(){
+  const emp = findEmp(state.currentUser);
+  const myTasks = tasksOf(state.currentUser).filter(t=>t.status==='aktif');
+  const myDue = myTasks.filter(isDue);
+  const spv = hasTeamView(state.currentUser);
+  const teamIds = spv ? TEAM_OF[state.currentUser].filter(id=>id!==state.currentUser) : [];
+  const teamDue = teamIds.flatMap(id => tasksOf(id).filter(t=>t.status==='aktif' && isDue(t)));
+  const m = state.data.meeting;
+  const nextMeeting = nextWeekdayDate(m.weekday, m.hour, m.minute);
+  const daysToMeeting = Math.ceil((nextMeeting - new Date()) / 86400000);
+  const scopeIds = spv ? TEAM_OF[state.currentUser] : [state.currentUser];
+  const alertScope = scopeIds.flatMap(id=>tasksOf(id)).filter(t=>t.status==='aktif' && isWeeklyDoubleMiss(t));
+  const alertByPerson = {};
+  alertScope.forEach(t=>{ (alertByPerson[t.employeeId] = alertByPerson[t.employeeId] || []).push(t); });
+  const curWeekLabel = weekLabel(currentCycleStart());
+
+  return `
+    <div class="greeting">Halo, ${emp.name} 👋</div>
+    <div class="greeting-sub">${DEPT_NAMES[emp.dept]}${emp.role==='spv' ? ' · Supervisor' : ''}</div>
+
+    <div class="card card-hero">
+      <div class="hero-row">
+        <div>
+          <div class="hero-big">${daysToMeeting <= 0 ? 'Hari ini' : 'H-' + daysToMeeting}</div>
+          <div class="hero-label">Progress Meeting · ${DAYS_ID[m.weekday]} ${pad(m.hour)}:${pad(m.minute)}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,.1); color:#F7EFE2; border-color:rgba(255,255,255,.25);" data-action="download-meeting-ics">📅 Unduh</button>
+      </div>
+    </div>
+
+    ${Object.keys(alertByPerson).length ? `
+      <div class="card" style="background:var(--danger-soft); border-color:#E3BBAE;">
+        <div class="row gap-8" style="margin-bottom:8px;"><b style="color:var(--danger);">⚠ Peringatan — ${curWeekLabel}: 2x belum isi progress</b></div>
+        ${Object.entries(alertByPerson).map(([empId, ts])=>`
+          <div style="font-size:13px; margin-bottom:4px;">
+            <b>${findEmp(empId).name}</b> — ${ts.length} task sudah 2x lewat jadwal isi progress minggu ini
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    ${emp.role!=='owner' ? `
+      <div class="section-title">Perlu kamu update (${myDue.length})</div>
+      ${myDue.length ? taskTableHTML(myDue, {showEmployee:false}) : `
+        <div class="empty-state"><span class="icon">✅</span>Semua tugasmu sudah update dalam 2 hari terakhir.</div>
+      `}
+    ` : ''}
+
+    ${spv ? `
+      <div class="section-title">${emp.role==='owner' ? 'Semua tim perlu update' : 'Tim kamu perlu update'} (${teamDue.length})</div>
+      ${teamDue.length ? taskTableHTML(teamDue, {showEmployee:true, showDept:emp.role==='owner'}) : `
+        <div class="empty-state"><span class="icon">👍</span>Tidak ada tugas tim yang tertunda.</div>
+      `}
+    ` : ''}
+  `;
+}
+function qtaskTasksHTML(){
+  const all = tasksOf(state.currentUser);
+  const aktifCount = all.filter(t=>t.status==='aktif').length;
+  const selesaiCount = all.length - aktifCount;
+  return `
+    <div class="section-title">Semua Task Saya (${all.length} · ${aktifCount} aktif, ${selesaiCount} selesai)</div>
+    ${taskTableHTML(all, {showEmployee:false})}
+    <button class="btn btn-primary btn-block" style="margin-top:6px;" data-action="open-add" data-mode="task">+ Tambah Task Baru</button>
+  `;
+}
+function qtaskTeamHTML(){
+  const memberIds = TEAM_OF[state.currentUser] || [state.currentUser];
+  const crossDept = findEmp(state.currentUser).role === 'owner';
+  const allTasksRaw = memberIds.flatMap(id => tasksOf(id));
+  const allTasks = applyFilter(allTasksRaw);
+  const aktif = allTasks.filter(t=>t.status==='aktif');
+  const due = aktif.filter(isDue);
+  const overdue = aktif.filter(isOverdueInsidentil);
+  return `
+    <div class="section-title">Ringkasan Tim${crossDept ? ' (Semua Departemen)' : ''}</div>
+    ${filterBarHTML(memberIds, crossDept)}
+    <div class="team-summary">
+      <div class="stat"><div class="num">${aktif.length}</div><div class="lbl">Tugas aktif</div></div>
+      <div class="stat"><div class="num">${due.length}</div><div class="lbl">Perlu update</div></div>
+      <div class="stat"><div class="num">${overdue.length}</div><div class="lbl">Lewat deadline</div></div>
+    </div>
+    <div class="section-title">Semua Task Tim (${allTasks.length})</div>
+    ${taskTableHTML(allTasks, {showEmployee:true, showDept:crossDept})}
+  `;
+}
+function qtaskReportHTML(){
+  const spv = hasTeamView(state.currentUser);
+  const crossDept = findEmp(state.currentUser).role === 'owner';
+  const memberIds = spv ? TEAM_OF[state.currentUser] : [state.currentUser];
+  const scopeIds = spv ? TEAM_OF[state.currentUser] : [state.currentUser];
+  const tasks = applyFilter(scopeIds.flatMap(id=>tasksOf(id)).filter(t=>t.status==='aktif'));
+  const ongoingTasks = tasks.filter(t=>latestProgressStatus(t.id)==='ongoing');
+  const stopTasks = tasks.filter(t=>latestProgressStatus(t.id)==='stop');
+  const noProgressTasks = tasks.filter(t=>!latestProgressStatus(t.id));
+  const doubleMissTasks = tasks.filter(isWeeklyDoubleMiss);
+  const doubleMissByPerson = {};
+  doubleMissTasks.forEach(t=>{ (doubleMissByPerson[t.employeeId] = doubleMissByPerson[t.employeeId] || []).push(t); });
+  const curWeekLabel = weekLabel(currentCycleStart());
+  const reports = tasks.map(t=>({ task:t, ...computeTaskReport(t) }));
+  const totalGaps = reports.reduce((s,r)=>s+r.gaps.length, 0);
+  const totalDup = reports.reduce((s,r)=>s+r.duplicates.length, 0);
+  const flagged = reports.filter(r=>r.gaps.length || r.duplicates.length);
+
+  return `
+    <div class="section-title">Dashboard Report ${spv ? '· Tim' : '· Saya'}</div>
+    <p class="hint" style="margin:-4px 2px 12px;">Siklus rekap: ${curWeekLabel} (reset tiap hari setelah meeting)</p>
+    ${spv ? filterBarHTML(memberIds, crossDept) : ''}
+
+    ${Object.keys(doubleMissByPerson).length ? `
+      <div class="card" style="background:var(--danger-soft); border-color:#E3BBAE; margin-bottom:16px;">
+        <div style="margin-bottom:8px;"><b style="color:var(--danger);">⚠ Peringatan — ${curWeekLabel}: 2x belum isi progress</b></div>
+        ${Object.entries(doubleMissByPerson).map(([empId, ts])=>`
+          <div style="font-size:13px; margin-bottom:4px;"><b>${findEmp(empId).name}</b> — ${ts.length} task: ${ts.map(t=>escapeHTML(t.title)).join(', ')}</div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <div class="team-summary">
+      <div class="stat"><div class="num" style="color:var(--po);">${ongoingTasks.length}</div><div class="lbl">▶ Ongoing</div></div>
+      <div class="stat"><div class="num" style="color:var(--danger);">${stopTasks.length}</div><div class="lbl">■ Stop</div></div>
+      <div class="stat"><div class="num">${noProgressTasks.length}</div><div class="lbl">Belum ada progress</div></div>
+    </div>
+
+    ${stopTasks.length ? `
+      <div class="section-title">⚠ Task berstatus Stop (${stopTasks.length})</div>
+      ${taskTableHTML(stopTasks, {showEmployee:spv, showDept:crossDept})}
+    ` : ''}
+
+    ${noProgressTasks.length ? `
+      <div class="section-title">Belum pernah diisi progress (${noProgressTasks.length})</div>
+      ${taskTableHTML(noProgressTasks, {showEmployee:spv, showDept:crossDept})}
+    ` : ''}
+
+    <div class="section-title">Kepatuhan Update</div>
+    <div class="team-summary">
+      <div class="stat"><div class="num">${tasks.length}</div><div class="lbl">Task aktif dipantau</div></div>
+      <div class="stat"><div class="num">${totalGaps}</div><div class="lbl">Ada tanggal kosong</div></div>
+      <div class="stat"><div class="num">${totalDup}</div><div class="lbl">Progress duplikat</div></div>
+    </div>
+    <p class="hint" style="margin:0 2px 14px;">Tanggal kosong = ada jeda &gt;2 hari tanpa progress. Duplikat = isi progress sama persis dengan update sebelumnya.</p>
+    ${reportTableHTML(flagged, {showEmployee:spv})}
+  `;
+}
+function qtaskSettingsHTML(){
+  const emp = findEmp(state.currentUser);
+  const m = state.data.meeting;
+  const weekdayOptions = DAYS_ID.map((d,i)=>`<option value="${i}" ${m.weekday===i?'selected':''}>${d}</option>`).join('');
+  const hourOptions = Array.from({length:24},(_,h)=>`<option value="${h}" ${m.hour===h?'selected':''}>${pad(h)}:00</option>`).join('');
+  const updateHourOptions = Array.from({length:24},(_,h)=>`<option value="${h}" ${m.updateHour===h?'selected':''}>${pad(h)}:00</option>`).join('');
+  return `
+    <div class="section-title">Akun</div>
+    <div class="card">
+      <div class="settings-row">
+        <span>Masuk sebagai <b>${emp.name}</b></span>
+        <button class="btn btn-ghost btn-sm" data-action="switch-user">Ganti</button>
+      </div>
+    </div>
+
+    <div class="section-title">Jadwal Progress Meeting</div>
+    <div class="card">
+      <div class="settings-row">
+        <span>Hari</span>
+        <select class="inline-select" data-action="set-meeting-weekday">${weekdayOptions}</select>
+      </div>
+      <div class="settings-row">
+        <span>Jam</span>
+        <select class="inline-select" data-action="set-meeting-hour">${hourOptions}</select>
+      </div>
+      <div class="settings-row">
+        <span>Jam pengingat isi progress (tiap 2 hari)</span>
+        <select class="inline-select" data-action="set-update-hour">${updateHourOptions}</select>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block" data-action="download-meeting-ics">📅 Unduh Pengingat Kalender (.ics)</button>
+    <p class="hint" style="margin:8px 2px 0;">File ini bisa dibuka lewat aplikasi Kalender di HP supaya kamu dapat notifikasi asli.</p>
+
+    <div class="section-title">Sinkronisasi</div>
+    <div class="card">
+      <div class="settings-row">
+        <span>Status</span>
+        ${syncPillHTML()}
+      </div>
+      <div class="settings-row">
+        <span>Terakhir sync</span>
+        <span class="mono muted" style="font-size:12px;">${state.lastSyncedAt ? new Date(state.lastSyncedAt).toLocaleTimeString('id-ID') : '-'}</span>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="manual-sync">🔄 Refresh Data</button>
+    </div>
+
+    <div class="section-title">Data Mentah</div>
+    <div class="card">
+      <p style="font-size:12.5px; color:var(--ink-soft); margin-bottom:10px;">Semua task &amp; riwayat progress tersimpan sebagai baris biasa di Google Sheet.</p>
+      <button class="btn btn-primary btn-block" data-action="open-sheet">📊 Buka Google Sheet</button>
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — Mockup Apps (QFinance, QSales, QAffiliator)
+   ============================================================ */
+function mockupHTML(appId){
+  const app = APPS.find(a=>a.id===appId);
+  const features = {
+    qfin: [
+      {icon:'📒', title:'General Ledger', desc:'Buku besar otomatis dari transaksi harian'},
+      {icon:'📊', title:'Neraca & Rugi Laba', desc:'Laporan keuangan real-time'},
+      {icon:'🏭', title:'HPP Roastery', desc:'Perhitungan HPP otomatis per batch'},
+      {icon:'📦', title:'Inventory Assembly', desc:'Tracking GB → RB → HB multi-layer'},
+      {icon:'💳', title:'Kas & Bank', desc:'Rekonsiliasi kas masuk & keluar'},
+      {icon:'🧾', title:'Hutang Piutang', desc:'Monitoring AR/AP dengan aging'},
+    ],
+    qsales: [
+      {icon:'👥', title:'CRM Database', desc:'Data pelanggan & riwayat transaksi'},
+      {icon:'📈', title:'Sales Pipeline', desc:'Tracking lead dari prospek hingga closing'},
+      {icon:'☕', title:'Kunjungan Cafe', desc:'Log kunjungan & follow-up outlet'},
+      {icon:'📱', title:'Sosial Media', desc:'Integrasi posting & engagement'},
+      {icon:'🎯', title:'Target & KPI', desc:'Monitoring capaian sales per periode'},
+      {icon:'📋', title:'Konsinyasi', desc:'Manajemen produk label kolaborasi'},
+    ],
+    qaff: [
+      {icon:'🔗', title:'Link Generator', desc:'Generate link afiliasi unik per user'},
+      {icon:'🖼️', title:'Watermark QR', desc:'Watermarking otomatis untuk konten'},
+      {icon:'💬', title:'WhatsApp API', desc:'Notifikasi lead via WhatsApp Business'},
+      {icon:'📊', title:'Komisi 5%', desc:'Perhitungan komisi real-time'},
+      {icon:'🏆', title:'Leaderboard', desc:'Ranking affiliator terbaik'},
+      {icon:'🔔', title:'Lead Tracking', desc:'Status visit & konversi lead'},
+    ],
+  };
+  const feats = features[appId] || [];
+  return `
+    <div class="mockup-hero">
+      <span class="icon">${app.icon}</span>
+      <h3>${app.name}</h3>
+      <p>${app.desc}. Modul ini sedang dalam pengembangan dan akan segera terintegrasi dengan QSystem.</p>
+      <button class="btn btn-primary" style="margin-top:16px;" data-action="switch-app" data-app="qtask">Kembali ke QTask</button>
+    </div>
+    <div class="section-title">Fitur yang Akan Hadir</div>
+    <div class="mockup-grid">
+      ${feats.map(f=>`
+        <div class="mockup-card">
+          <span class="m-icon">${f.icon}</span>
+          <div class="m-title">${f.title}</div>
+          <div class="m-desc">${f.desc}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="card" style="margin-top:16px; background:var(--accent-soft); border-color:var(--accent);">
+      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💡 Info Pengembangan</div>
+      <p style="font-size:13px; color:var(--ink-soft);">Tim developer sedang membangun modul ${app.name}. Integrasi dengan QSystem akan dilakukan secara bertahap. Data dari QTask akan menjadi dasar untuk modul ini.</p>
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — QTask Sub-Navigation
+   ============================================================ */
+function qtaskSubNavHTML(){
+  const spv = hasTeamView(state.currentUser);
+  const tabBtn = (tab, label) => `
+    <button class="btn btn-sm ${state.qtaskTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qtask-tab" data-tab="${tab}">${label}</button>
+  `;
+  return `
+    <div class="row gap-6 wrap" style="margin-bottom:14px;">
+      ${tabBtn('home','🏠 Beranda')}
+      ${tabBtn('tasks','🗂️ Tugas Saya')}
+      ${spv ? tabBtn('team','👥 Tim') : ''}
+      ${tabBtn('report','📊 Laporan')}
+      ${tabBtn('settings','⚙️ Pengaturan')}
+    </div>
+  `;
+}
+
+/* ============================================================
+   RENDER — Modal
+   ============================================================ */
+function modalHTML(){
+  if (!state.modal.open) return '';
+  const mode = state.modal.mode;
+  const myTeamIds = hasTeamView(state.currentUser) ? TEAM_OF[state.currentUser] : [state.currentUser];
+  const assignablePool = EMPLOYEES.filter(e=>e.role!=='owner');
+  const eligibleEmployees = hasTeamView(state.currentUser) ? assignablePool : assignablePool.filter(e=>e.id===state.currentUser);
+  const defaultEmp = findEmp(state.currentUser);
+  const taskOptionsFor = myTeamIds.flatMap(id => tasksOf(id).filter(t=>t.status==='aktif'))
+    .map(t => `<option value="${t.id}" ${state.modal.presetTaskId===t.id?'selected':''}>${findEmp(t.employeeId).name} — ${escapeHTML(t.title)}</option>`).join('');
+
+  return `
+    <div class="sheet-overlay" data-action="overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>Tambah</h3>
+          <button class="sheet-close" data-action="close-modal">✕</button>
+        </div>
+        <div class="modetabs">
+          <button class="modetab ${mode==='task'?'active':''}" data-action="switch-add-mode" data-mode="task">Tugas Baru</button>
+          <button class="modetab ${mode==='progress'?'active':''}" data-action="switch-add-mode" data-mode="progress">Isi Progress</button>
+        </div>
+        ${mode==='task' ? `
+        <form id="form-task">
+          <div class="field">
+            <label>Nama Karyawan</label>
+            <select name="employee" id="task-employee">
+              ${eligibleEmployees.map(e=>`<option value="${e.id}" ${e.id===defaultEmp.id?'selected':''}>${e.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>Departemen</label>
+            <div class="dept-display" id="task-dept-display">${DEPT_NAMES[defaultEmp.dept]}</div>
+          </div>
+          <div class="field">
+            <label>Nama Task</label>
+            <input type="text" name="title" placeholder="Contoh: Follow up cafe Melala" required>
+          </div>
+          <div class="field">
+            <label>Jenis Task</label>
+            <div class="segmented">
+              <input type="radio" name="task-type" id="type-reguler" value="reguler" checked>
+              <label for="type-reguler">Reguler</label>
+              <input type="radio" name="task-type" id="type-insidentil" value="insidentil">
+              <label for="type-insidentil">Insidentil</label>
+            </div>
+          </div>
+          <div class="field hidden" id="timeline-wrap">
+            <label>Timeline (deadline)</label>
+            <input type="date" name="timeline" id="task-timeline">
+            <div class="hint">Timeline ini akan dipakai untuk pengingat deadline.</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Simpan Tugas</button>
+        </form>
+        ` : `
+        <form id="form-progress">
+          <div class="field">
+            <label>Pilih Task</label>
+            <select name="task" required>
+              <option value="">— pilih task —</option>
+              ${taskOptionsFor}
+            </select>
+          </div>
+          <div class="field">
+            <label>Status Progress</label>
+            <div class="segmented">
+              <input type="radio" name="progress-status" id="status-ongoing" value="ongoing" checked>
+              <label for="status-ongoing">▶ Ongoing</label>
+              <input type="radio" name="progress-status" id="status-stop" value="stop">
+              <label for="status-stop">■ Stop</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>Tanggal</label>
+            <input type="date" name="date" value="${todayISO()}" max="${todayISO()}">
+          </div>
+          <div class="field">
+            <label>Catatan Progress</label>
+            <textarea name="note" placeholder="Ceritakan progress terbaru…" required></textarea>
+          </div>
+          <div class="field">
+            <label>Link (opsional)</label>
+            <input type="text" name="link" placeholder="https://docs.google.com/…">
+            <div class="hint">Kalau progress ini ada Gsheet/dokumen pendukungnya, tempel linknya di sini.</div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Simpan Progress</button>
+        </form>
+        `}
+      </div>
+    </div>
+  `;
+}
+function renderModal(){
+  const existing = document.getElementById('qsystem-modal-overlay');
+  if (existing) existing.remove();
+  if (!state.modal.open) return;
+  const html = modalHTML();
+  if (!html) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+  const overlay = wrapper.firstElementChild;
+  overlay.id = 'qsystem-modal-overlay';
+  document.body.appendChild(overlay);
+}
+
+/* ============================================================
+   RENDER — Utama
+   ============================================================ */
+function render(){
+  const app = document.getElementById('app');
+  if (!state.currentUser){
+    app.innerHTML = loginScreenHTML();
+    return;
+  }
+  let body = '';
+  if (state.appTab === 'dashboard'){
+    body = dashboardHTML();
+  } else if (state.appTab === 'qtask'){
+    body = qtaskSubNavHTML();
+    if (state.qtaskTab==='home') body += qtaskHomeHTML();
+    else if (state.qtaskTab==='tasks') body += qtaskTasksHTML();
+    else if (state.qtaskTab==='team' && hasTeamView(state.currentUser)) body += qtaskTeamHTML();
+    else if (state.qtaskTab==='report') body += qtaskReportHTML();
+    else if (state.qtaskTab==='settings') body += qtaskSettingsHTML();
+    else { state.qtaskTab='home'; body += qtaskHomeHTML(); }
+  } else if (state.appTab === 'qfin'){
+    body = mockupHTML('qfin');
+  } else if (state.appTab === 'qsales'){
+    body = mockupHTML('qsales');
+  } else if (state.appTab === 'qaff'){
+    body = mockupHTML('qaff');
+  } else {
+    state.appTab = 'dashboard';
+    body = dashboardHTML();
+  }
+
+  app.innerHTML = `
+    ${sidebarHTML()}
+    <div class="main-area">
+      ${topBarHTML()}
+      <main class="content">${body}</main>
+      ${bottomNavHTML()}
+    </div>
+  `;
+  renderModal();
+}
+
+/* ============================================================
+   Aksi
+   ============================================================ */
+function openModal(mode, taskId){
+  state.modal = { open:true, mode: mode || 'task', presetTaskId: taskId || null };
+  renderModal();
+}
+function closeModal(){
+  state.modal = { open:false, mode:'task', presetTaskId:null };
+  const existing = document.getElementById('qsystem-modal-overlay');
+  if (existing) existing.remove();
+  render();
+}
+
+async function selectUser(id){
+  state.currentUser = id;
+  try { localStorage.setItem(USER_KEY, id); } catch(e){}
+  state.appTab = 'dashboard';
+  state.qtaskTab = 'home';
+  await initData();
+  render();
+}
+
+document.addEventListener('click', function(e){
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+
+  if (el.dataset.action === 'select-user'){
+    selectUser(el.dataset.id);
+  }
+  else if (el.dataset.action === 'do-login'){
+    const sel = document.getElementById('login-select');
+    const pinInput = document.getElementById('login-pin');
+    const empId = sel ? sel.value : '';
+    const pin = pinInput ? pinInput.value.trim() : '';
+    if (!empId) { showToast('Pilih nama dulu'); return; }
+    if (!pin || pin.length !== 4) { showToast('Masukkan PIN 4 digit'); return; }
+    const emp = findEmp(empId);
+    if (!emp) { showToast('Nama tidak ditemukan'); return; }
+    if (emp.pin !== pin) { showToast('PIN salah'); pinInput.value = ''; pinInput.focus(); return; }
+    selectUser(empId);
+  }
+  else if (el.dataset.action === 'switch-app'){
+    state.appTab = el.dataset.app;
+    render();
+  }
+  else if (el.dataset.action === 'switch-qtask-tab'){
+    state.qtaskTab = el.dataset.tab;
+    render();
+  }
+  else if (el.dataset.action === 'open-add'){
+    openModal(el.dataset.mode, el.dataset.task);
+  }
+  else if (el.dataset.action === 'close-modal'){
+    closeModal();
+  }
+  else if (el.dataset.action === 'overlay-close'){
+    if (!e.target.closest('[data-stop]')) closeModal();
+  }
+  else if (el.dataset.action === 'switch-add-mode'){
+    state.modal.mode = el.dataset.mode;
+    renderModal();
+  }
+  else if (el.dataset.action === 'switch-user'){
+    state.currentUser = null;
+    state.appTab = 'dashboard';
+    render();
+  }
+  else if (el.dataset.action === 'manual-sync'){
+    refreshData();
+  }
+  else if (el.dataset.action === 'toggle-history'){
+    const id = el.dataset.task;
+    state.expanded[id] = !state.expanded[id];
+    render();
+  }
+  else if (el.dataset.action === 'toggle-report'){
+    const key = 'report-' + el.dataset.task;
+    state.expanded[key] = !state.expanded[key];
+    render();
+  }
+  else if (el.dataset.action === 'toggle-status'){
+    const t = state.data.tasks.find(x=>x.id===el.dataset.task);
+    if (t){
+      const willBe = t.status==='aktif' ? 'selesai' : 'aktif';
+      showToast('Menyimpan…');
+      apiCall('toggleTaskStatus', t.id).then(data=>{
+        state.data = data;
+        state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+        render();
+        showToast(willBe==='selesai' ? 'Tugas ditandai selesai' : 'Tugas dibuka kembali');
+      }).catch(()=>{ showToast('Gagal menyimpan, coba lagi'); });
+    }
+  }
+  else if (el.dataset.action === 'download-meeting-ics'){
+    downloadMeetingReminders();
+  }
+  else if (el.dataset.action === 'task-ics'){
+    downloadTaskDeadlineReminder(el.dataset.task);
+  }
+  else if (el.dataset.action === 'open-sheet'){
+    openSheet();
+  }
+  else if (el.dataset.action === 'reset-filter'){
+    state.filter = { dept:'all', nama:'all' };
+    render();
+  }
+});
+
+document.addEventListener('change', function(e){
+  if (e.target.id === 'task-employee'){
+    const emp = findEmp(e.target.value);
+    const dEl = document.getElementById('task-dept-display');
+    if (dEl && emp) dEl.textContent = DEPT_NAMES[emp.dept];
+  }
+  else if (e.target.name === 'task-type'){
+    const wrap = document.getElementById('timeline-wrap');
+    const input = document.getElementById('task-timeline');
+    if (e.target.value === 'insidentil'){
+      wrap.classList.remove('hidden'); if(input) input.required = true;
+    } else {
+      wrap.classList.add('hidden'); if(input) { input.required = false; input.value = ''; }
+    }
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-meeting-weekday'){
+    const v = Number(e.target.value);
+    apiCall('updateMeetingSetting','weekday',v).then(data=>{ state.data=data; render(); });
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-meeting-hour'){
+    const v = Number(e.target.value);
+    apiCall('updateMeetingSetting','hour',v).then(data=>{ state.data=data; render(); });
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-update-hour'){
+    const v = Number(e.target.value);
+    apiCall('updateMeetingSetting','updateHour',v).then(data=>{ state.data=data; render(); });
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-filter-dept'){
+    state.filter.dept = e.target.value; render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-filter-nama'){
+    state.filter.nama = e.target.value; render();
+  }
+});
+
+document.addEventListener('submit', function(e){
+  if (e.target.id === 'form-task'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const employeeId = fd.get('employee');
+    const emp = findEmp(employeeId);
+    const title = String(fd.get('title')||'').trim();
+    const type = fd.get('task-type') || 'reguler';
+    const timeline = type === 'insidentil' ? fd.get('timeline') : null;
+    if (!title){ showToast('Nama task wajib diisi'); return; }
+    if (type === 'insidentil' && !timeline){ showToast('Timeline wajib diisi untuk task insidentil'); return; }
+    const task = { employeeId, dept: emp.dept, title, type, timeline: timeline || null, createdBy: state.currentUser };
+    closeModal();
+    showToast('Menyimpan…');
+    apiCall('addTask', task).then(data=>{
+      state.data = data;
+      state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+      render();
+      showToast('Tugas baru ditambahkan');
+    }).catch(()=>{ showToast('Gagal menyimpan, coba lagi'); });
+  }
+  else if (e.target.id === 'form-progress'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const taskId = fd.get('task');
+    const note = String(fd.get('note')||'').trim();
+    const date = fd.get('date') || todayISO();
+    const pstatus = fd.get('progress-status') || 'ongoing';
+    let link = String(fd.get('link')||'').trim();
+    if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+    if (!taskId){ showToast('Pilih task dulu'); return; }
+    if (!note){ showToast('Catatan progress wajib diisi'); return; }
+    const entry = { taskId, date, note, status: pstatus, link: link || null, loggedBy: state.currentUser };
+    closeModal();
+    showToast('Menyimpan…');
+    apiCall('addProgress', entry).then(data=>{
+      state.data = data;
+      state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
+      render();
+      showToast('Progress tersimpan');
+    }).catch(()=>{ showToast('Gagal menyimpan, coba lagi'); });
+  }
+});
+
+/* ============================================================
+   Init
+   ============================================================ */
+async function init(){
+  try {
+    const last = localStorage.getItem(USER_KEY);
+    if (last && findEmp(last)) state.currentUser = last;
+  } catch(e){}
+
+  if (state.currentUser){
+    await initData();
+  } else {
+    render();
+  }
+}
+init();
+</script>
+</body>
+</html>
