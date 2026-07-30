@@ -473,6 +473,7 @@ function gsJSONP(fnName, ...args){
       const userRole = opts.userRole !== undefined ? opts.userRole : (emp ? emp.role : 'staff');
       params.set('salesName', salesName);
       params.set('userRole', userRole);
+      console.log('[gsJSONP] qsales_getDashboard params:', { salesName, userRole });
     }
     else if (fnName === 'qsales_getKPI') {
       const opts = args[0] || {};
@@ -481,6 +482,7 @@ function gsJSONP(fnName, ...args){
       const userRole = opts.userRole !== undefined ? opts.userRole : (emp ? emp.role : 'staff');
       params.set('salesName', salesName);
       params.set('userRole', userRole);
+      console.log('[gsJSONP] qsales_getKPI params:', { salesName, userRole });
     }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
@@ -1585,8 +1587,14 @@ async function fetchQSalesData(){
       salesName = state.qsalesFilterSales !== 'all' ? state.qsalesFilterSales : '';
       userRole = emp ? emp.role : 'owner';
     }
-    console.log('[QSales] Fetching dashboard for:', salesName || '(all)', '| role:', userRole);
+    console.log('[QSales] FETCH DASHBOARD START');
+    console.log('  currentUser:', state.currentUser);
+    console.log('  qsalesFilterSales:', state.qsalesFilterSales);
+    console.log('  isStaff:', isStaff);
+    console.log('  salesName:', salesName || '(all/empty)');
+    console.log('  userRole:', userRole);
     const result = await apiCall('qsales_getDashboard', { salesName, userRole });
+    console.log('[QSales] FETCH DASHBOARD RESULT:', result);
     console.log('[QSales] Response:', result);
     if (result && typeof result === 'object') {
       state.qsalesData = result;
@@ -1625,8 +1633,14 @@ async function fetchQSalesKPI(){
       salesName = state.qsalesFilterSales !== 'all' ? state.qsalesFilterSales : '';
       userRole = emp ? emp.role : 'owner';
     }
-    console.log('[QSales] Fetching KPI for:', salesName || '(all)', '| role:', userRole);
+    console.log('[QSales] FETCH KPI START');
+    console.log('  currentUser:', state.currentUser);
+    console.log('  qsalesFilterSales:', state.qsalesFilterSales);
+    console.log('  isStaff:', isStaff);
+    console.log('  salesName:', salesName || '(all/empty)');
+    console.log('  userRole:', userRole);
     const result = await apiCall('qsales_getKPI', { salesName, userRole });
+    console.log('[QSales] FETCH KPI RESULT:', result);
     console.log('[QSales] KPI Response:', result);
     if (result && typeof result === 'object' && !result.error) {
       state.qsalesKPIData = result;
@@ -2789,7 +2803,12 @@ function isAppAllowed(userId, appId){
   return getAllowedApps(userId).includes(appId);
 }
 function getSalesNames(){
-  return EMPLOYEES.filter(e => e.dept === 'sm' && e.role === 'staff').map(e => e.name);
+  // Hanya staff yang punya akses QSales di qcoSystem-nya
+  const emps = getEmployees();
+  return emps.filter(e => {
+    const rules = String(e.qcoSystem || e.QcoSystem || '').toLowerCase();
+    return rules.includes('sales') || rules.includes('qsales');
+  }).map(e => e.name);
 }
 
 </script>
