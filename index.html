@@ -2524,14 +2524,6 @@ document.addEventListener('click', function(e){
     }
     render();
   }
-  else if (el.dataset.action === 'set-qsales-filter'){
-    state.qsalesFilterSales = el.value;
-    state.qsalesData = null;
-    state.qsalesKPIData = null;
-    if (state.qsalesTab === 'dashboard' || state.qsalesTab === 'leads') fetchQSalesData();
-    if (state.qsalesTab === 'kpi') fetchQSalesKPI();
-    render();
-  }
   else if (el.dataset.action === 'reset-qsales-filter'){
     state.qsalesFilterSales = 'all';
     state.qsalesData = null;
@@ -2586,6 +2578,14 @@ document.addEventListener('change', function(e){
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-filter-nama'){
     state.filter.nama = e.target.value; render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-qsales-filter'){
+    state.qsalesFilterSales = e.target.value;
+    state.qsalesData = null;
+    state.qsalesKPIData = null;
+    if (state.qsalesTab === 'dashboard' || state.qsalesTab === 'leads') fetchQSalesData();
+    if (state.qsalesTab === 'kpi') fetchQSalesKPI();
+    render();
   }
 });
 
