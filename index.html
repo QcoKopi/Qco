@@ -259,6 +259,9 @@
     position:fixed; inset:0; background:rgba(43,29,20,.45); z-index:40;
     display:flex; align-items:flex-end; justify-content:center;
   }
+  .sheet-overlay.mn-overlay{
+    background:rgba(43,29,20,.65); z-index:50;
+  }
   @media (min-width:560px){.sheet-overlay{align-items:center;}}
   .sheet{
     background:var(--surface); width:100%; max-width:480px; max-height:88vh; overflow-y:auto;
@@ -2437,7 +2440,7 @@ function mnModalHTML(){
   const allEmps = getEmployees().filter(e => e.role !== 'owner' && e.id !== 'owner');
 
   return `
-    <div class="sheet-overlay" data-action="mn-overlay-close">
+    <div class="sheet-overlay mn-overlay" data-action="mn-overlay-close">
       <div class="sheet" data-stop="1">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
@@ -2456,9 +2459,9 @@ function mnModalHTML(){
           <div class="field">
             <label>Target</label>
             <div class="segmented">
-              <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''}>
+              <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='none'">
               <label for="mn-target-all">&#127760; Semua Staff</label>
-              <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''}>
+              <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='block'">
               <label for="mn-target-specific">&#128101; Staff Tertentu</label>
             </div>
           </div>
