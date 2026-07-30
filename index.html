@@ -401,6 +401,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -419,7 +420,7 @@ const CONFIG = {
 };
 
 /* ============================================================
-   API Layer — Dual Mode (GAS native vs GitHub Pages)
+   API Layer — JSONP Mode (CORS-free via <script> tag)
    ============================================================ */
 function isGASNative(){
   return (typeof google !== 'undefined' && google.script && google.script.run);
@@ -433,69 +434,104 @@ function gsNative(fnName, ...args){
   });
 }
 
-async function gsFetch(fnName, ...args){
-  // Build URL with query parameters (GET request — no CORS preflight issues)
-  const params = new URLSearchParams();
-  params.set('action', fnName);
+function gsJSONP(fnName, ...args){
+  return new Promise((resolve, reject) => {
+    // Build query parameters
+    const params = new URLSearchParams();
+    params.set('action', fnName);
 
-  if (fnName === 'updateMeetingSetting') {
-    params.set('key', args[0]);
-    params.set('value', args[1]);
-  }
-  else if (fnName === 'validatePin') {
-    params.set('userId', args[0]);
-    params.set('pin', args[1]);
-  }
-  else if (fnName === 'updatePin') {
-    params.set('userId', args[0]);
-    params.set('newPin', args[1]);
-  }
-  else if (fnName === 'addEmployee') {
-    params.set('payload', JSON.stringify(args[0]));
-  }
-  else if (fnName === 'deleteEmployee') {
-    params.set('userId', args[0]);
-  }
-  else if (fnName === 'toggleTaskStatus') {
-    params.set('taskId', args[0]);
-  }
-  else if (fnName === 'qsales_getDashboard') {
-    const emp = findEmp(state.currentUser);
-    if (emp) {
-      params.set('salesName', emp.name);
-      params.set('userRole', emp.role);
+    if (fnName === 'updateMeetingSetting') {
+      params.set('key', args[0]);
+      params.set('value', args[1]);
     }
-  }
-  else if (fnName === 'qsales_getKPI') {
-    const emp = findEmp(state.currentUser);
-    if (emp) {
-      params.set('salesName', emp.name);
-      params.set('userRole', emp.role);
+    else if (fnName === 'validatePin') {
+      params.set('userId', args[0]);
+      params.set('pin', args[1]);
     }
-  }
-  else if (args.length === 1) {
-    // For object payloads (addTask, addProgress), stringify to JSON
-    params.set('payload', JSON.stringify(args[0]));
-  }
-  else if (args.length >= 2) {
-    params.set('payload', JSON.stringify({ key: args[0], value: args[1] }));
-  }
+    else if (fnName === 'updatePin') {
+      params.set('userId', args[0]);
+      params.set('newPin', args[1]);
+    }
+    else if (fnName === 'addEmployee') {
+      params.set('payload', JSON.stringify(args[0]));
+    }
+    else if (fnName === 'deleteEmployee') {
+      params.set('userId', args[0]);
+    }
+    else if (fnName === 'toggleTaskStatus') {
+      params.set('taskId', args[0]);
+    }
+    else if (fnName === 'qsales_getDashboard') {
+      const emp = findEmp(state.currentUser);
+      if (emp) {
+        params.set('salesName', emp.name);
+        params.set('userRole', emp.role);
+      }
+    }
+    else if (fnName === 'qsales_getKPI') {
+      const emp = findEmp(state.currentUser);
+      if (emp) {
+        params.set('salesName', emp.name);
+        params.set('userRole', emp.role);
+      }
+    }
+    else if (args.length === 1) {
+      params.set('payload', JSON.stringify(args[0]));
+    }
+    else if (args.length >= 2) {
+      params.set('payload', JSON.stringify({ key: args[0], value: args[1] }));
+    }
 
-  const url = CONFIG.GAS_URL + '?' + params.toString();
-  const resp = await fetch(url, { method: 'GET' });
-  const json = await resp.json();
-  if (!json.success) throw new Error(json.error || 'API Error');
-  return json.data;
+    // Unique callback name
+    const cbName = '_qsjsonp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    params.set('callback', cbName);
+
+    const url = CONFIG.GAS_URL + '?' + params.toString();
+
+    // Create script tag
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+
+    // Timeout handler
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error('JSONP timeout — GAS tidak merespons dalam 15 detik'));
+    }, 15000);
+
+    // Callback handler
+    window[cbName] = function(resp) {
+      cleanup();
+      if (resp && resp.success) {
+        resolve(resp.data);
+      } else {
+        reject(new Error((resp && resp.error) || 'API Error'));
+      }
+    };
+
+    // Error handler
+    script.onerror = function() {
+      cleanup();
+      reject(new Error('JSONP failed — cek URL GAS & koneksi internet'));
+    };
+
+    function cleanup() {
+      clearTimeout(timeoutId);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    document.head.appendChild(script);
+  });
 }
 
 function apiCall(fnName, ...args){
   if (isGASNative()) {
     return gsNative(fnName, ...args);
   } else {
-    return gsFetch(fnName, ...args);
+    return gsJSONP(fnName, ...args);
   }
 }
-
 
 /* ============================================================
    QSYSTEM — Konfigurasi & Data Master
