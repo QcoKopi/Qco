@@ -891,6 +891,7 @@ async function initData(){
 }
 async function fetchManagementNotes(){
   if (!state.currentUser) return;
+  state.mnNotes = []; // clear dulu supaya tidak flash notes user lama
   state.mnLoading = true;
   if(!state.modal.open && !state.mnModalOpen) render();
   try {
@@ -1648,11 +1649,13 @@ function qtaskSettingsHTML(){
       <button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="manual-sync">🔄 Refresh Data</button>
     </div>
 
+    ${emp.role==='owner' ? `
     <div class="section-title">Data Mentah</div>
     <div class="card">
       <p style="font-size:12.5px; color:var(--ink-soft); margin-bottom:10px;">Semua task &amp; riwayat progress tersimpan sebagai baris biasa di Google Sheet.</p>
       <button class="btn btn-primary btn-block" data-action="open-sheet">📊 Buka Google Sheet</button>
     </div>
+    ` : ''}
   `;
 }
 
@@ -2592,6 +2595,9 @@ async function selectUser(id){
   state.currentUser = id;
   state.appTab = 'dashboard';
   state.qtaskTab = 'home';
+  state.mnNotes = []; // clear notes lama saat ganti user
+  state.mnModalOpen = false;
+  state.mnEditingId = null;
   await initData();
   fetchManagementNotes();
   render();
@@ -2683,6 +2689,9 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'switch-user'){
     state.currentUser = null;
     state.appTab = 'dashboard';
+    state.mnNotes = [];
+    state.mnModalOpen = false;
+    state.mnEditingId = null;
     render();
   }
   else if (el.dataset.action === 'manual-sync'){
