@@ -440,6 +440,9 @@ function gsJSONP(fnName, ...args){
     const params = new URLSearchParams();
     params.set('action', fnName);
 
+    // DEBUG: log every API call
+    console.log('[QSystem] API Call:', fnName, 'args:', args);
+
     if (fnName === 'updateMeetingSetting') {
       params.set('key', args[0]);
       params.set('value', args[1]);
@@ -510,9 +513,13 @@ function gsJSONP(fnName, ...args){
     };
 
     // Error handler
-    script.onerror = function() {
+    script.onerror = function(evt) {
       cleanup();
-      reject(new Error('JSONP failed — cek URL GAS & koneksi internet'));
+      console.error('[QSystem] JSONP script.onerror triggered');
+      console.error('  URL:', url);
+      console.error('  Action:', fnName);
+      console.error('  Event:', evt);
+      reject(new Error('JSONP failed — GAS tidak merespons JS valid. Penyebab: (1) URL GAS salah/sudah expired, (2) GAS belum deploy ulang setelah revisi, (3) Ada error di server GAS (cek Execution Log), (4) Script GAS return HTML error page bukan JavaScript'));
     };
 
     function cleanup() {
@@ -520,6 +527,34 @@ function gsJSONP(fnName, ...args){
       delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
     }
+
+    document.head.appendChild(script);
+  });
+}
+
+/* ---------- Test koneksi ke GAS ---------- */
+function testGASConnection(){
+  return new Promise((resolve, reject) => {
+    const cbName = '_qstest_' + Date.now();
+    const testUrl = CONFIG.GAS_URL + '?action=getData&callback=' + cbName;
+    console.log('[QSystem] Testing GAS connection:', testUrl);
+
+    const script = document.createElement('script');
+    script.src = testUrl;
+
+    window[cbName] = function(resp) {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      console.log('[QSystem] GAS test response:', resp);
+      resolve(resp);
+    };
+
+    script.onerror = function() {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      console.error('[QSystem] GAS test FAILED — URL tidak bisa diakses');
+      reject(new Error('GAS URL tidak merespons'));
+    };
 
     document.head.appendChild(script);
   });
@@ -2310,6 +2345,16 @@ document.addEventListener('submit', function(e){
    Init
    ============================================================ */
 async function init(){
+  // Test GAS connection first (debug only, doesn't block UI)
+  try {
+    await testGASConnection();
+    console.log('[QSystem] ✅ GAS connection OK');
+  } catch(e) {
+    console.error('[QSystem] ❌ GAS connection failed:', e.message);
+    console.error('[QSystem] Current GAS_URL:', CONFIG.GAS_URL);
+    console.error('[QSystem] Pastikan: (1) URL sudah di-update ke deployment terbaru, (2) Deployment mode = Execute as Me + Anyone, (3) Semua file .gs sudah di-save');
+  }
+
   // Always show login screen — PIN required every time
   // Pre-load data in background for faster validation
   try {
@@ -2317,6 +2362,7 @@ async function init(){
     state.syncStatus = 'synced';
     state.lastSyncedAt = Date.now();
   } catch(e){
+    console.error('[QSystem] getData failed:', e);
     state.syncStatus = 'offline';
   }
   render();
