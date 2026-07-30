@@ -485,6 +485,19 @@ function gsJSONP(fnName, ...args){
       params.set('userRole', userRole);
       console.log('[gsJSONP] qsales_getKPI params:', { salesName, userRole });
     }
+    else if (fnName === 'getManagementNotes') {
+      params.set('viewerId', args[0]);
+      console.log('[gsJSONP] getManagementNotes viewerId:', args[0]);
+    }
+    else if (fnName === 'deleteManagementNote') {
+      params.set('id', args[0]);
+      console.log('[gsJSONP] deleteManagementNote id:', args[0]);
+    }
+    else if (fnName === 'toggleManagementNote') {
+      params.set('id', args[0]);
+      params.set('isActive', String(args[1]));
+      console.log('[gsJSONP] toggleManagementNote:', { id: args[0], isActive: args[1] });
+    }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
     }
