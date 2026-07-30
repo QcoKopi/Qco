@@ -256,11 +256,14 @@
 
   /* ---------- Sheet / Modal ---------- */
   .sheet-overlay{
-    position:fixed; inset:0; background:rgba(43,29,20,.45); z-index:40;
+    position:fixed; inset:0; background:rgba(43,29,20,.75); z-index:40;
     display:flex; align-items:flex-end; justify-content:center;
   }
   .sheet-overlay.mn-overlay{
-    background:rgba(43,29,20,.65); z-index:50;
+    background:rgba(43,29,20,.85); z-index:50;
+  }
+  .sheet-overlay.mn-overlay .sheet{
+    background:#FFFFFF; box-shadow:0 20px 60px rgba(0,0,0,.4);
   }
   @media (min-width:560px){.sheet-overlay{align-items:center;}}
   .sheet{
@@ -491,6 +494,10 @@ function gsJSONP(fnName, ...args){
     else if (fnName === 'getManagementNotes') {
       params.set('viewerId', args[0]);
       console.log('[gsJSONP] getManagementNotes viewerId:', args[0]);
+    }
+    else if (fnName === 'getAllManagementNotes') {
+      // No params needed for owner
+      console.log('[gsJSONP] getAllManagementNotes');
     }
     else if (fnName === 'deleteManagementNote') {
       params.set('id', args[0]);
@@ -887,7 +894,10 @@ async function fetchManagementNotes(){
   state.mnLoading = true;
   if(!state.modal.open && !state.mnModalOpen) render();
   try {
-    const result = await apiCall('getManagementNotes', state.currentUser);
+    const emp = findEmp(state.currentUser);
+    const isOwner = emp && emp.role === 'owner';
+    const action = isOwner ? 'getAllManagementNotes' : 'getManagementNotes';
+    const result = await apiCall(action, state.currentUser);
     if (result && result.notes) state.mnNotes = result.notes;
   } catch(e) { console.error('MN fetch error:', e); }
   state.mnLoading = false;
