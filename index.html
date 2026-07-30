@@ -402,6 +402,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -664,7 +665,11 @@ let state = {
   qsalesData: null,
   qsalesLoading: false,
   qsalesError: null,
-  qsalesTab: 'dashboard', // dashboard | leads | kunjungan
+  qsalesTab: 'dashboard', // dashboard | leads | kpi | kunjungan
+  // QSales KPI sub-state
+  qsalesKPIData: null,
+  qsalesKPILoading: false,
+  qsalesKPIError: null,
   data: defaultData(),
   syncStatus: 'idle',
   lastSyncedAt: null,
@@ -1576,6 +1581,37 @@ async function fetchQSalesData(){
   render();
 }
 
+
+
+/* ============================================================
+   QSALES — KPI Data Fetch
+   ============================================================ */
+async function fetchQSalesKPI(){
+  if (state.qsalesKPILoading) return;
+  state.qsalesKPILoading = true;
+  state.qsalesKPIError = null;
+  render();
+  try {
+    const emp = findEmp(state.currentUser);
+    const salesName = emp ? emp.name : '';
+    const userRole = emp ? emp.role : 'staff';
+    console.log('[QSales] Fetching KPI for:', salesName, '| role:', userRole);
+    const result = await apiCall('qsales_getKPI');
+    console.log('[QSales] KPI Response:', result);
+    if (result && typeof result === 'object' && !result.error) {
+      state.qsalesKPIData = result;
+    } else {
+      throw new Error(result.error || 'Response tidak valid dari server');
+    }
+    state.qsalesKPILoading = false;
+  } catch(e) {
+    console.error('[QSales] KPI Fetch error:', e);
+    state.qsalesKPILoading = false;
+    state.qsalesKPIError = e.message || 'Gagal memuat data KPI. Pastikan GAS sudah deploy dengan file 06_QSales.gs';
+    showToast('QSales KPI: ' + state.qsalesKPIError);
+  }
+  render();
+}
 function qsalesSubNavHTML(){
   const tabBtn = (tab, label) => `
     <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
@@ -1584,6 +1620,7 @@ function qsalesSubNavHTML(){
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
       ${tabBtn('dashboard','📊 Dashboard')}
       ${tabBtn('leads','🎯 Leads')}
+      ${tabBtn('kpi','📈 KPI')}
       ${tabBtn('kunjungan','📅 Kunjungan')}
     </div>
   `;
@@ -1745,6 +1782,224 @@ function qsalesKunjunganHTML(){
       <span class="icon" style="font-size:32px; margin-bottom:12px; display:block;">📅</span>
       <p style="color:var(--ink-soft); font-size:13px; margin-bottom:16px;">Jadwal kunjungan lengkap tersedia di Portal QSales.</p>
       <button class="btn btn-primary" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">Buka Portal QSales</button>
+    </div>
+  `;
+}
+
+
+/* ============================================================
+   QSALES — KPI Dashboard HTML
+   ============================================================ */
+function qsalesKPIHTML(){
+  if (state.qsalesKPILoading){
+    return `
+      <div class="empty-state"><span class="icon">📊</span><p>Menghitung KPI Sales...</p></div>
+    `;
+  }
+  if (state.qsalesKPIError){
+    return `
+      <div class="greeting">KPI Sales 📈</div>
+      <div class="greeting-sub">Gagal memuat data KPI</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;">
+          <b>⚠ Error:</b> ${escapeHTML(state.qsalesKPIError)}
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">
+          Penyebab umum:<br>
+          1. GAS belum deploy dengan file 06_QSales.gs (revisi KPI)<br>
+          2. URL GAS belum diupdate di CONFIG<br>
+          3. Sheet ENTRY belum ada di spreadsheet
+        </div>
+        <button class="btn btn-primary" data-action="qsales-refresh">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+  const d = state.qsalesKPIData;
+  if (!d){
+    fetchQSalesKPI();
+    return `<div class="empty-state"><p>Memuat data KPI...</p></div>`;
+  }
+
+  const emp = findEmp(state.currentUser);
+  const isStaff = emp && emp.role === 'staff';
+  const summary = d.summary || {};
+  const monthly = d.monthly || [];
+  const weekly = d.weekly || [];
+  const daily = d.daily || [];
+
+  // Monthly HTML
+  const monthlyHTML = monthly.map(m => {
+    const achievementRate = m.target > 0 ? Math.round((m.totalVisit / m.target) * 100) : 0;
+    const isAchieved = m.status === 'TERCAPAI';
+    const statusColor = isAchieved ? 'var(--success)' : 'var(--warning)';
+
+    const salesBreakdown = (m.bySales || []).map(bs => {
+      const bsRate = m.target > 0 ? Math.round((bs.count / m.target) * 100) : 0;
+      return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--line); font-size:12px;">
+        <span>${escapeHTML(bs.sales)}</span>
+        <span><b>${bs.count}</b> visit <span style="color:var(--ink-faint);">(${bsRate}%)</span></span>
+      </div>`;
+    }).join('');
+
+    return `
+      <div class="card" style="margin-bottom:10px; border-left:4px solid ${statusColor};">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+          <div>
+            <div style="font-weight:700; font-size:15px;">${escapeHTML(m.monthName)}</div>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
+              ${m.isCurrentMonth ? '<span class="badge badge-ongoing">Bulan Ini</span> ' : ''}
+              ${m.workingDays} hari kerja · ${m.effectiveDays} hari efektif
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:24px; font-weight:500; color:${statusColor};">${m.totalVisit}</div>
+            <div style="font-size:11px; color:var(--ink-soft);">dari ${m.target} target</div>
+          </div>
+        </div>
+        <div style="background:var(--surface-alt); border-radius:8px; padding:8px 10px; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+            <span>Pencapaian</span>
+            <span style="font-weight:700; color:${statusColor};">${achievementRate}%</span>
+          </div>
+          <div style="height:6px; background:var(--line); border-radius:99px; overflow:hidden;">
+            <div style="height:100%; width:${Math.min(achievementRate, 100)}%; background:${statusColor}; border-radius:99px; transition:width .3s ease;"></div>
+          </div>
+        </div>
+        ${!isStaff ? `<div style="margin-top:8px;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px; letter-spacing:.04em;">Per Sales</div>
+          ${salesBreakdown || '<div style="font-size:12px; color:var(--ink-faint);">Tidak ada data</div>'}
+        </div>` : ''}
+        ${m.gap > 0 ? `<div style="font-size:12px; color:var(--danger); margin-top:6px;">⚠ Kurang ${m.gap} visit untuk mencapai target</div>` : ''}
+        ${isAchieved ? `<div style="font-size:12px; color:var(--success); margin-top:6px;">✅ Target bulanan tercapai!</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Weekly HTML (last 8 weeks)
+  const weeklyHTML = weekly.slice(-8).reverse().map(w => {
+    const isAchieved = w.status === 'TERCAPAI';
+    const statusColor = isAchieved ? 'var(--success)' : 'var(--warning)';
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--surface);">
+        <div>
+          <div style="font-weight:600; font-size:13px;">${escapeHTML(w.weekLabel)}</div>
+          <div style="font-size:11px; color:var(--ink-soft);">${w.month}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${statusColor};">${w.totalVisit}</div>
+          <div style="font-size:11px; color:var(--ink-soft);">/ ${w.target}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Daily HTML (last 14 days)
+  const dailyHTML = daily.slice(-14).reverse().map(day => {
+    const isAchieved = day.status === 'TERCAPAI';
+    const statusColor = isAchieved ? 'var(--success)' : (day.isWorkingDay ? 'var(--danger)' : 'var(--ink-faint)');
+    const dateObj = new Date(day.date + 'T00:00:00');
+    const dayName = DAYS_ID[dateObj.getDay()];
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); ${!day.isWorkingDay ? 'opacity:.6;' : ''}">
+        <div>
+          <div style="font-weight:600; font-size:12px;">${dayName}, ${fmtDate(day.date)}</div>
+          <div style="font-size:11px; color:var(--ink-soft);">
+            ${day.isWorkingDay ? 'Hari Kerja' : 'Libur'}
+            ${day.visit1 > 0 ? ` · V1:${day.visit1}` : ''}
+            ${day.visit2 > 0 ? ` · V2:${day.visit2}` : ''}
+            ${day.visit3 > 0 ? ` · V3:${day.visit3}` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--font-mono); font-size:16px; font-weight:500; color:${statusColor};">${day.totalVisit}</div>
+          <div style="font-size:10px; color:var(--ink-soft);">/ ${day.target}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // First entry info
+  const firstEntryHTML = (d.salesFirstEntry || []).map(fe => `
+    <div style="font-size:12px; color:var(--ink-soft); padding:2px 0;">
+      ${escapeHTML(fe.sales)}: mulai ${fmtDate(fe.firstDate)}
+    </div>
+  `).join('');
+
+  return `
+    <div class="greeting">KPI Sales 📈</div>
+    <div class="greeting-sub">
+      Target: ${d.dailyTarget} visit/hari · ${d.workDaysPerWeek} hari/minggu
+      ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)}</span>` : ''}
+    </div>
+
+    ${qsalesSubNavHTML()}
+
+    <div class="section-title">Ringkasan Pencapaian</div>
+    <div class="quick-stats">
+      <div class="qstat">
+        <div class="qnum" style="color:var(--accent-dark);">${summary.daysAchieved || 0}</div>
+        <div class="qlbl">Hari Tercapai</div>
+      </div>
+      <div class="qstat">
+        <div class="qnum" style="color:var(--po);">${summary.totalDaysTracked || 0}</div>
+        <div class="qlbl">Total Hari Tracked</div>
+      </div>
+      <div class="qstat">
+        <div class="qnum" style="color:${summary.daysAchievementRate >= 80 ? 'var(--success)' : summary.daysAchievementRate >= 50 ? 'var(--warning)' : 'var(--danger)'}">${summary.daysAchievementRate || 0}%</div>
+        <div class="qlbl">Achievement Rate</div>
+      </div>
+      <div class="qstat">
+        <div class="qnum" style="color:var(--accent-dark);">${summary.currentWeeksAchieved || 0}/${summary.currentWeeksTracked || 0}</div>
+        <div class="qlbl">Minggu Tercapai</div>
+      </div>
+    </div>
+
+    ${summary.currentMonth ? `
+    <div class="card" style="background:linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%); border-color:var(--accent); margin-bottom:16px;">
+      <div style="font-weight:700; font-size:15px; margin-bottom:8px;">📅 Bulan Berjalan: ${escapeHTML(summary.currentMonth.monthName)}</div>
+      <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;">
+        <div>
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;">Target Bulanan</div>
+          <div style="font-family:var(--font-mono); font-size:22px; font-weight:500;">${summary.currentMonth.target}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;">Realisasi</div>
+          <div style="font-family:var(--font-mono); font-size:22px; font-weight:500; color:${summary.currentMonth.status === 'TERCAPAI' ? 'var(--success)' : 'var(--accent-dark)'}">${summary.currentMonth.totalVisit}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;">Hari Kerja</div>
+          <div style="font-size:18px; font-weight:600;">${summary.currentMonth.workingDays}</div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em;">Hari Efektif</div>
+          <div style="font-size:18px; font-weight:600;">${summary.currentMonth.effectiveDays}</div>
+        </div>
+      </div>
+      ${summary.currentMonth.gap > 0 ? `<div style="margin-top:10px; font-size:12px; color:var(--danger);">⚠ Masih kurang ${summary.currentMonth.gap} visit</div>` : ''}
+      ${summary.currentMonth.status === 'TERCAPAI' ? `<div style="margin-top:10px; font-size:12px; color:var(--success);">✅ Target bulanan tercapai!</div>` : ''}
+    </div>
+    ` : ''}
+
+    <div class="section-title">Per Bulan</div>
+    ${monthly.length ? monthlyHTML : `<div class="empty-state">Belum ada data bulanan.</div>`}
+
+    <div class="section-title">Per Minggu (8 Minggu Terakhir)</div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      ${weekly.length ? weeklyHTML : `<div class="empty-state" style="border:none; box-shadow:none;">Belum ada data mingguan.</div>`}
+    </div>
+
+    <div class="section-title">Per Hari (14 Hari Terakhir)</div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      ${daily.length ? dailyHTML : `<div class="empty-state" style="border:none; box-shadow:none;">Belum ada data harian.</div>`}
+    </div>
+
+    <div class="section-title">Informasi Awal Data</div>
+    <div class="card">
+      <div style="font-size:12px; color:var(--ink-soft); margin-bottom:8px;">Data pertama kali tercatat:</div>
+      ${firstEntryHTML || '<div style="font-size:12px; color:var(--ink-faint);">Tidak ada informasi</div>'}
+      <div style="margin-top:10px; font-size:11px; color:var(--ink-faint);">
+        ${escapeHTML(d.workDaysDescription || '')}
+      </div>
     </div>
   `;
 }
@@ -2034,6 +2289,7 @@ function render(){
   } else if (state.appTab === 'qsales'){
     if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
+    else if (state.qsalesTab === 'kpi') body = qsalesKPIHTML();
     else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
     else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
   } else if (state.appTab === 'qaff'){
@@ -2195,12 +2451,18 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'switch-qsales-tab'){
     state.qsalesTab = el.dataset.tab;
+    if (state.qsalesTab === 'kpi' && !state.qsalesKPIData && !state.qsalesKPILoading) {
+      fetchQSalesKPI();
+    }
     render();
   }
   else if (el.dataset.action === 'qsales-refresh'){
     state.qsalesError = null;
     state.qsalesData = null;
+    state.qsalesKPIError = null;
+    state.qsalesKPIData = null;
     fetchQSalesData();
+    if (state.qsalesTab === 'kpi') fetchQSalesKPI();
   }
   else if (el.dataset.action === 'reset-filter'){
     state.filter = { dept:'all', nama:'all' };
