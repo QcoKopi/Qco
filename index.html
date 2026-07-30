@@ -1716,6 +1716,18 @@ function qsalesDashboardHTML(){
     </div>
   ` : '';
 
+  // Show debug info if available
+  const debugInfo = d.debug ? `
+    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
+      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
+      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
+      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
+      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
+      <div>isStaff: ${d.debug.isStaff}</div>
+      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
+    </div>
+  ` : '';
+
   return `
     <div class="greeting">QSales Intelligence 🎯</div>
     <div class="greeting-sub">
@@ -1724,6 +1736,7 @@ function qsalesDashboardHTML(){
       ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
+    ${debugInfo}
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
@@ -1995,6 +2008,18 @@ function qsalesKPIHTML(){
     </div>
   `).join('');
 
+  // Show debug info if available
+  const debugInfoKPI = d.debug ? `
+    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
+      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
+      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
+      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
+      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
+      <div>isStaff: ${d.debug.isStaff}</div>
+      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
+    </div>
+  ` : '';
+
   return `
     <div class="greeting">KPI Sales 📈</div>
     <div class="greeting-sub">
@@ -2003,6 +2028,7 @@ function qsalesKPIHTML(){
       ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
+    ${debugInfoKPI}
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
