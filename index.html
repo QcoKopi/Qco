@@ -574,6 +574,7 @@ function apiCall(fnName, ...args){
    ============================================================ */
 const EMPLOYEES = [
   { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative' },
+  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Sales Representative' },
   { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist' },
   { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor' },
   { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff' },
@@ -582,9 +583,9 @@ const EMPLOYEES = [
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
-  rizky: ['reza','nanda','rizky'],
+  rizky: ['reza','rasya','nanda','rizky'],
   umay: ['razak','umay'],
-  owner: ['reza','nanda','rizky','razak','umay'],
+  owner: ['reza','rasya','nanda','rizky','razak','umay'],
 };
 const USER_KEY = 'qsystem-current-user';
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -593,6 +594,13 @@ const DAYS_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 // Jobdesk per staff
 const JOBDESK = {
   reza: [
+    'Kunjungan cafe & prospecting (target: 113+ cafe)',
+    'Tracking status: On Going, Stop, dan Order',
+    'Catatan & temuan kunjungan cafe',
+    'Clustering & prioritas cafe',
+    'Input data ke QSales'
+  ],
+  rasya: [
     'Kunjungan cafe & prospecting (target: 113+ cafe)',
     'Tracking status: On Going, Stop, dan Order',
     'Catatan & temuan kunjungan cafe',
