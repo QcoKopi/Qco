@@ -485,6 +485,19 @@ function gsJSONP(fnName, ...args){
       params.set('userRole', userRole);
       console.log('[gsJSONP] qsales_getKPI params:', { salesName, userRole });
     }
+    else if (fnName === 'getManagementNotes') {
+      params.set('viewerId', args[0]);
+      console.log('[gsJSONP] getManagementNotes viewerId:', args[0]);
+    }
+    else if (fnName === 'deleteManagementNote') {
+      params.set('id', args[0]);
+      console.log('[gsJSONP] deleteManagementNote id:', args[0]);
+    }
+    else if (fnName === 'toggleManagementNote') {
+      params.set('id', args[0]);
+      params.set('isActive', String(args[1]));
+      console.log('[gsJSONP] toggleManagementNote:', { id: args[0], isActive: args[1] });
+    }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
     }
@@ -1296,13 +1309,13 @@ function mnBannerHTML(){
   return notes.map(n => `
     <div class="card" style="background:linear-gradient(135deg, #FFF8E7 0%, #FFF0C7 100%); border-color:#E6C68E; margin-bottom:14px;">
       <div style="display:flex; align-items:flex-start; gap:10px;">
-        <span style="font-size:22px; flex:none;">📢</span>
+        <span style="font-size:22px; flex:none;">&#128227;</span>
         <div style="flex:1;">
-          <div style="font-weight:700; font-size:13px; color:#8A5620; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;">📢 Notes from Management</div>
+          <div style="font-weight:700; font-size:13px; color:#8A5620; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;">&#128227; Notes from Management</div>
           <div style="font-weight:700; font-size:15px; color:var(--ink); margin-bottom:6px;">${escapeHTML(n.title)}</div>
           <div style="font-size:13.5px; color:var(--ink-soft); line-height:1.5;">${escapeHTML(n.content).replace(/\n/g,'<br>')}</div>
           <div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">
-            ${fmtDate(String(n.timestamp).split(' ')[0])} · ${n.targetType === 'all' ? '������ Semua Staff' : '������ Staff Tertentu'}
+            ${fmtDate(String(n.timestamp).split(' ')[0])} &#183; ${n.targetType === 'all' ? '&#127760; Semua Staff' : '&#128101; Staff Tertentu'}
           </div>
         </div>
       </div>
@@ -1564,7 +1577,7 @@ function qtaskSettingsHTML(){
     ` : ''}
 
     ${emp.role==='owner' ? `
-    <div class="section-title">📢 Management Notes</div>
+    <div class="section-title">&#128227; Management Notes</div>
     <div class="card">
       <div style="margin-bottom:12px;">
         <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Daftar Announcement (${state.mnNotes.length})</div>
@@ -1577,12 +1590,12 @@ function qtaskSettingsHTML(){
             </div>
             <div style="font-size:12px; color:var(--ink-soft); margin-top:3px;">${escapeHTML(n.content).substring(0,80)}${n.content.length>80?'...':''}</div>
             <div style="font-size:11px; color:var(--ink-faint); margin-top:4px;">
-              ${n.targetType==='all'?'������ Semua Staff':'������ ' + (n.targetStaff || []).map(id => (findEmp(id)||{}).name || id).join(', ')}
+              ${n.targetType==='all'?'&#127760; Semua Staff':'&#128101; ' + (n.targetStaff || []).map(id => (findEmp(id)||{}).name || id).join(', ')}
             </div>
             <div style="display:flex; gap:6px; margin-top:8px;">
-              <button class="btn btn-primary btn-sm" data-action="mn-edit" data-id="${n.id}">✏️ Edit</button>
-              <button class="btn btn-ghost btn-sm" data-action="mn-toggle" data-id="${n.id}" data-active="${String(!n.isActive)}">${n.isActive ? '⏸️ Nonaktifkan' : '▶️ Aktifkan'}</button>
-              <button class="btn btn-danger-ghost btn-sm" data-action="mn-delete" data-id="${n.id}">������️ Hapus</button>
+              <button class="btn btn-primary btn-sm" data-action="mn-edit" data-id="${n.id}">&#9999;&#65039; Edit</button>
+              <button class="btn btn-ghost btn-sm" data-action="mn-toggle" data-id="${n.id}" data-active="${String(!n.isActive)}">${n.isActive ? '&#9208;&#65039; Nonaktifkan' : '&#9654;&#65039; Aktifkan'}</button>
+              <button class="btn btn-danger-ghost btn-sm" data-action="mn-delete" data-id="${n.id}">&#128465;&#65039; Hapus</button>
             </div>
           </div>
         `).join('')}
@@ -2428,8 +2441,8 @@ function mnModalHTML(){
       <div class="sheet" data-stop="1">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
-          <h3>${editing ? '✏️ Edit' : '＋ Buat'} Notes</h3>
-          <button class="sheet-close" data-action="mn-close-modal">✕</button>
+          <h3>${editing ? '&#9999;&#65039; Edit' : '＋ Buat'} Notes</h3>
+          <button class="sheet-close" data-action="mn-close-modal">&#10005;</button>
         </div>
         <form id="form-mn">
           <div class="field">
@@ -2444,9 +2457,9 @@ function mnModalHTML(){
             <label>Target</label>
             <div class="segmented">
               <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''}>
-              <label for="mn-target-all">������ Semua Staff</label>
+              <label for="mn-target-all">&#127760; Semua Staff</label>
               <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''}>
-              <label for="mn-target-specific">������ Staff Tertentu</label>
+              <label for="mn-target-specific">&#128101; Staff Tertentu</label>
             </div>
           </div>
           <div class="field" id="mn-staff-select" style="${editing && editing.targetType==='specific' ? '' : 'display:none;'}">
@@ -2455,7 +2468,7 @@ function mnModalHTML(){
               ${allEmps.map(e => `
                 <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; cursor:pointer; padding:8px; border-radius:8px; background:var(--surface-alt); border:1.5px solid transparent;">
                   <input type="checkbox" name="mn-staff" value="${e.id}" ${editing && editing.targetStaff && editing.targetStaff.includes(e.id) ? 'checked' : ''}>
-                  <span>${e.name} · ${e.jabatan}</span>
+                  <span>${e.name} &#183; ${e.jabatan}</span>
                 </label>
               `).join('')}
             </div>
@@ -2743,10 +2756,17 @@ document.addEventListener('click', function(e){
       fetchManagementNotes();
     }).catch(err=>showToast('Gagal: ' + (err.message||err)));
   }
-  else if (el.dataset.action === 'mn-close-modal' || el.dataset.action === 'mn-overlay-close'){
+  else if (el.dataset.action === 'mn-close-modal'){
     state.mnModalOpen = false; state.mnEditingId = null;
     const existingMN = document.getElementById('mn-modal-overlay');
     if (existingMN) existingMN.remove();
+  }
+  else if (el.dataset.action === 'mn-overlay-close'){
+    if (!e.target.closest('[data-stop]')) {
+      state.mnModalOpen = false; state.mnEditingId = null;
+      const existingMN = document.getElementById('mn-modal-overlay');
+      if (existingMN) existingMN.remove();
+    }
   }
 });
 
