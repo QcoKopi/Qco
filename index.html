@@ -485,19 +485,6 @@ function gsJSONP(fnName, ...args){
       params.set('userRole', userRole);
       console.log('[gsJSONP] qsales_getKPI params:', { salesName, userRole });
     }
-    else if (fnName === 'getManagementNotes') {
-      params.set('viewerId', args[0]);
-      console.log('[gsJSONP] getManagementNotes viewerId:', args[0]);
-    }
-    else if (fnName === 'deleteManagementNote') {
-      params.set('id', args[0]);
-      console.log('[gsJSONP] deleteManagementNote id:', args[0]);
-    }
-    else if (fnName === 'toggleManagementNote') {
-      params.set('id', args[0]);
-      params.set('isActive', String(args[1]));
-      console.log('[gsJSONP] toggleManagementNote:', { id: args[0], isActive: args[1] });
-    }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
     }
@@ -2482,18 +2469,21 @@ function mnModalHTML(){
 }
 
 function renderModal(){
+  // QSystem main modal
   const existing = document.getElementById('qsystem-modal-overlay');
   if (existing) existing.remove();
-  if (!state.modal.open) return;
-  const html = modalHTML();
-  if (!html) return;
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = html;
-  const overlay = wrapper.firstElementChild;
-  overlay.id = 'qsystem-modal-overlay';
-  document.body.appendChild(overlay);
+  if (state.modal.open) {
+    const html = modalHTML();
+    if (html) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = html;
+      const overlay = wrapper.firstElementChild;
+      overlay.id = 'qsystem-modal-overlay';
+      document.body.appendChild(overlay);
+    }
+  }
 
-  // Render Management Notes modal
+  // Management Notes modal
   const existingMN = document.getElementById('mn-modal-overlay');
   if (existingMN) existingMN.remove();
   if (state.mnModalOpen) {
@@ -2732,10 +2722,12 @@ document.addEventListener('click', function(e){
     render();
   }
   else if (el.dataset.action === 'mn-open-modal'){
-    state.mnModalOpen = true; state.mnEditingId = null; renderModal();
+    state.mnModalOpen = true; state.mnEditingId = null;
+    renderModal();
   }
   else if (el.dataset.action === 'mn-edit'){
-    state.mnModalOpen = true; state.mnEditingId = el.dataset.id; renderModal();
+    state.mnModalOpen = true; state.mnEditingId = el.dataset.id;
+    renderModal();
   }
   else if (el.dataset.action === 'mn-delete'){
     if (!confirm('Hapus notes ini?')) return;
