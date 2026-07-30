@@ -404,6 +404,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -690,6 +691,11 @@ let state = {
   modal: { open:false, mode:'task', presetTaskId:null },
   expanded: {},
   filter: { dept:'all', nama:'all' },
+  // --- Management Notes ---
+  mnNotes: [],
+  mnLoading: false,
+  mnModalOpen: false,
+  mnEditingId: null,
 };
 
 function defaultData(){
@@ -860,6 +866,18 @@ async function initData(){
   }
   render();
 }
+async function fetchManagementNotes(){
+  if (!state.currentUser) return;
+  state.mnLoading = true;
+  if(!state.modal.open && !state.mnModalOpen) render();
+  try {
+    const result = await apiCall('getManagementNotes', state.currentUser);
+    if (result && result.notes) state.mnNotes = result.notes;
+  } catch(e) { console.error('MN fetch error:', e); }
+  state.mnLoading = false;
+  if(!state.modal.open && !state.mnModalOpen) render();
+}
+
 async function refreshData(){
   try {
     state.data = await apiCall('getData');
@@ -868,7 +886,8 @@ async function refreshData(){
   } catch(e){
     state.syncStatus = 'offline';
   }
-  if (!state.modal.open) render();
+  if (state.currentUser) fetchManagementNotes();
+  if (!state.modal.open && !state.mnModalOpen) render();
   else {
     const pill = document.querySelector('.sync-pill');
     if (pill) {
@@ -1271,6 +1290,26 @@ function bottomNavHTML(){
 /* ============================================================
    RENDER — Dashboard Staff
    ============================================================ */
+function mnBannerHTML(){
+  const notes = state.mnNotes || [];
+  if (!notes.length) return '';
+  return notes.map(n => `
+    <div class="card" style="background:linear-gradient(135deg, #FFF8E7 0%, #FFF0C7 100%); border-color:#E6C68E; margin-bottom:14px;">
+      <div style="display:flex; align-items:flex-start; gap:10px;">
+        <span style="font-size:22px; flex:none;">📢</span>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:13px; color:#8A5620; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;">📢 Notes from Management</div>
+          <div style="font-weight:700; font-size:15px; color:var(--ink); margin-bottom:6px;">${escapeHTML(n.title)}</div>
+          <div style="font-size:13.5px; color:var(--ink-soft); line-height:1.5;">${escapeHTML(n.content).replace(/\n/g,'<br>')}</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">
+            ${fmtDate(String(n.timestamp).split(' ')[0])} · ${n.targetType === 'all' ? '������ Semua Staff' : '������ Staff Tertentu'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
 function dashboardHTML(){
   const emp = findEmp(state.currentUser);
   const myTasks = tasksOf(state.currentUser).filter(t=>t.status==='aktif');
@@ -1279,6 +1318,7 @@ function dashboardHTML(){
   const jobdeskList = JOBDESK[emp.id] || [];
 
   return `
+    ${mnBannerHTML()}
     <div class="greeting">Halo, ${emp.name} 👋</div>
     <div class="greeting-sub">${emp.jabatan} · ${DEPT_NAMES[emp.dept]}</div>
 
@@ -1350,6 +1390,7 @@ function qtaskHomeHTML(){
   const curWeekLabel = weekLabel(currentCycleStart());
 
   return `
+    ${mnBannerHTML()}
     <div class="greeting">Halo, ${emp.name} 👋</div>
     <div class="greeting-sub">${DEPT_NAMES[emp.dept]}${emp.role==='spv' ? ' · Supervisor' : ''}</div>
 
@@ -1519,6 +1560,34 @@ function qtaskSettingsHTML(){
         </div>
       </div>
       <button class="btn btn-primary btn-block" data-action="open-add-employee">＋ Tambah Staff Baru</button>
+    </div>
+    ` : ''}
+
+    ${emp.role==='owner' ? `
+    <div class="section-title">📢 Management Notes</div>
+    <div class="card">
+      <div style="margin-bottom:12px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Daftar Announcement (${state.mnNotes.length})</div>
+        ${(state.mnNotes || []).length === 0 ? '<div style="font-size:12.5px; color:var(--ink-faint); margin-bottom:8px;">Belum ada notes.</div>' : ''}
+        ${(state.mnNotes || []).map(n => `
+          <div style="padding:10px; background:var(--surface-alt); border-radius:8px; margin-bottom:8px; border-left:3px solid var(--accent); opacity:${n.isActive ? '1' : '.5'};">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+              <div style="font-weight:600; font-size:13px; flex:1;">${escapeHTML(n.title)} ${!n.isActive ? '<span class="badge" style="background:var(--ink-faint); color:#fff;">Nonaktif</span>' : ''}</div>
+              <div style="font-size:11px; color:var(--ink-faint); white-space:nowrap;">${fmtDate(String(n.timestamp).split(' ')[0])}</div>
+            </div>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:3px;">${escapeHTML(n.content).substring(0,80)}${n.content.length>80?'...':''}</div>
+            <div style="font-size:11px; color:var(--ink-faint); margin-top:4px;">
+              ${n.targetType==='all'?'������ Semua Staff':'������ ' + (n.targetStaff || []).map(id => (findEmp(id)||{}).name || id).join(', ')}
+            </div>
+            <div style="display:flex; gap:6px; margin-top:8px;">
+              <button class="btn btn-primary btn-sm" data-action="mn-edit" data-id="${n.id}">✏️ Edit</button>
+              <button class="btn btn-ghost btn-sm" data-action="mn-toggle" data-id="${n.id}" data-active="${String(!n.isActive)}">${n.isActive ? '⏸️ Nonaktifkan' : '▶️ Aktifkan'}</button>
+              <button class="btn btn-danger-ghost btn-sm" data-action="mn-delete" data-id="${n.id}">������️ Hapus</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-primary btn-block" data-action="mn-open-modal">＋ Buat Notes Baru</button>
     </div>
     ` : ''}
 
@@ -2349,6 +2418,56 @@ function modalHTML(){
     </div>
   `;
 }
+function mnModalHTML(){
+  if (!state.mnModalOpen) return '';
+  const editing = state.mnEditingId ? (state.mnNotes || []).find(n => n.id === state.mnEditingId) : null;
+  const allEmps = getEmployees().filter(e => e.role !== 'owner' && e.id !== 'owner');
+
+  return `
+    <div class="sheet-overlay" data-action="mn-overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>${editing ? '✏️ Edit' : '＋ Buat'} Notes</h3>
+          <button class="sheet-close" data-action="mn-close-modal">✕</button>
+        </div>
+        <form id="form-mn">
+          <div class="field">
+            <label>Judul</label>
+            <input type="text" name="mn-title" value="${editing ? escapeHTML(editing.title) : ''}" placeholder="Contoh: Perubahan Jam Kerja" required>
+          </div>
+          <div class="field">
+            <label>Isi Notes</label>
+            <textarea name="mn-content" placeholder="Tulis pengumuman untuk staff..." required style="min-height:100px;">${editing ? escapeHTML(editing.content) : ''}</textarea>
+          </div>
+          <div class="field">
+            <label>Target</label>
+            <div class="segmented">
+              <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''}>
+              <label for="mn-target-all">������ Semua Staff</label>
+              <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''}>
+              <label for="mn-target-specific">������ Staff Tertentu</label>
+            </div>
+          </div>
+          <div class="field" id="mn-staff-select" style="${editing && editing.targetType==='specific' ? '' : 'display:none;'}">
+            <label>Pilih Staff</label>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              ${allEmps.map(e => `
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; cursor:pointer; padding:8px; border-radius:8px; background:var(--surface-alt); border:1.5px solid transparent;">
+                  <input type="checkbox" name="mn-staff" value="${e.id}" ${editing && editing.targetStaff && editing.targetStaff.includes(e.id) ? 'checked' : ''}>
+                  <span>${e.name} · ${e.jabatan}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          ${editing ? `<input type="hidden" name="mn-id" value="${editing.id}">` : ''}
+          <button type="submit" class="btn btn-primary btn-block">${editing ? 'Simpan Perubahan' : 'Publikasikan Notes'}</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
 function renderModal(){
   const existing = document.getElementById('qsystem-modal-overlay');
   if (existing) existing.remove();
@@ -2360,6 +2479,20 @@ function renderModal(){
   const overlay = wrapper.firstElementChild;
   overlay.id = 'qsystem-modal-overlay';
   document.body.appendChild(overlay);
+
+  // Render Management Notes modal
+  const existingMN = document.getElementById('mn-modal-overlay');
+  if (existingMN) existingMN.remove();
+  if (state.mnModalOpen) {
+    const mnHtml = mnModalHTML();
+    if (mnHtml) {
+      const mnWrapper = document.createElement('div');
+      mnWrapper.innerHTML = mnHtml;
+      const mnOverlay = mnWrapper.firstElementChild;
+      mnOverlay.id = 'mn-modal-overlay';
+      document.body.appendChild(mnOverlay);
+    }
+  }
 }
 
 /* ============================================================
@@ -2431,6 +2564,7 @@ async function selectUser(id){
   state.appTab = 'dashboard';
   state.qtaskTab = 'home';
   await initData();
+  fetchManagementNotes();
   render();
 }
 
@@ -2584,6 +2718,31 @@ document.addEventListener('click', function(e){
     state.filter = { dept:'all', nama:'all' };
     render();
   }
+  else if (el.dataset.action === 'mn-open-modal'){
+    state.mnModalOpen = true; state.mnEditingId = null; renderModal();
+  }
+  else if (el.dataset.action === 'mn-edit'){
+    state.mnModalOpen = true; state.mnEditingId = el.dataset.id; renderModal();
+  }
+  else if (el.dataset.action === 'mn-delete'){
+    if (!confirm('Hapus notes ini?')) return;
+    apiCall('deleteManagementNote', el.dataset.id).then(()=>{
+      showToast('Notes dihapus'); fetchManagementNotes();
+    }).catch(err=>showToast('Gagal: ' + (err.message||err)));
+  }
+  else if (el.dataset.action === 'mn-toggle'){
+    const id = el.dataset.id;
+    const makeActive = el.dataset.active === 'true';
+    apiCall('toggleManagementNote', id, makeActive).then(()=>{
+      showToast(makeActive ? 'Notes diaktifkan' : 'Notes dinonaktifkan');
+      fetchManagementNotes();
+    }).catch(err=>showToast('Gagal: ' + (err.message||err)));
+  }
+  else if (el.dataset.action === 'mn-close-modal' || el.dataset.action === 'mn-overlay-close'){
+    state.mnModalOpen = false; state.mnEditingId = null;
+    const existingMN = document.getElementById('mn-modal-overlay');
+    if (existingMN) existingMN.remove();
+  }
 });
 
 document.addEventListener('change', function(e){
@@ -2724,6 +2883,25 @@ document.addEventListener('submit', function(e){
       render();
       showToast('Progress tersimpan');
     }).catch(()=>{ showToast('Gagal menyimpan, coba lagi'); });
+  }
+  else if (e.target.id === 'form-mn'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const id = fd.get('mn-id') || null;
+    const title = String(fd.get('mn-title')||'').trim();
+    const content = String(fd.get('mn-content')||'').trim();
+    const targetType = fd.get('mn-target') || 'all';
+    const targetStaff = targetType === 'specific' ? Array.from(fd.getAll('mn-staff')) : [];
+    if (!title || !content) { showToast('Judul dan isi wajib diisi'); return; }
+    if (targetType === 'specific' && !targetStaff.length) { showToast('Pilih minimal 1 staff'); return; }
+    const payload = { id: id, title: title, content: content, targetType: targetType, targetStaff: targetStaff, createdBy: state.currentUser, isActive: true };
+    apiCall('saveManagementNote', payload).then(()=>{
+      showToast(id ? 'Notes diperbarui' : 'Notes dipublikasikan');
+      state.mnModalOpen = false; state.mnEditingId = null;
+      const existingMN = document.getElementById('mn-modal-overlay');
+      if (existingMN) existingMN.remove();
+      fetchManagementNotes();
+    }).catch(err=>showToast('Gagal: ' + (err.message||err)));
   }
 });
 
