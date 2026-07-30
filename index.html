@@ -403,6 +403,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -466,18 +467,20 @@ function gsJSONP(fnName, ...args){
       params.set('taskId', args[0]);
     }
     else if (fnName === 'qsales_getDashboard') {
+      const opts = args[0] || {};
       const emp = findEmp(state.currentUser);
-      if (emp) {
-        params.set('salesName', emp.name);
-        params.set('userRole', emp.role);
-      }
+      const salesName = opts.salesName !== undefined ? opts.salesName : (emp ? emp.name : '');
+      const userRole = opts.userRole !== undefined ? opts.userRole : (emp ? emp.role : 'staff');
+      params.set('salesName', salesName);
+      params.set('userRole', userRole);
     }
     else if (fnName === 'qsales_getKPI') {
+      const opts = args[0] || {};
       const emp = findEmp(state.currentUser);
-      if (emp) {
-        params.set('salesName', emp.name);
-        params.set('userRole', emp.role);
-      }
+      const salesName = opts.salesName !== undefined ? opts.salesName : (emp ? emp.name : '');
+      const userRole = opts.userRole !== undefined ? opts.userRole : (emp ? emp.role : 'staff');
+      params.set('salesName', salesName);
+      params.set('userRole', userRole);
     }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
@@ -573,13 +576,13 @@ function apiCall(fnName, ...args){
    QSYSTEM — Konfigurasi & Data Master
    ============================================================ */
 const EMPLOYEES = [
-  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Sales Representative' },
-  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Sales Representative' },
-  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Social Media Specialist' },
-  { id:'rizky', name:'Rizky', dept:'sm', role:'spv',  jabatan:'Sales & Marketing Supervisor' },
-  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Production Staff' },
-  { id:'umay',  name:'Umay',  dept:'po', role:'spv',  jabatan:'Operations Supervisor' },
-  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director' },
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task, Sales' },
+  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task dan Sales' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv',  jabatan:'Marketing & Sales', qcoSystem:'All' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'umay',  name:'Fahmi Maulana',  dept:'po', role:'spv',  jabatan:'Ops & Product Development', qcoSystem:'All' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director', qcoSystem:'All' },
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
@@ -674,6 +677,7 @@ let state = {
   qsalesLoading: false,
   qsalesError: null,
   qsalesTab: 'dashboard', // dashboard | leads | kpi | kunjungan
+  qsalesFilterSales: 'all', // 'all' | nama sales (untuk owner/spv filter)
   // QSales KPI sub-state
   qsalesKPIData: null,
   qsalesKPILoading: false,
@@ -1213,11 +1217,12 @@ function topBarHTML(){
 }
 function sidebarHTML(){
   const emp = findEmp(state.currentUser);
-  const navItem = (tab, icon, label) => `
+  const allowed = getAllowedApps(state.currentUser);
+  const navItem = (tab, icon, label) => allowed.includes(tab) ? `
     <button class="sidebar-item ${state.appTab===tab?'active':''}" data-action="switch-app" data-app="${tab}">
       <span class="navicon">${icon}</span>${label}
     </button>
-  `;
+  ` : '';
   return `
     <aside class="sidebar">
       <div class="sidebar-brand">
@@ -1241,11 +1246,12 @@ function sidebarHTML(){
   `;
 }
 function bottomNavHTML(){
-  const item = (tab, icon, label) => `
+  const allowed = getAllowedApps(state.currentUser);
+  const item = (tab, icon, label) => allowed.includes(tab) ? `
     <button class="navitem ${state.appTab===tab?'active':''}" data-action="switch-app" data-app="${tab}">
       <span class="navicon">${icon}</span>${label}
     </button>
-  `;
+  ` : '';
   return `
     <nav class="bottomnav">
       ${item('dashboard','🏠','Beranda')}
@@ -1290,7 +1296,7 @@ function dashboardHTML(){
 
     <div class="section-title">Aplikasi Tersedia</div>
     <div class="app-grid">
-      ${APPS.map(app=>`
+      ${APPS.filter(app=>isAppAllowed(state.currentUser, app.id)).map(app=>`
         <div class="app-card ${app.status==='live'?'active-app':''}" data-action="switch-app" data-app="${app.id}">
           <div class="app-icon ${app.color}">${app.icon}</div>
           <div class="app-info">
@@ -1569,10 +1575,18 @@ async function fetchQSalesData(){
   render();
   try {
     const emp = findEmp(state.currentUser);
-    const salesName = emp ? emp.name : '';
-    const userRole = emp ? emp.role : 'staff';
-    console.log('[QSales] Fetching dashboard for:', salesName, '| role:', userRole);
-    const result = await apiCall('qsales_getDashboard');
+    const isStaff = emp && emp.role === 'staff';
+    let salesName, userRole;
+    if (isStaff) {
+      salesName = emp ? emp.name : '';
+      userRole = emp ? emp.role : 'staff';
+    } else {
+      // Owner/Spv: gunakan filter jika dipilih, kosong = semua
+      salesName = state.qsalesFilterSales !== 'all' ? state.qsalesFilterSales : '';
+      userRole = emp ? emp.role : 'owner';
+    }
+    console.log('[QSales] Fetching dashboard for:', salesName || '(all)', '| role:', userRole);
+    const result = await apiCall('qsales_getDashboard', { salesName, userRole });
     console.log('[QSales] Response:', result);
     if (result && typeof result === 'object') {
       state.qsalesData = result;
@@ -1601,10 +1615,18 @@ async function fetchQSalesKPI(){
   render();
   try {
     const emp = findEmp(state.currentUser);
-    const salesName = emp ? emp.name : '';
-    const userRole = emp ? emp.role : 'staff';
-    console.log('[QSales] Fetching KPI for:', salesName, '| role:', userRole);
-    const result = await apiCall('qsales_getKPI');
+    const isStaff = emp && emp.role === 'staff';
+    let salesName, userRole;
+    if (isStaff) {
+      salesName = emp ? emp.name : '';
+      userRole = emp ? emp.role : 'staff';
+    } else {
+      // Owner/Spv: gunakan filter jika dipilih, kosong = semua
+      salesName = state.qsalesFilterSales !== 'all' ? state.qsalesFilterSales : '';
+      userRole = emp ? emp.role : 'owner';
+    }
+    console.log('[QSales] Fetching KPI for:', salesName || '(all)', '| role:', userRole);
+    const result = await apiCall('qsales_getKPI', { salesName, userRole });
     console.log('[QSales] KPI Response:', result);
     if (result && typeof result === 'object' && !result.error) {
       state.qsalesKPIData = result;
@@ -1666,15 +1688,29 @@ function qsalesDashboardHTML(){
 
   const emp = findEmp(state.currentUser);
   const isStaff = emp && emp.role === 'staff';
+  const isSpvOrOwner = emp && (emp.role === 'spv' || emp.role === 'owner');
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
+
+  // Build sales filter dropdown for owner/spv
+  const salesFilterHTML = isSpvOrOwner ? `
+    <div class="row gap-8 wrap" style="margin-bottom:14px;">
+      <select class="inline-select" data-action="set-qsales-filter">
+        <option value="all" ${state.qsalesFilterSales==='all'?'selected':''}>👥 Semua Sales</option>
+        ${getSalesNames().map(n=>`<option value="${escapeHTML(n)}" ${state.qsalesFilterSales===n?'selected':''}>👤 ${escapeHTML(n)}</option>`).join('')}
+      </select>
+      ${state.qsalesFilterSales !== 'all' ? `<button class="btn btn-ghost btn-sm" data-action="reset-qsales-filter">✕ Reset</button>` : ''}
+    </div>
+  ` : '';
 
   return `
     <div class="greeting">QSales Intelligence 🎯</div>
     <div class="greeting-sub">
       Ringkasan leads, reminder, &amp; pipeline penjualan
       ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)} only</span>` : ''}
+      ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
+    ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
     <div class="section-title">KPI Leads</div>
@@ -1830,10 +1866,22 @@ function qsalesKPIHTML(){
 
   const emp = findEmp(state.currentUser);
   const isStaff = emp && emp.role === 'staff';
+  const isSpvOrOwner = emp && (emp.role === 'spv' || emp.role === 'owner');
   const summary = d.summary || {};
   const monthly = d.monthly || [];
   const weekly = d.weekly || [];
   const daily = d.daily || [];
+
+  // Build sales filter dropdown for owner/spv
+  const salesFilterHTML = isSpvOrOwner ? `
+    <div class="row gap-8 wrap" style="margin-bottom:14px;">
+      <select class="inline-select" data-action="set-qsales-filter">
+        <option value="all" ${state.qsalesFilterSales==='all'?'selected':''}>👥 Semua Sales</option>
+        ${getSalesNames().map(n=>`<option value="${escapeHTML(n)}" ${state.qsalesFilterSales===n?'selected':''}>👤 ${escapeHTML(n)}</option>`).join('')}
+      </select>
+      ${state.qsalesFilterSales !== 'all' ? `<button class="btn btn-ghost btn-sm" data-action="reset-qsales-filter">✕ Reset</button>` : ''}
+    </div>
+  ` : '';
 
   // Monthly HTML
   const monthlyHTML = monthly.map(m => {
@@ -1938,8 +1986,10 @@ function qsalesKPIHTML(){
     <div class="greeting-sub">
       Target: ${d.dailyTarget} visit/hari · ${d.workDaysPerWeek} hari/minggu
       ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)}</span>` : ''}
+      ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
+    ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
     <div class="section-title">Ringkasan Pencapaian</div>
@@ -2281,6 +2331,10 @@ function render(){
     app.innerHTML = loginScreenHTML();
     return;
   }
+  // Redirect ke dashboard jika user tidak punya akses ke tab saat ini
+  if (!isAppAllowed(state.currentUser, state.appTab)) {
+    state.appTab = 'dashboard';
+  }
   let body = '';
   if (state.appTab === 'dashboard'){
     body = dashboardHTML();
@@ -2374,7 +2428,13 @@ document.addEventListener('click', function(e){
     });
   }
   else if (el.dataset.action === 'switch-app'){
-    state.appTab = el.dataset.app;
+    const targetApp = el.dataset.app;
+    // Cek apakah app diizinkan untuk user ini
+    if (!isAppAllowed(state.currentUser, targetApp)) {
+      showToast('Akses ditolak: Anda tidak memiliki izin untuk modul ini');
+      return;
+    }
+    state.appTab = targetApp;
     if (state.appTab === 'qsales' && !state.qsalesData && !state.qsalesLoading) {
       fetchQSalesData();
     }
@@ -2462,6 +2522,22 @@ document.addEventListener('click', function(e){
     if (state.qsalesTab === 'kpi' && !state.qsalesKPIData && !state.qsalesKPILoading) {
       fetchQSalesKPI();
     }
+    render();
+  }
+  else if (el.dataset.action === 'set-qsales-filter'){
+    state.qsalesFilterSales = el.value;
+    state.qsalesData = null;
+    state.qsalesKPIData = null;
+    if (state.qsalesTab === 'dashboard' || state.qsalesTab === 'leads') fetchQSalesData();
+    if (state.qsalesTab === 'kpi') fetchQSalesKPI();
+    render();
+  }
+  else if (el.dataset.action === 'reset-qsales-filter'){
+    state.qsalesFilterSales = 'all';
+    state.qsalesData = null;
+    state.qsalesKPIData = null;
+    if (state.qsalesTab === 'dashboard' || state.qsalesTab === 'leads') fetchQSalesData();
+    if (state.qsalesTab === 'kpi') fetchQSalesKPI();
     render();
   }
   else if (el.dataset.action === 'qsales-refresh'){
@@ -2641,13 +2717,81 @@ init();
 
 // Helper: get active employees (from GAS data or fallback)
 function getEmployees(){
-  return (state.data && state.data.employees && state.data.employees.length) 
-    ? state.data.employees 
-    : EMPLOYEES;
+  // Merge hardcoded + dynamic, preserve qcoSystem from either source
+  const dynamic = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : [];
+  if (!dynamic.length) return EMPLOYEES;
+  const merged = [];
+  const seen = new Set();
+  // Dynamic first (from GAS), preserve qcoSystem
+  dynamic.forEach(d => {
+    const hard = EMPLOYEES.find(e => e.id === d.id);
+    merged.push({
+      id: d.id || hard?.id || '',
+      name: d.name || hard?.name || '',
+      dept: d.dept || hard?.dept || 'sm',
+      role: d.role || hard?.role || 'staff',
+      jabatan: d.jabatan || hard?.jabatan || '',
+      qcoSystem: d.qcoSystem || d.QcoSystem || hard?.qcoSystem || ''
+    });
+    seen.add(d.id);
+  });
+  // Add hardcoded yang belum ada di dynamic
+  EMPLOYEES.forEach(e => {
+    if (!seen.has(e.id)) merged.push(e);
+  });
+  return merged;
 }
 function findEmpDynamic(id){ 
   return getEmployees().find(e=>e.id===id); 
 }
+
+/* ============================================================
+   ROLE-BASED APP ACCESS
+   ============================================================ */
+function getAllowedApps(userId){
+  const emp = findEmp(userId);
+  if (!emp) return ['dashboard'];
+  // Parse dari kolom QcoSystem (dari GAS atau hardcoded)
+  const rules = String(emp.qcoSystem || '').trim();
+  if (!rules) {
+    // Fallback: Spv & Owner = semua, staff = dashboard + qtask
+    if (emp.role === 'spv' || emp.role === 'owner') {
+      return ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+    }
+    return ['dashboard', 'qtask'];
+  }
+  // "All" = semua aplikasi
+  if (rules.toLowerCase() === 'all') {
+    return ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+  }
+  // Parse string rules: "Hanya bisa membuka Dashboard, Task, Sales"
+  const appMap = {
+    'dashboard': 'dashboard',
+    'task': 'qtask',
+    'sales': 'qsales',
+    'finance': 'qfin',
+    'affiliator': 'qaff',
+    'qtask': 'qtask',
+    'qsales': 'qsales',
+    'qfin': 'qfin',
+    'qaff': 'qaff',
+  };
+  const allowed = ['dashboard']; // dashboard selalu diizinkan
+  const lowerRules = rules.toLowerCase();
+  Object.keys(appMap).forEach(key => {
+    if (lowerRules.includes(key)) {
+      if (!allowed.includes(appMap[key])) allowed.push(appMap[key]);
+    }
+  });
+  return allowed;
+}
+function isAppAllowed(userId, appId){
+  return getAllowedApps(userId).includes(appId);
+}
+function getSalesNames(){
+  return EMPLOYEES.filter(e => e.dept === 'sm' && e.role === 'staff').map(e => e.name);
+}
+
 </script>
 </body>
 </html>
