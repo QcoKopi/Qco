@@ -426,8 +426,21 @@ const CONFIG = {
   // URL QSales Portal (frontend lengkap — terpisah atau sama)
   QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
   // URL QFinance Portal (frontend lengkap — terpisah)
-  QFIN_PORTAL_URL: 'https://qcokopi.github.io/qfin-frontend/qfin.html',
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
 };
+
+/* ============================================================
+   QFINANCE — Embedded GL Data (from CSV export)
+   ============================================================ */
+window.GL_DATA = {"summary":{"total_transaksi":1985,"total_debit":2719851498.62,"total_kredit":3299245578.29,"net_saldo":-579394079.67},"bySumber":[{"sumber":"Saldo_Awal","count":29,"total":986673593.6700001},{"sumber":"Penjualan_App","count":877,"total":824859011.189336},{"sumber":"Assembly_Entry","count":698,"total":675790079.687832},{"sumber":"Pembelian_App","count":278,"total":445892510.742162},{"sumber":"Penjualan_INV","count":101,"total":284654050.0},{"sumber":"Kas_Masuk","count":2,"total":81376333.0}],"monthly":[{"month":"2025-12","total":241761762.78},{"month":"2026-01","total":1345056809.67},{"month":"2026-02","total":390547915.83},{"month":"2026-03","total":271653844.63},{"month":"2026-04","total":403622378.54},{"month":"2026-05","total":329514926.73},{"month":"2026-06","total":161572492.29},{"month":"2026-07","total":155515447.83}],"topDebit":[{"akun":"Persediaan Barang Beans","total":966656919.687832},{"akun":"Piutang Usaha","total":455012245.0},{"akun":"Harga Pokok Penjualan","total":369846766.189336},{"akun":"Cash in Bank BCA - IDR","total":285416500.0},{"akun":"Inventaris Mesin Roasting","total":220315000.0},{"akun":"Inventaris Mesin Kopi","total":122000000.0},{"akun":"Gaji","total":69600000.0},{"akun":"Inventaris Furniture","total":42242177.0}],"topKredit":[{"akun":"Persediaan Barang Beans","total":983708813.479412},{"akun":"Penjualan","total":455012245.0},{"akun":"Cash in Bank BCA - IDR","total":425608832.0},{"akun":"Piutang Usaha","total":284654050.0},{"akun":"Setoran Modal Bapak Yogie","total":81376333.0},{"akun":"Factory Overhead","total":56238217.363912},{"akun":"Cash on Hand-IDR","total":19190250.0},{"akun":"Persediaan Barang Kemasan","total":4935243.776006}],"transactions":[{"tanggal_clean":"2026-07-21","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":596705.54,"keterangan":"Assembly batch 2107-HB02205050R: RB Robusta Temanggung -> RB Houseblend 50% Robusta 50% Arabika Classic","sumber":"Assembly_Entry","referensi":"2107-HB02205050R"},{"tanggal_clean":"2026-07-21","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":609118.92,"keterangan":"HPP Penjualan RB Arabika Jawa Barat","sumber":"Penjualan_App","referensi":"INV1471"},{"tanggal_clean":"2026-07-21","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":1000000.0,"keterangan":"Penjualan RB Arabika Jawa Barat","sumber":"Penjualan_App","referensi":"INV1471"},{"tanggal_clean":"2026-07-21","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":605930.33,"keterangan":"HPP Penjualan RB Houseblend 40% Robusta 60% Arabika Reguler","sumber":"Penjualan_App","referensi":"INV1470"},{"tanggal_clean":"2026-07-21","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":435000.0,"keterangan":"Penjualan RB Houseblend 40% Robusta 60% Arabika Reguler","sumber":"Penjualan_App","referensi":"INV1470"},{"tanggal_clean":"2026-07-21","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":7100000.0,"keterangan":"Pembelian GB Robusta Temanggung","sumber":"Pembelian_App","referensi":"FP-0852"},{"tanggal_clean":"2026-07-20","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":334765.81,"keterangan":"Assembly batch 2007-HB02074060RNEW: RB Robusta Temanggung -> RB Houseblend 40% Robusta 60% Arabika NEW","sumber":"Assembly_Entry","referensi":"2007-HB02074060RNEW"},{"tanggal_clean":"2026-07-18","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":79722.5,"keterangan":"HPP Penjualan 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"73050-00","nama_akun_debit":"Perbaikan Mesin","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":3250000.0,"keterangan":"Pembelian Mesin Kopi Faema 2 Grup","sumber":"Pembelian_App","referensi":"FP-0795"},{"tanggal_clean":"2026-07-18","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":220000.0,"keterangan":"Penjualan 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":47190.0,"keterangan":"HPP Penjualan 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":2723.25,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 250gr — 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":130565.0,"keterangan":"Penjualan 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":2723.25,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 250gr — 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1469"},{"tanggal_clean":"2026-07-18","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":47190.0,"keterangan":"Assembly batch 1807-RB21-250: RB Arabika Argopuro Natural -> 250 gr - RB Arabika Argopuro Natural","sumber":"Assembly_Entry","referensi":"1807-RB21-250"},{"tanggal_clean":"2026-07-18","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":4290.0,"keterangan":"Kapitalisasi overhead Assembly batch 1807-RB21-250 ke 250 gr - RB Arabika Argopuro Natural","sumber":"Assembly_Entry","referensi":"1807-RB21-250"},{"tanggal_clean":"2026-07-18","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":79722.5,"keterangan":"Assembly batch 1807-RB15-250: RB Arabika Bali Kintamani Natural -> 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"1807-RB15-250"},{"tanggal_clean":"2026-07-18","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":7247.5,"keterangan":"Kapitalisasi overhead Assembly batch 1807-RB15-250 ke 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"1807-RB15-250"},{"tanggal_clean":"2026-07-17","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":51542.04,"keterangan":"HPP Penjualan 500 gr - RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1468"},{"tanggal_clean":"2026-07-17","akun_debit":"71000-00","nama_akun_debit":"Office Expenses","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":40000.0,"keterangan":"Pembelian Galon","sumber":"Pembelian_App","referensi":"FP-0794"},{"tanggal_clean":"2026-07-17","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":16000000.0,"keterangan":"Penjualan RB Houseblend 50% Robusta 50% Arabika KembalikealamNew","sumber":"Penjualan_App","referensi":"INV1467"},{"tanggal_clean":"2026-07-17","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":13008131.61,"keterangan":"HPP Penjualan RB Houseblend 50% Robusta 50% Arabika KembalikealamNew","sumber":"Penjualan_App","referensi":"INV1467"},{"tanggal_clean":"2026-07-17","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":196986.67,"keterangan":"HPP Kemasan Kemasan Kopi 7kg Besar Hitam Tanpa Valve — RB Houseblend 50% Robusta 50% Arabika KembalikealamNew","sumber":"Penjualan_App","referensi":"INV1467"},{"tanggal_clean":"2026-07-17","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":70000.0,"keterangan":"Penjualan 500 gr - RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1468"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":51542.04,"keterangan":"Assembly batch 1707-RB01-500: RB Robusta Temanggung -> 500 gr - RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1707-RB01-500"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":13138212.92,"keterangan":"Assembly batch 1707-HB07015050KANew: RB Robusta Temanggung -> RB Houseblend 50% Robusta 50% Arabika KembalikealamNew","sumber":"Assembly_Entry","referensi":"1707-HB07015050KANew"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":1194382.99,"keterangan":"Kapitalisasi overhead Assembly batch 1707-HB07015050KANew ke RB Houseblend 50% Robusta 50% Arabika KembalikealamNew","sumber":"Assembly_Entry","referensi":"1707-HB07015050KANew"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":2502131.59,"keterangan":"Assembly batch 1707-RB01: GB Robusta Temanggung -> RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1707-RB01"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":227466.51,"keterangan":"Kapitalisasi overhead Assembly batch 1707-RB01 ke RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1707-RB01"},{"tanggal_clean":"2026-07-17","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":4685.64,"keterangan":"Kapitalisasi overhead Assembly batch 1707-RB01-500 ke 500 gr - RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1707-RB01-500"},{"tanggal_clean":"2026-07-16","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":113733.25,"keterangan":"Kapitalisasi overhead Assembly batch 1607-RB01 ke RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1607-RB01"},{"tanggal_clean":"2026-07-16","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":1251065.79,"keterangan":"Assembly batch 1607-RB01: GB Robusta Temanggung -> RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1607-RB01"},{"tanggal_clean":"2026-07-16","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":506332.16,"keterangan":"Kapitalisasi overhead Assembly batch 1607-RB20 ke RB Arabika Jawa Barat105","sumber":"Assembly_Entry","referensi":"1607-RB20"},{"tanggal_clean":"2026-07-16","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":5569653.71,"keterangan":"Assembly batch 1607-RB20: GB Arabika Jawa Barat105 -> RB Arabika Jawa Barat105","sumber":"Assembly_Entry","referensi":"1607-RB20"},{"tanggal_clean":"2026-07-16","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":6050000.0,"keterangan":"Pembelian GB Arabika Jawa Barat105","sumber":"Pembelian_App","referensi":"FP-0793"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":94818.18,"keterangan":"Kapitalisasi overhead Assembly batch 1507-RB14 ke RB Arabica Ciwidey Natural","sumber":"Assembly_Entry","referensi":"1507-RB14"},{"tanggal_clean":"2026-07-15","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":220000.0,"keterangan":"Penjualan 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1466"},{"tanggal_clean":"2026-07-15","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":47190.0,"keterangan":"HPP Penjualan 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1466"},{"tanggal_clean":"2026-07-15","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":2723.25,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 250gr — 250 gr - RB Arabika Argopuro Natural","sumber":"Penjualan_App","referensi":"INV1466"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":1043000.0,"keterangan":"Assembly batch 1507-RB14: GB Arabika Ciwidey Natural -> RB Arabica Ciwidey Natural","sumber":"Assembly_Entry","referensi":"1507-RB14"},{"tanggal_clean":"2026-07-15","akun_debit":"71060-00","nama_akun_debit":"Office Facilities","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":1156032.0,"keterangan":"Pembelian Aplikasi /Canva Pro/Finance","sumber":"Pembelian_App","referensi":"FP-0792"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":478335.0,"keterangan":"Assembly batch 1507-RB25: GB Arabika Bali Kintamani Natural -> RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"1507-RB25"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":4290.0,"keterangan":"Kapitalisasi overhead Assembly batch 1507-RB21-250 ke 250 gr - RB Arabika Argopuro Natural","sumber":"Assembly_Entry","referensi":"1507-RB21-250"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":43485.0,"keterangan":"Kapitalisasi overhead Assembly batch 1507-RB25 ke RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"1507-RB25"},{"tanggal_clean":"2026-07-15","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":47190.0,"keterangan":"Assembly batch 1507-RB21-250: RB Arabika Argopuro Natural -> 250 gr - RB Arabika Argopuro Natural","sumber":"Assembly_Entry","referensi":"1507-RB21-250"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":1126319.74,"keterangan":"Assembly batch 1407-HB02077030RNEW: RB Robusta Temanggung -> RB Houseblend 70% Robusta 30% Arabika NEW","sumber":"Assembly_Entry","referensi":"1407-HB02077030RNEW"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":5500000.0,"keterangan":"Pembelian GB Arabika Jawa Barat105","sumber":"Pembelian_App","referensi":"FP-0788"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":1020000.0,"keterangan":"Pembelian GB Arabika Ciwidey Natural","sumber":"Pembelian_App","referensi":"FP-0789"},{"tanggal_clean":"2026-07-14","akun_debit":"15000-00","nama_akun_debit":"Fixed Asset","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":2681949.0,"keterangan":"Pembelian Samsung Galaxy Tab A11","sumber":"Pembelian_App","referensi":"FP-0790"},{"tanggal_clean":"2026-07-14","akun_debit":"71060-00","nama_akun_debit":"Office Facilities","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":623590.0,"keterangan":"Pembelian Aplikasi /Canva Pro/Finance","sumber":"Pembelian_App","referensi":"FP-0791"},{"tanggal_clean":"2026-07-14","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":32256.92,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 1000gr — RB Houseblend 70% Robusta 30% Arabika NEW","sumber":"Penjualan_App","referensi":"INV1465"},{"tanggal_clean":"2026-07-14","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":1500000.0,"keterangan":"Penjualan RB Houseblend 70% Robusta 30% Arabika NEW","sumber":"Penjualan_App","referensi":"INV1465"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":102392.7,"keterangan":"Kapitalisasi overhead Assembly batch 1407-HB02077030RNEW ke RB Houseblend 70% Robusta 30% Arabika NEW","sumber":"Assembly_Entry","referensi":"1407-HB02077030RNEW"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":1251065.79,"keterangan":"Assembly batch 1407-RB01: GB Robusta Temanggung -> RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1407-RB01"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":113733.25,"keterangan":"Kapitalisasi overhead Assembly batch 1407-RB01 ke RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1407-RB01"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":3713102.47,"keterangan":"Assembly batch 1407-RB20: GB Arabika Jawa Barat105 -> RB Arabika Jawa Barat105","sumber":"Assembly_Entry","referensi":"1407-RB20"},{"tanggal_clean":"2026-07-14","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":337554.77,"keterangan":"Kapitalisasi overhead Assembly batch 1407-RB20 ke RB Arabika Jawa Barat105","sumber":"Assembly_Entry","referensi":"1407-RB20"},{"tanggal_clean":"2026-07-14","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":1126319.74,"keterangan":"HPP Penjualan RB Houseblend 70% Robusta 30% Arabika NEW","sumber":"Penjualan_App","referensi":"INV1465"},{"tanggal_clean":"2026-07-13","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":227466.51,"keterangan":"Kapitalisasi overhead Assembly batch 1307-RB01 ke RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1307-RB01"},{"tanggal_clean":"2026-07-13","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":2502131.59,"keterangan":"Assembly batch 1307-RB01: GB Robusta Temanggung -> RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1307-RB01"},{"tanggal_clean":"2026-07-13","akun_debit":"71040-00","nama_akun_debit":"Food&Transport","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":100000.0,"keterangan":"Pembelian Konsumsi/Gosend/Ongkir/Bensin/Kunjungan Opengiriman","sumber":"Pembelian_App","referensi":"FP-0787"},{"tanggal_clean":"2026-07-13","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":7130000.0,"keterangan":"Pembelian GB Robusta Temanggung","sumber":"Pembelian_App","referensi":"FP-0786"},{"tanggal_clean":"2026-07-11","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":51542.04,"keterangan":"HPP Penjualan 500 gr - RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1464"},{"tanggal_clean":"2026-07-11","akun_debit":"71010-00","nama_akun_debit":"Electricity","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":503100.0,"keterangan":"Pembelian Listrik","sumber":"Pembelian_App","referensi":"FP-0784"},{"tanggal_clean":"2026-07-11","akun_debit":"15300-00","nama_akun_debit":"Kendaraan","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":950000.0,"keterangan":"Pembelian Servis Motor Inventaris","sumber":"Pembelian_App","referensi":"FP-0785"},{"tanggal_clean":"2026-07-11","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":70000.0,"keterangan":"Penjualan 500 gr - RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1464"},{"tanggal_clean":"2026-07-11","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":51735.8,"keterangan":"Assembly batch 1107-RB01-500: RB Robusta Temanggung -> 500 gr - RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1107-RB01-500"},{"tanggal_clean":"2026-07-11","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":4703.25,"keterangan":"Kapitalisasi overhead Assembly batch 1107-RB01-500 ke 500 gr - RB Robusta Temanggung","sumber":"Assembly_Entry","referensi":"1107-RB01-500"},{"tanggal_clean":"2026-07-10","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":65598.96,"keterangan":"HPP Penjualan RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"73050-00","nama_akun_debit":"Perbaikan Mesin","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":50000.0,"keterangan":"Pembelian Mesin Roasting Uncle Jhon Kapasitas 3 kg","sumber":"Pembelian_App","referensi":"FP-0780"},{"tanggal_clean":"2026-07-10","akun_debit":"73050-00","nama_akun_debit":"Perbaikan Mesin","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":32000.0,"keterangan":"Pembelian Mesin Roasting Uncle Jhon Kapasitas 3 kg","sumber":"Pembelian_App","referensi":"FP-0781"},{"tanggal_clean":"2026-07-10","akun_debit":"71000-00","nama_akun_debit":"Office Expenses","akun_kredit":"10100-00","nama_akun_kredit":"Cash on Hand-IDR","jumlah":28300.0,"keterangan":"Pembelian Baterai/Charger/Kabel/Pompa Galon Meiko/Lampu/Obat obatan","sumber":"Pembelian_App","referensi":"FP-0782"},{"tanggal_clean":"2026-07-10","akun_debit":"12506-00","nama_akun_debit":"Persediaan Barang Kemasan","akun_kredit":"10515-00","nama_akun_kredit":"Cash in Bank BCA - IDR","jumlah":110950.0,"keterangan":"Pembelian Kemasan Flat Bottom Valve 250gr","sumber":"Pembelian_App","referensi":"FP-0783"},{"tanggal_clean":"2026-07-10","akun_debit":"72020-00","nama_akun_debit":"Sample","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":17160.0,"keterangan":"Biaya sample RB Arabika Argopuro Natural","sumber":"Pembelian_App","referensi":""},{"tanggal_clean":"2026-07-10","akun_debit":"72020-00","nama_akun_debit":"Sample","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":14062.64,"keterangan":"Biaya sample RB Gayo","sumber":"Pembelian_App","referensi":""},{"tanggal_clean":"2026-07-10","akun_debit":"72020-00","nama_akun_debit":"Sample","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":9623.58,"keterangan":"Biaya sample RB Robusta Temanggung","sumber":"Pembelian_App","referensi":""},{"tanggal_clean":"2026-07-10","akun_debit":"72020-00","nama_akun_debit":"Sample","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":14244.64,"keterangan":"Biaya sample RB Arabika Jawa Barat105","sumber":"Pembelian_App","referensi":""},{"tanggal_clean":"2026-07-10","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":87500.0,"keterangan":"Penjualan RB Robusta Temanggung","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":126000.0,"keterangan":"Penjualan RB Gayo","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":98438.5,"keterangan":"HPP Penjualan RB Gayo","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":210000.0,"keterangan":"Penjualan RB Arabika Jawa Barat105","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":199424.94,"keterangan":"HPP Penjualan RB Arabika Jawa Barat105","sumber":"Penjualan_App","referensi":"INV1462"},{"tanggal_clean":"2026-07-10","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":600000.0,"keterangan":"Penjualan RB Arabika Jawa Barat105","sumber":"Penjualan_App","referensi":"INV1463"},{"tanggal_clean":"2026-07-10","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":569785.55,"keterangan":"HPP Penjualan RB Arabika Jawa Barat105","sumber":"Penjualan_App","referensi":"INV1463"},{"tanggal_clean":"2026-07-10","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":12902.77,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 1000gr — RB Arabika Jawa Barat105","sumber":"Penjualan_App","referensi":"INV1463"},{"tanggal_clean":"2026-07-10","akun_debit":"10100-00","nama_akun_debit":"Cash on Hand-IDR","akun_kredit":"11000-00","nama_akun_kredit":"Piutang Usaha","jumlah":600000.0,"keterangan":"Pembayaran invoice INV1463","sumber":"Penjualan_INV","referensi":"INV1463"},{"tanggal_clean":"2026-07-09","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":2723.25,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 250gr — 250 gr - RB Arabika Natural Semendo","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":130565.0,"keterangan":"Penjualan 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":79722.5,"keterangan":"HPP Penjualan 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":2723.25,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 250gr — 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":39930.0,"keterangan":"HPP Penjualan 250 gr - RB Arabika Natural Semendo","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"11000-00","nama_akun_debit":"Piutang Usaha","akun_kredit":"40010-00","nama_akun_kredit":"Penjualan","jumlah":60000.0,"keterangan":"Penjualan 250 gr - RB Arabika Natural Semendo","sumber":"Penjualan_App","referensi":"INV1460"},{"tanggal_clean":"2026-07-09","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":79361.76,"keterangan":"Assembly batch 0907-RB15-250: RB Arabika Bali Kintamani Natural -> 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"0907-RB15-250"},{"tanggal_clean":"2026-07-09","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":7214.71,"keterangan":"Kapitalisasi overhead Assembly batch 0907-RB15-250 ke 250 gr - RB Arabika Bali Kintamani Natural","sumber":"Assembly_Entry","referensi":"0907-RB15-250"},{"tanggal_clean":"2026-07-09","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":39930.0,"keterangan":"Assembly batch 0907-RB06-250: RB Arabika Natural Semendo -> 250 gr - RB Arabika Natural Semendo","sumber":"Assembly_Entry","referensi":"0907-RB06-250"},{"tanggal_clean":"2026-07-09","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":3630.0,"keterangan":"Kapitalisasi overhead Assembly batch 0907-RB06-250 ke 250 gr - RB Arabika Natural Semendo","sumber":"Assembly_Entry","referensi":"0907-RB06-250"},{"tanggal_clean":"2026-07-08","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"50500-00","nama_akun_kredit":"Factory Overhead","jumlah":32316.8,"keterangan":"Kapitalisasi overhead Assembly batch 0807-HB01207030C ke RB Houseblend 70% Robusta 30% Arabika Classic","sumber":"Assembly_Entry","referensi":"0807-HB01207030C"},{"tanggal_clean":"2026-07-08","akun_debit":"12502-00","nama_akun_debit":"Persediaan Barang Beans","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":355484.79,"keterangan":"Assembly batch 0807-HB01207030C: RB Arabika Jawa Barat105 -> RB Houseblend 70% Robusta 30% Arabika Classic","sumber":"Assembly_Entry","referensi":"0807-HB01207030C"},{"tanggal_clean":"2026-07-08","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12506-00","nama_akun_kredit":"Persediaan Barang Kemasan","jumlah":9677.08,"keterangan":"HPP Kemasan Kemasan Flat Bottom Valve 1000gr — RB Houseblend 70% Robusta 30% Arabika Classic","sumber":"Penjualan_App","referensi":"INV1459"},{"tanggal_clean":"2026-07-08","akun_debit":"50100-00","nama_akun_debit":"Harga Pokok Penjualan","akun_kredit":"12502-00","nama_akun_kredit":"Persediaan Barang Beans","jumlah":355484.79,"keterangan":"HPP Penjualan RB Houseblend 70% Robusta 30% Arabika Classic","sumber":"Penjualan_App","referensi":"INV1459"}]};
+
+function fmtRupiah(n){
+  if (n === null || n === undefined || isNaN(n)) return 'Rp 0';
+  const abs = Math.abs(Number(n));
+  const s = abs.toLocaleString('id-ID');
+  return (Number(n) < 0 ? '-Rp ' : 'Rp ') + s;
+}
+
 
 /* ============================================================
    API Layer — JSONP Mode (CORS-free via <script> tag)
@@ -695,6 +708,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
    QSYSTEM State
    ============================================================ */
 let state = {
+  qfinFilterSumber: 'all', // all | sumber name
   currentUser: null,
   appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
   // QTask sub-state
@@ -2206,6 +2220,9 @@ function qsalesKPIHTML(){
 /* ============================================================
    QFINANCE — Dashboard Integration
    ============================================================ */
+/* ============================================================
+   QFINANCE — Dashboard Integration (Interactive with GL Data)
+   ============================================================ */
 function qfinDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
@@ -2222,78 +2239,157 @@ function qfinDashboardHTML(){
     `;
   }
 
-  // Portal URL hanya untuk Umay (dept: po + role: spv) dan Owner
   const canOpenPortal = emp.role === 'owner' || (emp.dept === 'po' && emp.role === 'spv');
+  const gl = window.GL_DATA || { summary: {}, bySumber: [], monthly: [], topDebit: [], topKredit: [], transactions: [] };
+  const s = gl.summary;
+  const filterSumber = state.qfinFilterSumber || 'all';
+
+  // Filter transactions
+  let txs = gl.transactions || [];
+  if (filterSumber !== 'all') {
+    txs = txs.filter(t => t.sumber === filterSumber);
+  }
+  txs = txs.slice(0, 50);
+
+  // Sumber options
+  const sumberOpts = (gl.bySumber || []).map(b => `<option value="${escapeHTML(b.sumber)}" ${filterSumber===b.sumber?'selected':''}>${escapeHTML(b.sumber)} (${b.count})</option>`).join('');
+
+  // Bar chart by sumber (SVG)
+  const maxSumber = Math.max(...(gl.bySumber || []).map(b => Math.abs(b.total)), 1);
+  const barChartSVG = (gl.bySumber || []).map((b, i) => {
+    const h = Math.max(4, Math.abs(b.total) / maxSumber * 80);
+    const y = b.total >= 0 ? 90 - h : 90;
+    const color = b.total >= 0 ? 'var(--po)' : 'var(--danger)';
+    return `<rect x="${i * 60 + 10}" y="${y}" width="50" height="${h}" fill="${color}" rx="4" opacity=".85"/>`;
+  }).join('');
+  const barLabels = (gl.bySumber || []).map((b, i) => {
+    return `<text x="${i * 60 + 35}" y="105" font-size="8" text-anchor="middle" fill="var(--ink-soft)">${escapeHTML(b.sumber.slice(0,8))}</text>`;
+  }).join('');
+
+  // Top debit accounts HTML
+  const topDebitHTML = (gl.topDebit || []).slice(0,5).map(d => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(d.akun)}</span>
+      <span style="font-family:var(--font-mono); font-weight:500; color:var(--po);">${fmtRupiah(d.total)}</span>
+    </div>
+  `).join('');
+
+  // Top kredit accounts HTML
+  const topKreditHTML = (gl.topKredit || []).slice(0,5).map(d => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(d.akun)}</span>
+      <span style="font-family:var(--font-mono); font-weight:500; color:var(--danger);">${fmtRupiah(d.total)}</span>
+    </div>
+  `).join('');
+
+  // Transaction rows
+  const txRows = txs.map(t => `
+    <tr>
+      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; white-space:nowrap;">${escapeHTML(t.tanggal_clean || '-')}</td>
+      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:12px; font-weight:600;">${escapeHTML(t.keterangan || '').slice(0,40)}${(t.keterangan||'').length>40?'...':''}</td>
+      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-soft);">${escapeHTML(t.sumber || '')}</td>
+      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; color:var(--po); font-family:var(--font-mono);">${t.akun_debit ? fmtRupiah(t.jumlah) : '-'}</td>
+      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; color:var(--danger); font-family:var(--font-mono);">${t.akun_kredit ? fmtRupiah(t.jumlah) : '-'}</td>
+    </tr>
+  `).join('');
 
   return `
     <div class="greeting">QFinance 💰</div>
-    <div class="greeting-sub">Manajemen keuangan, GL, neraca, HPP, &amp; inventory assembly</div>
+    <div class="greeting-sub">General Ledger · ${s.total_transaksi || 0} transaksi tercatat</div>
 
-    <div class="section-title">Aksi Cepat</div>
-    <div class="app-grid" style="grid-template-columns:1fr;">
-      ${canOpenPortal ? `
+    ${canOpenPortal ? `
+    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
       <div class="app-card" onclick="window.open(CONFIG.QFIN_PORTAL_URL, '_blank')">
         <div class="app-icon qfin">💰</div>
         <div class="app-info">
           <div class="app-name">Buka Portal QFinance</div>
-          <div class="app-desc">Akses fitur lengkap: General Ledger, Neraca, Rugi Laba, HPP Roastery, Inventory Assembly, Kas &amp; Bank, Hutang Piutang</div>
+          <div class="app-desc">Akses fitur lengkap: GL, Neraca, Rugi Laba, HPP, Inventory, Kas &amp; Bank, AR/AP</div>
           <span class="app-status live">🟢 Live</span>
         </div>
       </div>
-      ` : `
+    </div>
+    ` : `
+    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
       <div class="app-card" style="opacity:.6; cursor:default;">
         <div class="app-icon qfin">🔒</div>
         <div class="app-info">
           <div class="app-name">Portal QFinance</div>
-          <div class="app-desc">Akses portal dibatasi. Hubungi Supervisor Ops &amp; Product Development atau Director untuk akses penuh.</div>
+          <div class="app-desc">Akses portal dibatasi. Hubungi Supervisor Ops &amp; Product Development atau Director.</div>
           <span class="app-status" style="background:var(--danger-soft); color:var(--danger);">🔒 Terkunci</span>
         </div>
       </div>
-      `}
     </div>
+    `}
 
-    <div class="section-title">Modul Tersedia</div>
-    <div class="mockup-grid" style="grid-template-columns:repeat(2, 1fr);">
-      <div class="mockup-card">
-        <span class="m-icon">📒</span>
-        <div class="m-title">General Ledger</div>
-        <div class="m-desc">Buku besar otomatis dari transaksi harian</div>
+    <div class="section-title">Ringkasan GL</div>
+    <div class="quick-stats">
+      <div class="qstat">
+        <div class="qnum" style="font-size:22px;">${s.total_transaksi || 0}</div>
+        <div class="qlbl">Total Transaksi</div>
       </div>
-      <div class="mockup-card">
-        <span class="m-icon">📊</span>
-        <div class="m-title">Neraca &amp; Rugi Laba</div>
-        <div class="m-desc">Laporan keuangan real-time</div>
+      <div class="qstat">
+        <div class="qnum" style="color:var(--po); font-size:20px;">${fmtRupiah(s.total_debit || 0)}</div>
+        <div class="qlbl">Total Debit</div>
       </div>
-      <div class="mockup-card">
-        <span class="m-icon">🏭</span>
-        <div class="m-title">HPP Roastery</div>
-        <div class="m-desc">Perhitungan HPP otomatis per batch roasting</div>
+      <div class="qstat">
+        <div class="qnum" style="color:var(--danger); font-size:20px;">${fmtRupiah(s.total_kredit || 0)}</div>
+        <div class="qlbl">Total Kredit</div>
       </div>
-      <div class="mockup-card">
-        <span class="m-icon">📦</span>
-        <div class="m-title">Inventory Assembly</div>
-        <div class="m-desc">Tracking GB → RB → HB multi-layer</div>
-      </div>
-      <div class="mockup-card">
-        <span class="m-icon">💳</span>
-        <div class="m-title">Kas &amp; Bank</div>
-        <div class="m-desc">Rekonsiliasi kas masuk &amp; keluar</div>
-      </div>
-      <div class="mockup-card">
-        <span class="m-icon">🧾</span>
-        <div class="m-title">Hutang Piutang</div>
-        <div class="m-desc">Monitoring AR/AP dengan aging</div>
+      <div class="qstat">
+        <div class="qnum" style="color:${(s.net_saldo||0)>=0?'var(--success)':'var(--danger)'}; font-size:20px;">${fmtRupiah(s.net_saldo || 0)}</div>
+        <div class="qlbl">Net Saldo</div>
       </div>
     </div>
 
-    <div class="card" style="margin-top:16px; background:var(--accent-soft); border-color:var(--accent);">
-      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💡 Info Akses</div>
-      <p style="font-size:13px; color:var(--ink-soft);">
-        ${canOpenPortal
-          ? 'Anda memiliki akses penuh ke Portal QFinance.'
-          : 'Anda dapat melihat overview QFinance. Akses <b>Portal QFinance</b> hanya untuk <b>Supervisor Ops &amp; Product Development</b> dan <b>Director</b>.'}
-      </p>
+    <div class="section-title">Transaksi per Sumber</div>
+    <div class="card" style="padding:12px; margin-bottom:16px;">
+      <svg viewBox="0 0 360 120" style="width:100%; height:auto; max-height:140px;">
+        ${barChartSVG}
+        ${barLabels}
+      </svg>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; justify-content:center;">
+        ${(gl.bySumber || []).map(b => `
+          <span class="badge badge-active" style="font-size:11px;">${escapeHTML(b.sumber)}: ${fmtRupiah(b.total)}</span>
+        `).join('')}
+      </div>
     </div>
+
+    <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:16px;">
+      <div class="card">
+        <div style="font-weight:700; font-size:13px; margin-bottom:8px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.04em;">🔼 Top Akun Debit</div>
+        ${topDebitHTML || '<div class="faint" style="font-size:12px;">Tidak ada data</div>'}
+      </div>
+      <div class="card">
+        <div style="font-weight:700; font-size:13px; margin-bottom:8px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.04em;">🔽 Top Akun Kredit</div>
+        ${topKreditHTML || '<div class="faint" style="font-size:12px;">Tidak ada data</div>'}
+      </div>
+    </div>
+
+    <div class="section-title">Transaksi Terbaru</div>
+    <div class="row gap-8 wrap" style="margin-bottom:12px;">
+      <select class="inline-select" data-action="set-qfin-filter">
+        <option value="all" ${filterSumber==='all'?'selected':''}>Semua Sumber</option>
+        ${sumberOpts}
+      </select>
+      ${filterSumber !== 'all' ? `<button class="btn btn-ghost btn-sm" data-action="reset-qfin-filter">✕ Reset</button>` : ''}
+    </div>
+    <div class="table-wrap" style="margin-bottom:16px;">
+      <table class="task-table" style="min-width:500px;">
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>Keterangan</th>
+            <th>Sumber</th>
+            <th>Debit</th>
+            <th>Kredit</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${txRows || '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--ink-soft);">Tidak ada transaksi</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="text-align:center;">Menampilkan ${txs.length} transaksi terakhir dari ${s.total_transaksi || 0} total.</p>
   `;
 }
 
@@ -2842,6 +2938,14 @@ document.addEventListener('click', function(e){
     if (state.qsalesTab === 'kpi') fetchQSalesKPI();
     render();
   }
+  else if (el.dataset.action === 'set-qfin-filter'){
+    state.qfinFilterSumber = el.target ? el.target.value : 'all';
+    render();
+  }
+  else if (el.dataset.action === 'reset-qfin-filter'){
+    state.qfinFilterSumber = 'all';
+    render();
+  }
   else if (el.dataset.action === 'qsales-refresh'){
     state.qsalesError = null;
     state.qsalesData = null;
@@ -2929,6 +3033,10 @@ document.addEventListener('change', function(e){
     state.qsalesKPIData = null;
     if (state.qsalesTab === 'dashboard' || state.qsalesTab === 'leads') fetchQSalesData();
     if (state.qsalesTab === 'kpi') fetchQSalesKPI();
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-qfin-filter'){
+    state.qfinFilterSumber = e.target.value;
     render();
   }
 });
