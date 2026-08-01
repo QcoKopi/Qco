@@ -410,7 +410,6 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
-<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -2214,8 +2213,9 @@ function qsalesKPIHTML(){
   `;
 }
 /* ============================================================
-   QFINANCE — Dashboard Integration (live dari sheet "GL" via
-   backend qfin_getDashboard(), lihat 08_QFinance.gs)
+   QFINANCE — Dashboard Integration (live dari sheet "Neraca",
+   "Hutang_Piutang", "Stock" via backend qfin_getDashboard(),
+   lihat 08_QFinance.gs)
    ============================================================ */
 async function fetchQFinData(){
   if (state.qfinLoading || state.qfinFetchAttempted) return;
@@ -2272,7 +2272,7 @@ function qfinDashboardHTML(){
     `;
   }
   const d = state.qfinData || {};
-  if (!d.kasRows || !d.bankRows){
+  if (!d.lastUpdated){
     return `<div class="empty-state"><span class="icon">💰</span><p>Data belum dimuat.</p><button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="qfin-refresh">🔄 Muat Data</button></div>`;
   }
 
@@ -2302,6 +2302,22 @@ function qfinDashboardHTML(){
       '</tbody></table></div>';
   }
 
+  // Helper: render a pos_akun row (12 kolom bulan) as a Bulan/Nilai table
+  // — dipakai bareng untuk Kas, Bank, dan Laba Rugi Bulanan, semua dari
+  // sheet Neraca dengan format data yang sama persis. NO calculations.
+  function renderMonthlyTable(rowData, monthNames, curMonth) {
+    if (!rowData) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
+    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="font-size:11.5px;">' +
+      '<thead><tr><th>Bulan</th><th>Nilai</th></tr></thead>' +
+      '<tbody>' +
+      monthNames.map(m => '<tr style="' + (m===curMonth ? 'background:var(--accent-soft);' : '') + '">' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + m + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">' + fmtRupiah(rowData[m] || 0) + '</td>' +
+        '</tr>').join('') +
+      '</tbody></table></div>';
+  }
+
   // Filter hutang/piutang by jenis (client-side filter, NOT calculation)
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
@@ -2309,6 +2325,8 @@ function qfinDashboardHTML(){
   const monthNames = ['January 2026','February 2026','March 2026','April 2026','May 2026','June 2026',
                       'July 2026','August 2026','September 2026','October 2026','November 2026','December 2026'];
   const curMonth = monthNames[now.getMonth()];
+  const kasRow = d.kasRow || null;
+  const bankRow = d.bankRow || null;
   const labaRugi = d.labaRugiRow || {};
 
   return `
@@ -2339,21 +2357,16 @@ function qfinDashboardHTML(){
     </div>
     `}
 
-    <div class="section-title">🏦 Kas</div>
+    <div class="section-title">💵 Kas</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-kas">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">💵</span>
-          <div style="font-weight:600; font-size:14px;">Transaksi Kas (sheet GL)</div>
+          <div style="font-weight:600; font-size:14px;">${escapeHTML((kasRow && kasRow.pos_akun) || '1.1 Kas')} (sheet Neraca)</div>
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandKas ? '⌃' : '⌄'}</span>
       </div>
-      ${expandKas ? renderRows(d.kasRows, [
-        {label:'Tanggal', key:'tanggal'},
-        {label:'Keterangan', key:'keterangan'},
-        {label:'Debit', key:'debit', fn: v => fmtRupiah(v)},
-        {label:'Kredit', key:'kredit', fn: v => fmtRupiah(v)}
-      ]) : ''}
+      ${expandKas ? renderMonthlyTable(kasRow, monthNames, curMonth) : ''}
     </div>
 
     <div class="section-title">🏦 Bank</div>
@@ -2361,16 +2374,11 @@ function qfinDashboardHTML(){
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-bank">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">🏦</span>
-          <div style="font-weight:600; font-size:14px;">Transaksi Bank (sheet GL)</div>
+          <div style="font-weight:600; font-size:14px;">${escapeHTML((bankRow && bankRow.pos_akun) || '1.2 Bank')} (sheet Neraca)</div>
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandBank ? '⌃' : '⌄'}</span>
       </div>
-      ${expandBank ? renderRows(d.bankRows, [
-        {label:'Tanggal', key:'tanggal'},
-        {label:'Keterangan', key:'keterangan'},
-        {label:'Debit', key:'debit', fn: v => fmtRupiah(v)},
-        {label:'Kredit', key:'kredit', fn: v => fmtRupiah(v)}
-      ]) : ''}
+      ${expandBank ? renderMonthlyTable(bankRow, monthNames, curMonth) : ''}
     </div>
 
     <div class="section-title">📋 Hutang Usaha</div>
@@ -2418,15 +2426,7 @@ function qfinDashboardHTML(){
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandLaba ? '⌃' : '⌄'}</span>
       </div>
-      ${expandLaba ? '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
-        '<table class="task-table" style="font-size:11.5px;">' +
-        '<thead><tr><th>Bulan</th><th>Nilai</th></tr></thead>' +
-        '<tbody>' +
-        monthNames.map(m => '<tr style="' + (m===curMonth ? 'background:var(--accent-soft);' : '') + '">' +
-          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + m + '</td>' +
-          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">' + fmtRupiah(labaRugi[m] || 0) + '</td>' +
-          '</tr>').join('') +
-        '</tbody></table></div>' : ''}
+      ${expandLaba ? renderMonthlyTable(d.labaRugiRow || null, monthNames, curMonth) : ''}
     </div>
 
     <div class="section-title">☕ Stock Kopi</div>
@@ -2451,7 +2451,7 @@ function qfinDashboardHTML(){
     </div>
 
     <p class="hint" style="text-align:center; margin-top:8px;">
-      Data live dari sheet GL, Hutang_Piutang, Neraca, Stock · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
+      Data live dari sheet Neraca, Hutang_Piutang, Stock · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
     </p>
   `;
 }
