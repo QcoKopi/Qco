@@ -709,6 +709,9 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
    ============================================================ */
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
+  qfinData: null,
+  qfinLoading: false,
+  qfinError: null,
   currentUser: null,
   appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
   // QTask sub-state
@@ -1723,8 +1726,29 @@ async function fetchQSalesData(){
   }
   render();
 }
-
-
+/* ============================================================
+   QFinancde — Dashboard Integration
+   ============================================================ */
+async function fetchQFinData(){
+  if (state.qfinLoading) return;
+  state.qfinLoading = true;
+  state.qfinError = null;
+  render();
+  try {
+    const result = await apiCall('qfin_getDashboard');
+    if (result && typeof result === 'object' && !result.error) {
+      state.qfinData = result;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid dari server');
+    }
+    state.qfinLoading = false;
+  } catch(e) {
+    state.qfinLoading = false;
+    state.qfinError = e.message || 'Gagal memuat data QFinance. Pastikan sheet "GL" ada dan 08_QFinance.gs + 05_WebApp.gs sudah di-deploy.';
+    showToast('QFinance: ' + state.qfinError);
+  }
+  render();
+}
 
 /* ============================================================
    QSALES — KPI Data Fetch
