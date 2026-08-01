@@ -2223,6 +2223,120 @@ function qsalesKPIHTML(){
 /* ============================================================
    QFINANCE — Dashboard Integration (Interactive with GL Data)
    ============================================================ */
+
+/* ============================================================
+   QFINANCE — Saldo Awal per Akun (untuk perhitungan live)
+   ============================================================ */
+window.GL_SALDO_AWAL = {
+  "10100-00": { nama: "Cash on Hand-IDR", jenis: "aset", saldo: 1475700 },
+  "10515-00": { nama: "Cash in Bank BCA - IDR", jenis: "aset", saldo: -71513883 },
+  "11000-00": { nama: "Piutang Usaha", jenis: "aset", saldo: 57980000 },
+  "20101-00": { nama: "Hutang Kepada PT Ganjar", jenis: "kewajiban", saldo: 60000000 },
+};
+
+/* ============================================================
+   QFINANCE — Helper: Hitung Saldo Akun dari GL + Saldo Awal
+   ============================================================ */
+function computeAccountBalance(accountCode) {
+  const gl = window.GL_DATA || { transactions: [] };
+  const sa = window.GL_SALDO_AWAL || {};
+  const saldoAwal = sa[accountCode] ? sa[accountCode].saldo : 0;
+  const jenis = sa[accountCode] ? sa[accountCode].jenis : "aset";
+
+  let debit = 0, kredit = 0;
+  (gl.transactions || []).forEach(t => {
+    if (t.akun_debit === accountCode) debit += (t.jumlah || 0);
+    if (t.akun_kredit === accountCode) kredit += (t.jumlah || 0);
+  });
+
+  // Aset: Saldo Awal + Debit - Kredit
+  // Kewajiban: Saldo Awal + Kredit - Debit
+  const saldo = jenis === "kewajiban" 
+    ? saldoAwal + kredit - debit 
+    : saldoAwal + debit - kredit;
+
+  return { saldo, debit, kredit, saldoAwal, jenis, nama: (sa[accountCode]||{}).nama || accountCode };
+}
+
+function getTransactionsForAccount(accountCode, limit) {
+  const gl = window.GL_DATA || { transactions: [] };
+  limit = limit || 20;
+  return (gl.transactions || [])
+    .filter(t => t.akun_debit === accountCode || t.akun_kredit === accountCode)
+    .sort((a,b) => (b.tanggal_clean||'').localeCompare(a.tanggal_clean||''))
+    .slice(0, limit);
+}
+
+function getPiutangByCustomer() {
+  const gl = window.GL_DATA || { transactions: [] };
+  const customers = {};
+
+  // Saldo awal piutang per customer (dari dokumen)
+  const saldoAwalPiutang = {
+    "Arif (Halaman Baru)": 3600000,
+    "Arif (Makkanya Coffee)": 1350000,
+    "Arif (Makkanya Express)": 12000000,
+    "Arion Caffe": 1780000,
+    "Bar": 125000,
+    "Herby (Hath)": 725000,
+    "Kata Rasa": 5400000,
+    "Kembali Ke Alam Group": 16000000,
+    "Kopi Kita": 260000,
+    "Kopi Popi": 2080000,
+    "Marame Café": 1900000,
+    "ONIX Serang (Renovaldi)": 8600000,
+    "Eau De Coffee": 2200000,
+    "Arif (Zui)": 1295000,
+    "Satu Kala (Albi)": 540000,
+    "Luang  Coffee": 125000,
+  };
+
+  // Init dari saldo awal
+  Object.entries(saldoAwalPiutang).forEach(([cust, saldo]) => {
+    customers[cust] = { saldoAwal: saldo, debit: 0, kredit: 0, saldo: saldo, txs: [] };
+  });
+
+  // Proses transaksi Piutang (11000-00)
+  (gl.transactions || []).forEach(t => {
+    if (t.akun_debit === "11000-00" || t.akun_kredit === "11000-00") {
+      // Extract customer name from pihak or keterangan
+      let cust = t.pihak || "";
+      if (!cust && t.keterangan) {
+        // Try to extract from keterangan like "Pembayaran invoice INV1234,Customer Name"
+        const m = t.keterangan.match(/,([^,]+)$/);
+        if (m) cust = m[1].trim();
+      }
+      if (!cust) cust = "Lainnya";
+
+      if (!customers[cust]) {
+        customers[cust] = { saldoAwal: 0, debit: 0, kredit: 0, saldo: 0, txs: [] };
+      }
+
+      const jumlah = t.jumlah || 0;
+      if (t.akun_debit === "11000-00") {
+        customers[cust].debit += jumlah;
+        customers[cust].saldo += jumlah;
+      } else {
+        customers[cust].kredit += jumlah;
+        customers[cust].saldo -= jumlah;
+      }
+      customers[cust].txs.push(t);
+    }
+  });
+
+  // Filter hanya yang saldo != 0, sort by saldo desc
+  return Object.entries(customers)
+    .filter(([_, d]) => Math.abs(d.saldo) > 100)
+    .sort((a, b) => b[1].saldo - a[1].saldo);
+}
+
+function getTotalHutang() {
+  // Hutang Ganjar (20101-00) dari saldo awal + mutasi
+  const hutangGanjar = computeAccountBalance("20101-00");
+  // Jika ada akun hutang lain, bisa ditambahkan di sini
+  return hutangGanjar.saldo;
+}
+
 function qfinDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
@@ -2240,62 +2354,80 @@ function qfinDashboardHTML(){
   }
 
   const canOpenPortal = emp.role === 'owner' || (emp.dept === 'po' && emp.role === 'spv');
-  const gl = window.GL_DATA || { summary: {}, bySumber: [], monthly: [], topDebit: [], topKredit: [], transactions: [] };
-  const s = gl.summary;
-  const filterSumber = state.qfinFilterSumber || 'all';
+  const now = new Date();
+  const tanggalStr = now.getDate() + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear();
 
-  // Filter transactions
-  let txs = gl.transactions || [];
-  if (filterSumber !== 'all') {
-    txs = txs.filter(t => t.sumber === filterSumber);
+  // ── KAS & BANK ──
+  const kas = computeAccountBalance("10100-00");
+  const bank = computeAccountBalance("10515-00");
+  const totalKasBank = kas.saldo + bank.saldo;
+
+  // ── HUTANG PIUTANG ──
+  const piutang = computeAccountBalance("11000-00");
+  const piutangDetail = getPiutangByCustomer();
+  const totalHutang = getTotalHutang();
+
+  // Expandable state keys
+  const expandKas = !!state.expanded['qfin-kas'];
+  const expandBank = !!state.expanded['qfin-bank'];
+  const expandPiutang = !!state.expanded['qfin-piutang'];
+  const expandHutang = !!state.expanded['qfin-hutang'];
+
+  // Helper: render transaction rows for expandable
+  function txRowsHTML(accountCode, expanded) {
+    if (!expanded) return '';
+    const txs = getTransactionsForAccount(accountCode, 15);
+    if (!txs.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada transaksi</div>';
+    return `
+      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
+        <table class="task-table" style="min-width:400px; font-size:11.5px;">
+          <thead>
+            <tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th></tr>
+          </thead>
+          <tbody>
+            ${txs.map(t => `
+              <tr>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">${escapeHTML(t.tanggal_clean||'-')}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line);">${escapeHTML((t.keterangan||'').slice(0,35))}${(t.keterangan||'').length>35?'...':''}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--po); font-family:var(--font-mono);">${t.akun_debit===accountCode ? fmtRupiah(t.jumlah) : '-'}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--danger); font-family:var(--font-mono);">${t.akun_kredit===accountCode ? fmtRupiah(t.jumlah) : '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
   }
-  txs = txs.slice(0, 50);
 
-  // Sumber options
-  const sumberOpts = (gl.bySumber || []).map(b => `<option value="${escapeHTML(b.sumber)}" ${filterSumber===b.sumber?'selected':''}>${escapeHTML(b.sumber)} (${b.count})</option>`).join('');
-
-  // Bar chart by sumber (SVG)
-  const maxSumber = Math.max(...(gl.bySumber || []).map(b => Math.abs(b.total)), 1);
-  const barChartSVG = (gl.bySumber || []).map((b, i) => {
-    const h = Math.max(4, Math.abs(b.total) / maxSumber * 80);
-    const y = b.total >= 0 ? 90 - h : 90;
-    const color = b.total >= 0 ? 'var(--po)' : 'var(--danger)';
-    return `<rect x="${i * 60 + 10}" y="${y}" width="50" height="${h}" fill="${color}" rx="4" opacity=".85"/>`;
-  }).join('');
-  const barLabels = (gl.bySumber || []).map((b, i) => {
-    return `<text x="${i * 60 + 35}" y="105" font-size="8" text-anchor="middle" fill="var(--ink-soft)">${escapeHTML(b.sumber.slice(0,8))}</text>`;
-  }).join('');
-
-  // Top debit accounts HTML
-  const topDebitHTML = (gl.topDebit || []).slice(0,5).map(d => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
-      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(d.akun)}</span>
-      <span style="font-family:var(--font-mono); font-weight:500; color:var(--po);">${fmtRupiah(d.total)}</span>
-    </div>
-  `).join('');
-
-  // Top kredit accounts HTML
-  const topKreditHTML = (gl.topKredit || []).slice(0,5).map(d => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
-      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(d.akun)}</span>
-      <span style="font-family:var(--font-mono); font-weight:500; color:var(--danger);">${fmtRupiah(d.total)}</span>
-    </div>
-  `).join('');
-
-  // Transaction rows
-  const txRows = txs.map(t => `
-    <tr>
-      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; white-space:nowrap;">${escapeHTML(t.tanggal_clean || '-')}</td>
-      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:12px; font-weight:600;">${escapeHTML(t.keterangan || '').slice(0,40)}${(t.keterangan||'').length>40?'...':''}</td>
-      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11px; color:var(--ink-soft);">${escapeHTML(t.sumber || '')}</td>
-      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; color:var(--po); font-family:var(--font-mono);">${t.akun_debit ? fmtRupiah(t.jumlah) : '-'}</td>
-      <td style="padding:8px 10px; border-top:1px solid var(--line); font-size:11.5px; color:var(--danger); font-family:var(--font-mono);">${t.akun_kredit ? fmtRupiah(t.jumlah) : '-'}</td>
-    </tr>
-  `).join('');
+  // Piutang detail rows
+  function piutangDetailHTML(expanded) {
+    if (!expanded) return '';
+    if (!piutangDetail.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data piutang</div>';
+    return `
+      <div style="margin-top:10px;">
+        ${piutangDetail.map(([cust, d]) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600;">${escapeHTML(cust)}</div>
+              <div class="faint" style="font-size:11px;">${d.txs.length} transaksi · Awal ${fmtRupiah(d.saldoAwal)}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:var(--font-mono); font-weight:500; color:${d.saldo>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(d.saldo)}</div>
+              <div class="faint" style="font-size:10px;">Dr ${fmtRupiah(d.debit)} · Kr ${fmtRupiah(d.kredit)}</div>
+            </div>
+          </div>
+        `).join('')}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0 0; margin-top:6px; border-top:2px solid var(--line); font-size:13px; font-weight:700;">
+          <span>Total Piutang Usaha</span>
+          <span style="font-family:var(--font-mono); color:var(--accent-dark);">${fmtRupiah(piutang.saldo)}</span>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="greeting">QFinance 💰</div>
-    <div class="greeting-sub">General Ledger · ${s.total_transaksi || 0} transaksi tercatat</div>
+    <div class="greeting-sub">Posisi Keuangan · ${tanggalStr}</div>
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
@@ -2303,7 +2435,7 @@ function qfinDashboardHTML(){
         <div class="app-icon qfin">💰</div>
         <div class="app-info">
           <div class="app-name">Buka Portal QFinance</div>
-          <div class="app-desc">Akses fitur lengkap: GL, Neraca, Rugi Laba, HPP, Inventory, Kas &amp; Bank, AR/AP</div>
+          <div class="app-desc">GL lengkap, Neraca, Rugi Laba, HPP, Inventory, Kas &amp; Bank, AR/AP</div>
           <span class="app-status live">🟢 Live</span>
         </div>
       </div>
@@ -2321,78 +2453,101 @@ function qfinDashboardHTML(){
     </div>
     `}
 
-    <div class="section-title">Ringkasan GL</div>
-    <div class="quick-stats">
-      <div class="qstat">
-        <div class="qnum" style="font-size:22px;">${s.total_transaksi || 0}</div>
-        <div class="qlbl">Total Transaksi</div>
+    <!-- CARD 1: KAS & BANK -->
+    <div class="section-title">🏦 Kas & Bank</div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div>
+          <div style="font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; font-weight:700;">Total Kas & Bank</div>
+          <div style="font-family:var(--font-mono); font-size:28px; font-weight:500; color:${totalKasBank>=0?'var(--po)':'var(--danger)'}; margin-top:4px;">${fmtRupiah(totalKasBank)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="badge badge-active" style="font-size:11px;">Live</div>
+        </div>
       </div>
-      <div class="qstat">
-        <div class="qnum" style="color:var(--po); font-size:20px;">${fmtRupiah(s.total_debit || 0)}</div>
-        <div class="qlbl">Total Debit</div>
+
+      <!-- Kas -->
+      <div style="border-top:1px solid var(--line); padding:12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-kas">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">💵</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Kas Kecil</div>
+              <div class="faint" style="font-size:11px;">10100-00 · Awal ${fmtRupiah(kas.saldoAwal)}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${kas.saldo>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(kas.saldo)}</div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandKas ? '⌃' : '⌄'}</span>
+          </div>
+        </div>
+        ${txRowsHTML("10100-00", expandKas)}
       </div>
-      <div class="qstat">
-        <div class="qnum" style="color:var(--danger); font-size:20px;">${fmtRupiah(s.total_kredit || 0)}</div>
-        <div class="qlbl">Total Kredit</div>
-      </div>
-      <div class="qstat">
-        <div class="qnum" style="color:${(s.net_saldo||0)>=0?'var(--success)':'var(--danger)'}; font-size:20px;">${fmtRupiah(s.net_saldo || 0)}</div>
-        <div class="qlbl">Net Saldo</div>
+
+      <!-- Bank -->
+      <div style="border-top:1px solid var(--line); padding:12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-bank">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">🏦</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Bank BCA</div>
+              <div class="faint" style="font-size:11px;">10515-00 · Awal ${fmtRupiah(bank.saldoAwal)}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${bank.saldo>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(bank.saldo)}</div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandBank ? '⌃' : '⌄'}</span>
+          </div>
+        </div>
+        ${txRowsHTML("10515-00", expandBank)}
       </div>
     </div>
 
-    <div class="section-title">Transaksi per Sumber</div>
-    <div class="card" style="padding:12px; margin-bottom:16px;">
-      <svg viewBox="0 0 360 120" style="width:100%; height:auto; max-height:140px;">
-        ${barChartSVG}
-        ${barLabels}
-      </svg>
-      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; justify-content:center;">
-        ${(gl.bySumber || []).map(b => `
-          <span class="badge badge-active" style="font-size:11px;">${escapeHTML(b.sumber)}: ${fmtRupiah(b.total)}</span>
-        `).join('')}
+    <!-- CARD 2: HUTANG PIUTANG -->
+    <div class="section-title">📊 Hutang & Piutang</div>
+    <div class="card" style="margin-bottom:12px;">
+
+      <!-- Piutang Usaha -->
+      <div style="padding:12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-piutang">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">📥</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Piutang Usaha</div>
+              <div class="faint" style="font-size:11px;">11000-00 · ${piutangDetail.length} customer · Awal ${fmtRupiah(piutang.saldoAwal)}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${piutang.saldo>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(piutang.saldo)}</div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandPiutang ? '⌃' : '⌄'}</span>
+          </div>
+        </div>
+        ${piutangDetailHTML(expandPiutang)}
+      </div>
+
+      <!-- Hutang Usaha -->
+      <div style="border-top:1px solid var(--line); padding:12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">📤</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Hutang Usaha</div>
+              <div class="faint" style="font-size:11px;">20101-00 · PT Ganjar</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--danger);">${fmtRupiah(totalHutang)}</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:16px;">
-      <div class="card">
-        <div style="font-weight:700; font-size:13px; margin-bottom:8px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.04em;">🔼 Top Akun Debit</div>
-        ${topDebitHTML || '<div class="faint" style="font-size:12px;">Tidak ada data</div>'}
-      </div>
-      <div class="card">
-        <div style="font-weight:700; font-size:13px; margin-bottom:8px; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.04em;">🔽 Top Akun Kredit</div>
-        ${topKreditHTML || '<div class="faint" style="font-size:12px;">Tidak ada data</div>'}
-      </div>
-    </div>
-
-    <div class="section-title">Transaksi Terbaru</div>
-    <div class="row gap-8 wrap" style="margin-bottom:12px;">
-      <select class="inline-select" data-action="set-qfin-filter">
-        <option value="all" ${filterSumber==='all'?'selected':''}>Semua Sumber</option>
-        ${sumberOpts}
-      </select>
-      ${filterSumber !== 'all' ? `<button class="btn btn-ghost btn-sm" data-action="reset-qfin-filter">✕ Reset</button>` : ''}
-    </div>
-    <div class="table-wrap" style="margin-bottom:16px;">
-      <table class="task-table" style="min-width:500px;">
-        <thead>
-          <tr>
-            <th>Tanggal</th>
-            <th>Keterangan</th>
-            <th>Sumber</th>
-            <th>Debit</th>
-            <th>Kredit</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${txRows || '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--ink-soft);">Tidak ada transaksi</td></tr>'}
-        </tbody>
-      </table>
-    </div>
-    <p class="hint" style="text-align:center;">Menampilkan ${txs.length} transaksi terakhir dari ${s.total_transaksi || 0} total.</p>
+    <p class="hint" style="text-align:center; margin-top:8px;">
+      Saldo dihitung dari <b>Saldo Awal 1 Jan 2026</b> + mutasi GL sampai hari ini.<br>
+      Data bersumber dari sheet Buku Besar (auto-rebuild ±1 menit setelah transaksi).
+    </p>
   `;
 }
-
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -2898,6 +3053,12 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'toggle-report'){
     const key = 'report-' + el.dataset.task;
+    state.expanded[key] = !state.expanded[key];
+    render();
+  }
+
+  else if (el.dataset.action === 'toggle-qfin'){
+    const key = el.dataset.key;
     state.expanded[key] = !state.expanded[key];
     render();
   }
