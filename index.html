@@ -256,22 +256,20 @@
 
   /* ---------- Sheet / Modal ---------- */
   .sheet-overlay{
-    position:fixed; inset:0; background:rgba(43,29,20,.75); z-index:40;
+    position:fixed; inset:0; background:rgba(0,0,0,.82); z-index:40;
     display:flex; align-items:flex-end; justify-content:center;
   }
-  .sheet-overlay.mn-overlay{
-    background:rgba(43,29,20,.85); z-index:50;
-  }
-  .sheet-overlay.mn-overlay .sheet{
-    background:#FFFFFF; box-shadow:0 20px 60px rgba(0,0,0,.4);
-  }
+
+
   @media (min-width:560px){.sheet-overlay{align-items:center;}}
   .sheet{
-    background:var(--surface); width:100%; max-width:480px; max-height:88vh; overflow-y:auto;
+    background:#FFFFFF; width:100%; max-width:480px; max-height:88vh; overflow-y:auto;
     border-radius:20px 20px 0 0; padding:18px 18px calc(env(safe-area-inset-bottom,0) + 20px);
     animation:slideup .22s ease-out;
+    box-shadow:0 25px 80px rgba(0,0,0,.5);
+    border:1px solid var(--line);
   }
-  @media (min-width:560px){.sheet{border-radius:20px; margin-bottom:0;}}
+  @media (min-width:560px){.sheet{border-radius:20px; margin-bottom:0; box-shadow:0 25px 80px rgba(0,0,0,.5);}}
   @keyframes slideup{from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;}}
   .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:99px; margin:0 auto 14px;}
   .sheet-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
