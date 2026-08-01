@@ -534,18 +534,26 @@ function gsJSONP(fnName, ...args){
     script.src = url;
     script.async = true;
 
-    // Timeout handler
+    // Timeout handler — dinaikkan dari 15 ke 30 detik: action yang baca
+    // beberapa sheet sekaligus (mis. qfin_getDashboard) butuh napas
+    // lebih, dan sejak lock dibatasi cuma untuk action yang menulis
+    // (lihat 05_WebApp.gs v7), action baca seharusnya jarang lagi
+    // mepet batas waktu — tapi tetap dikasih ruang lebih untuk jaga-jaga.
+    const JSONP_TIMEOUT_MS = 30000;
     const timeoutId = setTimeout(() => {
       cleanup();
-      reject(new Error('JSONP timeout — GAS tidak merespons dalam 15 detik'));
-    }, 15000);
+      console.error('[QSystem] JSONP TIMEOUT:', fnName, '— tidak ada respons dalam', JSONP_TIMEOUT_MS/1000, 'detik. URL:', url);
+      reject(new Error('JSONP timeout — GAS tidak merespons dalam ' + (JSONP_TIMEOUT_MS/1000) + ' detik'));
+    }, JSONP_TIMEOUT_MS);
 
     // Callback handler
     window[cbName] = function(resp) {
       cleanup();
       if (resp && resp.success) {
+        console.log('[QSystem] API Response OK:', fnName, resp.data);
         resolve(resp.data);
       } else {
+        console.error('[QSystem] API Response ERROR:', fnName, resp);
         reject(new Error((resp && resp.error) || 'API Error'));
       }
     };
@@ -2332,6 +2340,12 @@ function qfinDashboardHTML(){
   return `
     <div class="greeting">QFinance 💰</div>
     <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
+
+    ${(d._debugErrors && d._debugErrors.length) ? `
+    <div class="card" style="background:var(--warning-soft); border-color:var(--warning-soft); margin-bottom:12px;">
+      <div style="font-size:12.5px; color:var(--warning);"><b>⚠ Catatan dari backend:</b><br>${d._debugErrors.map(x => escapeHTML(String(x))).join('<br>')}</div>
+    </div>
+    ` : ''}
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
