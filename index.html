@@ -409,6 +409,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -424,6 +425,8 @@ const CONFIG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxETc9Xv6udc7U0N9yflz7DrosN3PH1STUhF-d1qrW0ST48DKjFU4w8Kafuadm09XU/exec',
   // URL QSales Portal (frontend lengkap — terpisah atau sama)
   QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
+  // URL QFinance Portal (frontend lengkap — terpisah)
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/qfin-frontend/qfin.html',
 };
 
 /* ============================================================
@@ -674,7 +677,7 @@ const JOBDESK = {
 // App config
 const APPS = [
   { id:'qtask', name:'QTask', desc:'Tracker tugas & progress tim', icon:'📋', status:'live', color:'qtask' },
-  { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'soon', color:'qfin' },
+  { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'live', color:'qfin' },
   { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'live', color:'qsales' },
   { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
 ];
@@ -2197,6 +2200,103 @@ function qsalesKPIHTML(){
     </div>
   `;
 }
+/* ============================================================
+   QFINANCE — Dashboard Integration
+   ============================================================ */
+/* ============================================================
+   QFINANCE — Dashboard Integration
+   ============================================================ */
+function qfinDashboardHTML(){
+  const emp = findEmp(state.currentUser);
+  const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
+  if (!canSeeTab) {
+    return `
+      <div class="greeting">QFinance 💰</div>
+      <div class="greeting-sub">Akses ditolak</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;">
+          <b>⚠ Akses Ditolak:</b> QFinance hanya dapat diakses oleh Supervisor dan Director.
+        </div>
+        <button class="btn btn-primary" data-action="switch-app" data-app="dashboard">Kembali ke Dashboard</button>
+      </div>
+    `;
+  }
+
+  // Portal URL hanya untuk Umay (dept: po + role: spv) dan Owner
+  const canOpenPortal = emp.role === 'owner' || (emp.dept === 'po' && emp.role === 'spv');
+
+  return `
+    <div class="greeting">QFinance 💰</div>
+    <div class="greeting-sub">Manajemen keuangan, GL, neraca, HPP, &amp; inventory assembly</div>
+
+    <div class="section-title">Aksi Cepat</div>
+    <div class="app-grid" style="grid-template-columns:1fr;">
+      ${canOpenPortal ? `
+      <div class="app-card" onclick="window.open(CONFIG.QFIN_PORTAL_URL, '_blank')">
+        <div class="app-icon qfin">💰</div>
+        <div class="app-info">
+          <div class="app-name">Buka Portal QFinance</div>
+          <div class="app-desc">Akses fitur lengkap: General Ledger, Neraca, Rugi Laba, HPP Roastery, Inventory Assembly, Kas &amp; Bank, Hutang Piutang</div>
+          <span class="app-status live">🟢 Live</span>
+        </div>
+      </div>
+      ` : `
+      <div class="app-card" style="opacity:.6; cursor:default;">
+        <div class="app-icon qfin">🔒</div>
+        <div class="app-info">
+          <div class="app-name">Portal QFinance</div>
+          <div class="app-desc">Akses portal dibatasi. Hubungi Supervisor Ops &amp; Product Development atau Director untuk akses penuh.</div>
+          <span class="app-status" style="background:var(--danger-soft); color:var(--danger);">🔒 Terkunci</span>
+        </div>
+      </div>
+      `}
+    </div>
+
+    <div class="section-title">Modul Tersedia</div>
+    <div class="mockup-grid" style="grid-template-columns:repeat(2, 1fr);">
+      <div class="mockup-card">
+        <span class="m-icon">📒</span>
+        <div class="m-title">General Ledger</div>
+        <div class="m-desc">Buku besar otomatis dari transaksi harian</div>
+      </div>
+      <div class="mockup-card">
+        <span class="m-icon">📊</span>
+        <div class="m-title">Neraca &amp; Rugi Laba</div>
+        <div class="m-desc">Laporan keuangan real-time</div>
+      </div>
+      <div class="mockup-card">
+        <span class="m-icon">🏭</span>
+        <div class="m-title">HPP Roastery</div>
+        <div class="m-desc">Perhitungan HPP otomatis per batch roasting</div>
+      </div>
+      <div class="mockup-card">
+        <span class="m-icon">📦</span>
+        <div class="m-title">Inventory Assembly</div>
+        <div class="m-desc">Tracking GB → RB → HB multi-layer</div>
+      </div>
+      <div class="mockup-card">
+        <span class="m-icon">💳</span>
+        <div class="m-title">Kas &amp; Bank</div>
+        <div class="m-desc">Rekonsiliasi kas masuk &amp; keluar</div>
+      </div>
+      <div class="mockup-card">
+        <span class="m-icon">🧾</span>
+        <div class="m-title">Hutang Piutang</div>
+        <div class="m-desc">Monitoring AR/AP dengan aging</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px; background:var(--accent-soft); border-color:var(--accent);">
+      <div style="font-weight:700; font-size:14px; margin-bottom:6px;">💡 Info Akses</div>
+      <p style="font-size:13px; color:var(--ink-soft);">
+        ${canOpenPortal
+          ? 'Anda memiliki akses penuh ke Portal QFinance.'
+          : 'Anda dapat melihat overview QFinance. Akses <b>Portal QFinance</b> hanya untuk <b>Supervisor Ops &amp; Product Development</b> dan <b>Director</b>.'}
+      </p>
+    </div>
+  `;
+}
+
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -2550,7 +2650,7 @@ function render(){
     else if (state.qtaskTab==='settings') body += qtaskSettingsHTML();
     else { state.qtaskTab='home'; body += qtaskHomeHTML(); }
   } else if (state.appTab === 'qfin'){
-    body = mockupHTML('qfin');
+    body = qfinDashboardHTML();
   } else if (state.appTab === 'qsales'){
     if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
@@ -3016,36 +3116,44 @@ function getAllowedApps(userId){
   if (!emp) return ['dashboard'];
   // Parse dari kolom QcoSystem (dari GAS atau hardcoded)
   const rules = String(emp.qcoSystem || '').trim();
+  let allowed = ['dashboard'];
   if (!rules) {
     // Fallback: Spv & Owner = semua, staff = dashboard + qtask
     if (emp.role === 'spv' || emp.role === 'owner') {
-      return ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+      allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+    } else {
+      allowed = ['dashboard', 'qtask'];
     }
-    return ['dashboard', 'qtask'];
+  } else if (rules.toLowerCase() === 'all') {
+    allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+  } else {
+    // Parse string rules: "Hanya bisa membuka Dashboard, Task, Sales"
+    const appMap = {
+      'dashboard': 'dashboard',
+      'task': 'qtask',
+      'sales': 'qsales',
+      'finance': 'qfin',
+      'affiliator': 'qaff',
+      'qtask': 'qtask',
+      'qsales': 'qsales',
+      'qfin': 'qfin',
+      'qaff': 'qaff',
+    };
+    const lowerRules = rules.toLowerCase();
+    Object.keys(appMap).forEach(key => {
+      if (lowerRules.includes(key)) {
+        if (!allowed.includes(appMap[key])) allowed.push(appMap[key]);
+      }
+    });
   }
-  // "All" = semua aplikasi
-  if (rules.toLowerCase() === 'all') {
-    return ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
-  }
-  // Parse string rules: "Hanya bisa membuka Dashboard, Task, Sales"
-  const appMap = {
-    'dashboard': 'dashboard',
-    'task': 'qtask',
-    'sales': 'qsales',
-    'finance': 'qfin',
-    'affiliator': 'qaff',
-    'qtask': 'qtask',
-    'qsales': 'qsales',
-    'qfin': 'qfin',
-    'qaff': 'qaff',
-  };
-  const allowed = ['dashboard']; // dashboard selalu diizinkan
-  const lowerRules = rules.toLowerCase();
-  Object.keys(appMap).forEach(key => {
-    if (lowerRules.includes(key)) {
-      if (!allowed.includes(appMap[key])) allowed.push(appMap[key]);
+  // RESTRICT QFIN Tab: Spv (semua dept) dan Owner bisa lihat tab QFinance
+  // Razak (staff, po) = asisten, tidak mendapat akses QFinance
+  if (allowed.includes('qfin')) {
+    const canSeeQFinTab = emp.role === 'owner' || emp.role === 'spv';
+    if (!canSeeQFinTab) {
+      allowed = allowed.filter(a => a !== 'qfin');
     }
-  });
+  }
   return allowed;
 }
 function isAppAllowed(userId, appId){
