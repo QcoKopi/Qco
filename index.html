@@ -2269,7 +2269,7 @@ function qfinDashboardHTML(){
   if (state.qfinLoading){
     return `
       <div class="greeting">QFinance 💰</div>
-      <div class="empty-state"><span class="icon">💰</span><p>Memuat data dari sheet GL...</p></div>
+      <div class="empty-state"><span class="icon">💰</span><p>Memuat data dari sheet...</p></div>
     `;
   }
   if (state.qfinError){
@@ -2282,8 +2282,16 @@ function qfinDashboardHTML(){
       </div>
     `;
   }
-  const d = state.qfinData;
-  if (!d){
+  const d = state.qfinData || {};
+
+  // SAFE defaults for all new data fields
+  const hp = d.hutangPiutang || { hutang: { total: 0, count: 0, items: [] }, piutang: { total: 0, count: 0, items: [] } };
+  const hutangData = hp.hutang || { total: 0, count: 0, items: [] };
+  const piutangData = hp.piutang || { total: 0, count: 0, items: [] };
+  const lr = d.labaRugi || { currentMonth: '-', currentMonthValue: 0, monthly: [] };
+  const sk = d.stockKopi || { total: 0, count: 0, items: [] };
+
+  if (!d.kas || !d.bank){
     fetchQFinData();
     return `<div class="empty-state"><p>Memuat data QFinance...</p></div>`;
   }
@@ -2301,91 +2309,75 @@ function qfinDashboardHTML(){
 
   function txRowsHTML(transactions, expanded) {
     if (!expanded) return '';
-    if (!transactions.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada transaksi</div>';
-    return `
-      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
-        <table class="task-table" style="min-width:400px; font-size:11.5px;">
-          <thead><tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th></tr></thead>
-          <tbody>
-            ${transactions.map(t => `
-              <tr>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">${escapeHTML(t.tanggal||'-')}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line);">${escapeHTML((t.keterangan||'').slice(0,35))}${(t.keterangan||'').length>35?'...':''}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--po); font-family:var(--font-mono);">${t.arah==='debit' ? fmtRupiah(t.jumlah) : '-'}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--danger); font-family:var(--font-mono);">${t.arah==='kredit' ? fmtRupiah(t.jumlah) : '-'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    if (!transactions || !transactions.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada transaksi</div>';
+    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="min-width:400px; font-size:11.5px;">' +
+      '<thead><tr><th>Tanggal</th><th>Keterangan</th><th>Debit</th><th>Kredit</th></tr></thead>' +
+      '<tbody>' +
+      transactions.map(t => 
+        '<tr>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">' + escapeHTML(t.tanggal||'-') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line);">' + escapeHTML((t.keterangan||'').slice(0,35)) + ((t.keterangan||'').length>35?'...':'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--po); font-family:var(--font-mono);">' + (t.arah==='debit' ? fmtRupiah(t.jumlah) : '-') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); color:var(--danger); font-family:var(--font-mono);">' + (t.arah==='kredit' ? fmtRupiah(t.jumlah) : '-') + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
   }
 
   function hpDetailHTML(items, expanded) {
     if (!expanded) return '';
-    if (!items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada rincian</div>';
-    return `
-      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
-        <table class="task-table" style="min-width:480px; font-size:11.5px;">
-          <thead><tr><th>Pihak</th><th>Rincian</th><th>Jumlah</th><th>Saldo</th></tr></thead>
-          <tbody>
-            ${items.map(it => `
-              <tr>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(it.nama_pihak)}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line);">${escapeHTML((it.rincian||'').slice(0,40))}${(it.rincian||'').length>40?'...':''}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--ink-soft);">${fmtRupiah(it.jumlah_rincian)}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--accent-dark);">${fmtRupiah(it.saldo_pihak)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    if (!items || !items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada rincian</div>';
+    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="min-width:480px; font-size:11.5px;">' +
+      '<thead><tr><th>Pihak</th><th>Rincian</th><th>Jumlah</th><th>Saldo</th></tr></thead>' +
+      '<tbody>' +
+      items.map(it => 
+        '<tr>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + escapeHTML(it.nama_pihak||'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line);">' + escapeHTML((it.rincian||'').slice(0,40)) + ((it.rincian||'').length>40?'...':'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--ink-soft);">' + fmtRupiah(it.jumlah_rincian||0) + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--accent-dark);">' + fmtRupiah(it.saldo_pihak||0) + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
   }
 
-  function labaRugiHTML(lr, expanded) {
+  function labaRugiHTML(lrObj, expanded) {
     if (!expanded) return '';
-    if (!lr.monthly || !lr.monthly.length) return '<div class="faint" style="font-size:12px; padding:8px;">Belum ada data laba rugi</div>';
-    return `
-      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
-        <table class="task-table" style="min-width:400px; font-size:11.5px;">
-          <thead><tr><th>Bulan</th><th>Laba Berjalan</th></tr></thead>
-          <tbody>
-            ${lr.monthly.map(m => `
-              <tr style="${m.month===lr.currentMonth ? 'background:var(--accent-soft);' : ''}">
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(m.month)}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:${m.value>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(m.value)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    if (!lrObj.monthly || !lrObj.monthly.length) return '<div class="faint" style="font-size:12px; padding:8px;">Belum ada data laba rugi</div>';
+    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="min-width:400px; font-size:11.5px;">' +
+      '<thead><tr><th>Bulan</th><th>Laba Berjalan</th></tr></thead>' +
+      '<tbody>' +
+      lrObj.monthly.map(m => 
+        '<tr style="' + (m.month===lrObj.currentMonth ? 'background:var(--accent-soft);' : '') + '">' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + escapeHTML(m.month||'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:' + (m.value>=0?'var(--po)':'var(--danger)') + ';">' + fmtRupiah(m.value||0) + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
   }
 
-  function stockKopiHTML(sk, expanded) {
+  function stockKopiHTML(skObj, expanded) {
     if (!expanded) return '';
-    if (!sk.items || !sk.items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada stock kopi</div>';
-    return `
-      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
-        <table class="task-table" style="min-width:520px; font-size:11.5px;">
-          <thead><tr><th>Produk</th><th>Batch</th><th>Tanggal</th><th>Prod</th><th>Jual</th><th>Assembly</th><th>Sisa</th></tr></thead>
-          <tbody>
-            ${sk.items.map(it => `
-              <tr>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(it.nama_produk)} <span class="faint" style="font-size:10px;">${escapeHTML(it.id_produk)}</span></td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-size:10.5px;">${escapeHTML(it.batch_no)}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">${escapeHTML(it.tanggal)}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">${it.diproduksi}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--po);">${it.terjual}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--warning);">${it.dipakai_assembly_lain}</td>
-                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-weight:700; color:var(--accent-dark);">${it.sisa}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    if (!skObj.items || !skObj.items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada stock kopi</div>';
+    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="min-width:520px; font-size:11.5px;">' +
+      '<thead><tr><th>Produk</th><th>Batch</th><th>Tanggal</th><th>Prod</th><th>Jual</th><th>Assembly</th><th>Sisa</th></tr></thead>' +
+      '<tbody>' +
+      skObj.items.map(it => 
+        '<tr>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + escapeHTML(it.nama_produk||'') + ' <span class="faint" style="font-size:10px;">' + escapeHTML(it.id_produk||'') + '</span></td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-size:10.5px;">' + escapeHTML(it.batch_no||'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">' + escapeHTML(it.tanggal||'') + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">' + (it.diproduksi||0) + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--po);">' + (it.terjual||0) + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--warning);">' + (it.dipakai_assembly_lain||0) + '</td>' +
+        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-weight:700; color:var(--accent-dark);">' + (it.sisa||0) + '</td>' +
+        '</tr>'
+      ).join('') +
+      '</tbody></table></div>';
   }
 
   return `
@@ -2470,15 +2462,15 @@ function qfinDashboardHTML(){
             <span style="font-size:18px;">📥</span>
             <div>
               <div style="font-weight:600; font-size:14px;">Piutang Usaha</div>
-              <div class="faint" style="font-size:11px;">${d.hutangPiutang.piutang.count} pihak · sheet Hutang_Piutang</div>
+              <div class="faint" style="font-size:11px;">${piutangData.count} pihak · sheet Hutang_Piutang</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${d.hutangPiutang.piutang.total>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(d.hutangPiutang.piutang.total)}</div>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${piutangData.total>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(piutangData.total)}</div>
             <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandPiutang ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${hpDetailHTML(d.hutangPiutang.piutang.items, expandPiutang)}
+        ${hpDetailHTML(piutangData.items, expandPiutang)}
       </div>
     </div>
 
@@ -2489,15 +2481,15 @@ function qfinDashboardHTML(){
             <span style="font-size:18px;">📤</span>
             <div>
               <div style="font-weight:600; font-size:14px;">Hutang Usaha</div>
-              <div class="faint" style="font-size:11px;">${d.hutangPiutang.hutang.count} pihak · sheet Hutang_Piutang</div>
+              <div class="faint" style="font-size:11px;">${hutangData.count} pihak · sheet Hutang_Piutang</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--danger);">${fmtRupiah(d.hutangPiutang.hutang.total)}</div>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--danger);">${fmtRupiah(hutangData.total)}</div>
             <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandHutang ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${hpDetailHTML(d.hutangPiutang.hutang.items, expandHutang)}
+        ${hpDetailHTML(hutangData.items, expandHutang)}
       </div>
     </div>
 
@@ -2509,15 +2501,15 @@ function qfinDashboardHTML(){
             <span style="font-size:18px;">📈</span>
             <div>
               <div style="font-weight:600; font-size:14px;">Laba Berjalan Kumulatif</div>
-              <div class="faint" style="font-size:11px;">${escapeHTML(d.labaRugi.currentMonth || '-')} · sheet Neraca</div>
+              <div class="faint" style="font-size:11px;">${escapeHTML(lr.currentMonth || '-')} · sheet Neraca</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${d.labaRugi.currentMonthValue>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(d.labaRugi.currentMonthValue)}</div>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${lr.currentMonthValue>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(lr.currentMonthValue)}</div>
             <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandLaba ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${labaRugiHTML(d.labaRugi, expandLaba)}
+        ${labaRugiHTML(lr, expandLaba)}
       </div>
     </div>
 
@@ -2529,20 +2521,20 @@ function qfinDashboardHTML(){
             <span style="font-size:18px;">☕</span>
             <div>
               <div style="font-weight:600; font-size:14px;">Persediaan Kopi</div>
-              <div class="faint" style="font-size:11px;">${d.stockKopi.count} produk · total sisa ${d.stockKopi.total} unit · sheet Stock</div>
+              <div class="faint" style="font-size:11px;">${sk.count} produk · total sisa ${sk.total} unit · sheet Stock</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--accent-dark);">${d.stockKopi.total} <span style="font-size:12px; color:var(--ink-faint);">unit</span></div>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--accent-dark);">${sk.total} <span style="font-size:12px; color:var(--ink-faint);">unit</span></div>
             <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStockKopi ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${stockKopiHTML(d.stockKopi, expandStockKopi)}
+        ${stockKopiHTML(sk, expandStockKopi)}
       </div>
     </div>
 
     <p class="hint" style="text-align:center; margin-top:8px;">
-      Data live dari sheet <b>GL</b>, <b>Hutang_Piutang</b>, <b>Neraca</b>, <b>Stock</b> · ${d.totalBarisGL} baris jurnal · Terakhir dimuat ${new Date(d.lastUpdated).toLocaleTimeString('id-ID')}
+      Data live dari sheet <b>GL</b>, <b>Hutang_Piutang</b>, <b>Neraca</b>, <b>Stock</b> · ${d.totalBarisGL||0} baris jurnal · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
     </p>
   `;
 }
@@ -2603,25 +2595,57 @@ function mockupHTML(appId){
 /* ============================================================
    RENDER — QTask Sub-Navigation
    ============================================================ */
-function qtaskSubNavHTML(){
-  const spv = hasTeamView(state.currentUser);
-  const tabBtn = (tab, label) => `
-    <button class="btn btn-sm ${state.qtaskTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qtask-tab" data-tab="${tab}">${label}</button>
-  `;
+
+function mnModalHTML(){
+  if (!state.mnModalOpen) return '';
+  const editing = state.mnEditingId ? (state.mnNotes || []).find(n => n.id === state.mnEditingId) : null;
+  const allEmps = getEmployees().filter(e => e.role !== 'owner' && e.id !== 'owner');
+
   return `
-    <div class="row gap-6 wrap" style="margin-bottom:14px;">
-      ${tabBtn('home','🏠 Beranda')}
-      ${tabBtn('tasks','🗂️ Tugas Saya')}
-      ${spv ? tabBtn('team','👥 Tim') : ''}
-      ${tabBtn('report','📊 Laporan')}
-      ${tabBtn('settings','⚙️ Pengaturan')}
+    <div class="sheet-overlay mn-overlay" data-action="mn-overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>${editing ? '&#9999;&#65039; Edit' : '＋ Buat'} Notes</h3>
+          <button class="sheet-close" data-action="mn-close-modal">&#10005;</button>
+        </div>
+        <form id="form-mn">
+          <div class="field">
+            <label>Judul</label>
+            <input type="text" name="mn-title" value="${editing ? escapeHTML(editing.title) : ''}" placeholder="Contoh: Perubahan Jam Kerja" required>
+          </div>
+          <div class="field">
+            <label>Isi Notes</label>
+            <textarea name="mn-content" placeholder="Tulis pengumuman untuk staff..." required style="min-height:100px;">${editing ? escapeHTML(editing.content) : ''}</textarea>
+          </div>
+          <div class="field">
+            <label>Target</label>
+            <div class="segmented">
+              <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='none'">
+              <label for="mn-target-all">&#127760; Semua Staff</label>
+              <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='block'">
+              <label for="mn-target-specific">&#128101; Staff Tertentu</label>
+            </div>
+          </div>
+          <div class="field" id="mn-staff-select" style="${editing && editing.targetType==='specific' ? '' : 'display:none;'}">
+            <label>Pilih Staff</label>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              ${allEmps.map(e => `
+                <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; cursor:pointer; padding:8px; border-radius:8px; background:var(--surface-alt); border:1.5px solid transparent;">
+                  <input type="checkbox" name="mn-staff" value="${e.id}" ${editing && editing.targetStaff && editing.targetStaff.includes(e.id) ? 'checked' : ''}>
+                  <span>${e.name} &#183; ${e.jabatan}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          ${editing ? `<input type="hidden" name="mn-id" value="${editing.id}">` : ''}
+          <button type="submit" class="btn btn-primary btn-block">${editing ? 'Simpan Perubahan' : 'Publikasikan Notes'}</button>
+        </form>
+      </div>
     </div>
   `;
 }
 
-/* ============================================================
-   RENDER — Modal
-   ============================================================ */
 function modalHTML(){
   if (!state.modal.open) return '';
   const mode = state.modal.mode;
@@ -2791,55 +2815,6 @@ function modalHTML(){
           <button type="submit" class="btn btn-primary btn-block">Simpan Progress</button>
         </form>
         `}
-      </div>
-    </div>
-  `;
-}
-function mnModalHTML(){
-  if (!state.mnModalOpen) return '';
-  const editing = state.mnEditingId ? (state.mnNotes || []).find(n => n.id === state.mnEditingId) : null;
-  const allEmps = getEmployees().filter(e => e.role !== 'owner' && e.id !== 'owner');
-
-  return `
-    <div class="sheet-overlay mn-overlay" data-action="mn-overlay-close">
-      <div class="sheet" data-stop="1">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">
-          <h3>${editing ? '&#9999;&#65039; Edit' : '＋ Buat'} Notes</h3>
-          <button class="sheet-close" data-action="mn-close-modal">&#10005;</button>
-        </div>
-        <form id="form-mn">
-          <div class="field">
-            <label>Judul</label>
-            <input type="text" name="mn-title" value="${editing ? escapeHTML(editing.title) : ''}" placeholder="Contoh: Perubahan Jam Kerja" required>
-          </div>
-          <div class="field">
-            <label>Isi Notes</label>
-            <textarea name="mn-content" placeholder="Tulis pengumuman untuk staff..." required style="min-height:100px;">${editing ? escapeHTML(editing.content) : ''}</textarea>
-          </div>
-          <div class="field">
-            <label>Target</label>
-            <div class="segmented">
-              <input type="radio" name="mn-target" id="mn-target-all" value="all" ${!editing || editing.targetType==='all' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='none'">
-              <label for="mn-target-all">&#127760; Semua Staff</label>
-              <input type="radio" name="mn-target" id="mn-target-specific" value="specific" ${editing && editing.targetType==='specific' ? 'checked' : ''} onchange="document.getElementById('mn-staff-select').style.display='block'">
-              <label for="mn-target-specific">&#128101; Staff Tertentu</label>
-            </div>
-          </div>
-          <div class="field" id="mn-staff-select" style="${editing && editing.targetType==='specific' ? '' : 'display:none;'}">
-            <label>Pilih Staff</label>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              ${allEmps.map(e => `
-                <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; cursor:pointer; padding:8px; border-radius:8px; background:var(--surface-alt); border:1.5px solid transparent;">
-                  <input type="checkbox" name="mn-staff" value="${e.id}" ${editing && editing.targetStaff && editing.targetStaff.includes(e.id) ? 'checked' : ''}>
-                  <span>${e.name} &#183; ${e.jabatan}</span>
-                </label>
-              `).join('')}
-            </div>
-          </div>
-          ${editing ? `<input type="hidden" name="mn-id" value="${editing.id}">` : ''}
-          <button type="submit" class="btn btn-primary btn-block">${editing ? 'Simpan Perubahan' : 'Publikasikan Notes'}</button>
-        </form>
       </div>
     </div>
   `;
