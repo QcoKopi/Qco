@@ -707,6 +707,7 @@ let state = {
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
+  qfinFetchAttempted: false,
   currentUser: null,
   appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
   // QTask sub-state
@@ -2217,7 +2218,8 @@ function qsalesKPIHTML(){
    backend qfin_getDashboard(), lihat 08_QFinance.gs)
    ============================================================ */
 async function fetchQFinData(){
-  if (state.qfinLoading) return;
+  if (state.qfinLoading || state.qfinFetchAttempted) return;
+  state.qfinFetchAttempted = true;
   state.qfinLoading = true;
   state.qfinError = null;
   render();
@@ -2271,8 +2273,7 @@ function qfinDashboardHTML(){
   }
   const d = state.qfinData || {};
   if (!d.kasRows || !d.bankRows){
-    fetchQFinData();
-    return `<div class="empty-state"><p>Memuat data QFinance...</p></div>`;
+    return `<div class="empty-state"><span class="icon">💰</span><p>Data belum dimuat.</p><button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="qfin-refresh">🔄 Muat Data</button></div>`;
   }
 
   const canOpenPortal = emp.role === 'owner' || (emp.dept === 'po' && emp.role === 'spv');
@@ -3029,6 +3030,7 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'qfin-refresh'){
     state.qfinError = null;
     state.qfinData = null;
+    state.qfinFetchAttempted = false;
     fetchQFinData();
   }
   else if (el.dataset.action === 'reset-filter'){
