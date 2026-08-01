@@ -2341,11 +2341,10 @@ function qfinDashboardHTML(){
     <div class="greeting">QFinance 💰</div>
     <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
 
-    ${(d._debugErrors && d._debugErrors.length) ? `
-    <div class="card" style="background:var(--warning-soft); border-color:var(--warning-soft); margin-bottom:12px;">
-      <div style="font-size:12.5px; color:var(--warning);"><b>⚠ Catatan dari backend:</b><br>${d._debugErrors.map(x => escapeHTML(String(x))).join('<br>')}</div>
+    <div class="card" style="background:#111; color:#0f0; margin-bottom:12px; font-family:var(--font-mono); font-size:10.5px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow-y:auto;">
+      <div style="color:#fff; font-weight:700; margin-bottom:6px;">🔧 DEBUG (baca langsung dari server, apa adanya):</div>
+      ${((d._debugErrors && d._debugErrors.length) ? d._debugErrors.map(x => '❌ ' + escapeHTML(String(x))).join('<br>') + '<br>' : '')}${(d._debugInfo && d._debugInfo.length) ? d._debugInfo.map(x => escapeHTML(String(x))).join('<br>') : '(tidak ada _debugInfo -- berarti kode lama yang jalan)'}
     </div>
-    ` : ''}
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
