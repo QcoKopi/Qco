@@ -426,7 +426,7 @@ const CONFIG = {
   // URL QSales Portal (frontend lengkap — terpisah atau sama)
   QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
   // URL QFinance Portal (frontend lengkap — terpisah)
-  QFIN_PORTAL_URL: 'https://qcokopi.github.io/qfin-frontend/qfin.html',
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
 };
 
 function fmtRupiah(n){
@@ -2481,16 +2481,6 @@ function qfinDashboardHTML(){
         {label:'Jumlah', key:'jumlah_rincian', fn: v => fmtRupiah(v)},
         {label:'Saldo', key:'saldo_pihak', fn: v => fmtRupiah(v)}
       ]) : ''}
-    </div>
-
-    <div class="section-title">📈 Laba Rugi Bulanan</div>
-    <div class="card" style="margin-bottom:12px;">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:18px;">📈</span>
-        <div style="font-weight:600; font-size:14px;">${escapeHTML(labaRugi.pos_akun || 'Laba Berjalan')} (sheet Neraca)</div>
-      </div>
-      ${renderLabaRugiChart(d.labaRugiRow || null)}
-      ${labaRugiAnalysis(d.labaRugiRow || null)}
     </div>
 
     <div class="section-title">☕ Stock Kopi</div>
