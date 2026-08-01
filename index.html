@@ -410,6 +410,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -2280,8 +2281,10 @@ function qfinDashboardHTML(){
 
   const expandKas = !!state.expanded['qfin-kas'];
   const expandBank = !!state.expanded['qfin-bank'];
-  const expandPiutang = !!state.expanded['qfin-piutang'];
-  const expandStock = !!state.expanded['qfin-stock'];
+  const expandHutang = !!state.expanded['qfin-hutang-detail'];
+  const expandPiutang = !!state.expanded['qfin-piutang-detail'];
+  const expandLaba = !!state.expanded['qfin-labarugi'];
+  const expandStockKopi = !!state.expanded['qfin-stock-kopi'];
 
   function txRowsHTML(transactions, expanded) {
     if (!expanded) return '';
@@ -2305,49 +2308,76 @@ function qfinDashboardHTML(){
     `;
   }
 
-  function piutangDetailHTML(expanded) {
+  function hpDetailHTML(items, expanded) {
     if (!expanded) return '';
-    if (!d.piutang.hasCustomerBreakdown) {
-      return `<div class="faint" style="font-size:12px; padding:8px;">Belum ada rincian per customer untuk data saat ini.</div>`;
-    }
+    if (!items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada rincian</div>';
     return `
-      <div style="margin-top:10px;">
-        ${d.piutang.perCustomer.map(c => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
-            <div style="flex:1; min-width:0;">
-              <div style="font-weight:600;">${escapeHTML(c.customer)}</div>
-              <div class="faint" style="font-size:11px;">${c.jumlahTransaksi} transaksi</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-family:var(--font-mono); font-weight:500; color:${c.saldo>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(c.saldo)}</div>
-              <div class="faint" style="font-size:10px;">Dr ${fmtRupiah(c.debit)} · Kr ${fmtRupiah(c.kredit)}</div>
-            </div>
-          </div>
-        `).join('')}
+      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
+        <table class="task-table" style="min-width:480px; font-size:11.5px;">
+          <thead><tr><th>Pihak</th><th>Rincian</th><th>Jumlah</th><th>Saldo</th></tr></thead>
+          <tbody>
+            ${items.map(it => `
+              <tr>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(it.nama_pihak)}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line);">${escapeHTML((it.rincian||'').slice(0,40))}${(it.rincian||'').length>40?'...':''}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--ink-soft);">${fmtRupiah(it.jumlah_rincian)}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--accent-dark);">${fmtRupiah(it.saldo_pihak)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
-  function stockDetailHTML(expanded) {
+  function labaRugiHTML(lr, expanded) {
     if (!expanded) return '';
+    if (!lr.monthly || !lr.monthly.length) return '<div class="faint" style="font-size:12px; padding:8px;">Belum ada data laba rugi</div>';
     return `
-      <div style="margin-top:10px;">
-        ${d.stock.perAkun.map(s => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px;">
-            <div>
-              <div style="font-weight:600;">${escapeHTML(s.nama)}</div>
-              <div class="faint" style="font-size:11px;">${s.coa}</div>
-            </div>
-            <div style="font-family:var(--font-mono); font-weight:500;">${fmtRupiah(s.saldo)}</div>
-          </div>
-        `).join('')}
+      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
+        <table class="task-table" style="min-width:400px; font-size:11.5px;">
+          <thead><tr><th>Bulan</th><th>Laba Berjalan</th></tr></thead>
+          <tbody>
+            ${lr.monthly.map(m => `
+              <tr style="${m.month===lr.currentMonth ? 'background:var(--accent-soft);' : ''}">
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(m.month)}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:${m.value>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(m.value)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function stockKopiHTML(sk, expanded) {
+    if (!expanded) return '';
+    if (!sk.items || !sk.items.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada stock kopi</div>';
+    return `
+      <div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">
+        <table class="task-table" style="min-width:520px; font-size:11.5px;">
+          <thead><tr><th>Produk</th><th>Batch</th><th>Tanggal</th><th>Prod</th><th>Jual</th><th>Assembly</th><th>Sisa</th></tr></thead>
+          <tbody>
+            ${sk.items.map(it => `
+              <tr>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">${escapeHTML(it.nama_produk)} <span class="faint" style="font-size:10px;">${escapeHTML(it.id_produk)}</span></td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-size:10.5px;">${escapeHTML(it.batch_no)}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); white-space:nowrap;">${escapeHTML(it.tanggal)}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">${it.diproduksi}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--po);">${it.terjual}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--warning);">${it.dipakai_assembly_lain}</td>
+                <td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); font-weight:700; color:var(--accent-dark);">${it.sisa}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
   return `
     <div class="greeting">QFinance 💰</div>
-    <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet GL)</span></div>
+    <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
@@ -2418,64 +2448,92 @@ function qfinDashboardHTML(){
       </div>
     </div>
 
-    <div class="section-title">📥 Piutang Usaha</div>
+    <div class="section-title">📋 Hutang & Piutang Usaha</div>
+
     <div class="card" style="margin-bottom:12px;">
       <div style="padding:4px 0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-piutang">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-piutang-detail">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-size:18px;">📥</span>
             <div>
               <div style="font-weight:600; font-size:14px;">Piutang Usaha</div>
-              <div class="faint" style="font-size:11px;">${d.piutang.coa}${d.piutang.hasCustomerBreakdown ? ' · ' + d.piutang.perCustomer.length + ' customer' : ''} · Awal ${fmtRupiah(d.piutang.saldoAwal)}</div>
+              <div class="faint" style="font-size:11px;">${d.hutangPiutang.piutang.count} pihak · sheet Hutang_Piutang</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${d.piutang.saldo>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(d.piutang.saldo)}</div>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${d.hutangPiutang.piutang.total>0?'var(--accent-dark)':'var(--success)'};">${fmtRupiah(d.hutangPiutang.piutang.total)}</div>
             <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandPiutang ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${piutangDetailHTML(expandPiutang)}
+        ${hpDetailHTML(d.hutangPiutang.piutang.items, expandPiutang)}
       </div>
     </div>
 
-    <div class="section-title">📦 Stock (Persediaan)</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="padding:4px 0;">
-        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-stock">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-hutang-detail">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:18px;">📦</span>
+            <span style="font-size:18px;">📤</span>
             <div>
-              <div style="font-weight:600; font-size:14px;">Total Nilai Persediaan</div>
-              <div class="faint" style="font-size:11px;">${d.stock.perAkun.length} akun persediaan</div>
+              <div style="font-weight:600; font-size:14px;">Hutang Usaha</div>
+              <div class="faint" style="font-size:11px;">${d.hutangPiutang.hutang.count} pihak · sheet Hutang_Piutang</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--accent-dark);">${fmtRupiah(d.stock.total)}</div>
-            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStock ? '⌃' : '⌄'}</span>
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--danger);">${fmtRupiah(d.hutangPiutang.hutang.total)}</div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandHutang ? '⌃' : '⌄'}</span>
           </div>
         </div>
-        ${stockDetailHTML(expandStock)}
+        ${hpDetailHTML(d.hutangPiutang.hutang.items, expandHutang)}
       </div>
     </div>
 
-    ${d.hutang ? `
-    <div class="section-title">📤 Hutang Usaha</div>
+    <div class="section-title">📈 Laba Rugi Bulanan</div>
     <div class="card" style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <div style="font-weight:600; font-size:14px;">${escapeHTML(d.hutang.nama)}</div>
-          <div class="faint" style="font-size:11px;">${d.hutang.coa}</div>
+      <div style="padding:4px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-labarugi">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">📈</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Laba Berjalan Kumulatif</div>
+              <div class="faint" style="font-size:11px;">${escapeHTML(d.labaRugi.currentMonth || '-')} · sheet Neraca</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${d.labaRugi.currentMonthValue>=0?'var(--po)':'var(--danger)'};">${fmtRupiah(d.labaRugi.currentMonthValue)}</div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandLaba ? '⌃' : '⌄'}</span>
+          </div>
         </div>
-        <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--danger);">${fmtRupiah(d.hutang.saldo)}</div>
+        ${labaRugiHTML(d.labaRugi, expandLaba)}
       </div>
     </div>
-    ` : ''}
+
+    <div class="section-title">☕ Stock Kopi</div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="padding:4px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="qfin-stock-kopi">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:18px;">☕</span>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Persediaan Kopi</div>
+              <div class="faint" style="font-size:11px;">${d.stockKopi.count} produk · total sisa ${d.stockKopi.total} unit · sheet Stock</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:var(--accent-dark);">${d.stockKopi.total} <span style="font-size:12px; color:var(--ink-faint);">unit</span></div>
+            <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStockKopi ? '⌃' : '⌄'}</span>
+          </div>
+        </div>
+        ${stockKopiHTML(d.stockKopi, expandStockKopi)}
+      </div>
+    </div>
 
     <p class="hint" style="text-align:center; margin-top:8px;">
-      Dihitung langsung dari sheet <b>GL</b> · ${d.totalBarisGL} baris jurnal · Terakhir dimuat ${new Date(d.lastUpdated).toLocaleTimeString('id-ID')}
+      Data live dari sheet <b>GL</b>, <b>Hutang_Piutang</b>, <b>Neraca</b>, <b>Stock</b> · ${d.totalBarisGL} baris jurnal · Terakhir dimuat ${new Date(d.lastUpdated).toLocaleTimeString('id-ID')}
     </p>
   `;
 }
+
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -2636,7 +2694,7 @@ function modalHTML(){
   }
 
   const myTeamIds = hasTeamView(state.currentUser) ? TEAM_OF[state.currentUser] : [state.currentUser];
-  const assignablePool = EMPLOYEES.filter(e=>e.role!=='owner');
+  const assignablePool = EMPLOYEES.filter(e=>e.id===state.currentUser || e.role!=='owner');
   const eligibleEmployees = hasTeamView(state.currentUser) ? assignablePool : assignablePool.filter(e=>e.id===state.currentUser);
   const defaultEmp = findEmp(state.currentUser);
   const taskOptionsFor = myTeamIds.flatMap(id => tasksOf(id).filter(t=>t.status==='aktif'))
