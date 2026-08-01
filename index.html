@@ -426,7 +426,7 @@ const CONFIG = {
   // URL QSales Portal (frontend lengkap — terpisah atau sama)
   QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
   // URL QFinance Portal (frontend lengkap — terpisah)
-  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/qfin-frontend/qfin.html',
 };
 
 function fmtRupiah(n){
@@ -2310,41 +2310,103 @@ function qfinDashboardHTML(){
       '</tbody></table></div>';
   }
 
-  // Helper: render a pos_akun row (12 kolom bulan) as a Bulan/Nilai table
-  // — dipakai bareng untuk Kas, Bank, dan Laba Rugi Bulanan, semua dari
-  // sheet Neraca dengan format data yang sama persis. NO calculations.
-  function renderMonthlyTable(rowData, monthNames, curMonth) {
-    if (!rowData) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
-    return '<div class="table-wrap" style="margin-top:10px; border:none; border-radius:8px;">' +
-      '<table class="task-table" style="font-size:11.5px;">' +
-      '<thead><tr><th>Bulan</th><th>Nilai</th></tr></thead>' +
-      '<tbody>' +
-      monthNames.map(m => '<tr style="' + (m===curMonth ? 'background:var(--accent-soft);' : '') + '">' +
-        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + m + '</td>' +
-        '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">' + fmtRupiah(rowData[m] || 0) + '</td>' +
-        '</tr>').join('') +
-      '</tbody></table></div>';
+  // Helper: ambil daftar key bulan dari sebuah row (mis. kasRow/bankRow/
+  // labaRugiRow), dalam urutan aslinya (= urutan kolom di sheet Neraca,
+  // dari bulan paling awal ke paling akhir). "pos_akun" bukan bulan,
+  // dibuang.
+  function monthKeysOf(row) {
+    if (!row) return [];
+    return Object.keys(row).filter(k => k !== 'pos_akun');
+  }
+  // Helper: entri bulan PALING TERAKHIR yang tersedia di sebuah row.
+  function latestMonthEntry(row) {
+    const keys = monthKeysOf(row);
+    if (!keys.length) return null;
+    const lastKey = keys[keys.length - 1];
+    return { month: lastKey, value: Number(row[lastKey]) || 0 };
+  }
+
+  // Chart garis sederhana (SVG murni, tanpa library) untuk Laba Rugi
+  // Bulanan — dari bulan pertama sampai bulan terakhir yang ADA datanya
+  // di sheet. Nilainya dipakai apa adanya dari backend, cuma digambar.
+  function renderLabaRugiChart(row) {
+    const keys = monthKeysOf(row);
+    if (!keys.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
+    const values = keys.map(k => Number(row[k]) || 0);
+    const w = 640, h = 210, padL = 8, padR = 8, padT = 14, padB = 26;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    let minV = Math.min(0, ...values), maxV = Math.max(0, ...values);
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    const range = maxV - minV;
+    const xStep = values.length > 1 ? innerW / (values.length - 1) : 0;
+    const xOf = i => padL + i * xStep;
+    const yOf = v => padT + innerH - ((v - minV) / range) * innerH;
+    const zeroY = yOf(0);
+
+    const pathD = values.map((v, i) => (i === 0 ? 'M' : 'L') + xOf(i).toFixed(1) + ',' + yOf(v).toFixed(1)).join(' ');
+    const areaD = pathD +
+      ' L' + xOf(values.length - 1).toFixed(1) + ',' + zeroY.toFixed(1) +
+      ' L' + xOf(0).toFixed(1) + ',' + zeroY.toFixed(1) + ' Z';
+    const dots = values.map((v, i) =>
+      '<circle cx="' + xOf(i).toFixed(1) + '" cy="' + yOf(v).toFixed(1) + '" r="3.5" fill="' + (v >= 0 ? 'var(--success)' : 'var(--danger)') + '" stroke="#fff" stroke-width="1"/>'
+    ).join('');
+    const labels = keys.map((k, i) =>
+      '<text x="' + xOf(i).toFixed(1) + '" y="' + (h - 8) + '" font-size="9.5" fill="var(--ink-faint)" text-anchor="middle">' + escapeHTML(String(k).split(' ')[0].slice(0, 3)) + '</text>'
+    ).join('');
+
+    return `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block; margin-top:10px;">
+        <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>
+        <path d="${areaD}" fill="var(--accent-soft)" opacity="0.6"/>
+        <path d="${pathD}" fill="none" stroke="var(--accent-dark)" stroke-width="2.2"/>
+        ${dots}
+        ${labels}
+      </svg>
+    `;
+  }
+
+  // Analisa deskriptif singkat dari data Laba Rugi Bulanan yang sudah
+  // ada (posisi terakhir, perubahan vs bulan sebelumnya, bulan
+  // terbaik/terlemah). Semua angka diambil langsung dari data backend,
+  // tidak ada hitungan ulang dari sheet mentah.
+  function labaRugiAnalysis(row) {
+    const keys = monthKeysOf(row);
+    if (!keys.length) return '';
+    const values = keys.map(k => Number(row[k]) || 0);
+    const latest = values[values.length - 1];
+    const latestMonth = keys[keys.length - 1];
+    const prev = values.length > 1 ? values[values.length - 2] : null;
+    const delta = prev !== null ? latest - prev : null;
+
+    let minIdx = 0, maxIdx = 0;
+    values.forEach((v, i) => { if (v < values[minIdx]) minIdx = i; if (v > values[maxIdx]) maxIdx = i; });
+
+    const posisi = latest >= 0 ? 'laba' : 'rugi';
+    const parts = [];
+    parts.push('Per <b>' + escapeHTML(latestMonth) + '</b>, posisi kumulatif adalah <b style="color:' + (latest >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + posisi + ' ' + fmtRupiah(Math.abs(latest)) + '</b>.');
+    if (delta !== null) {
+      const arah = delta >= 0 ? 'membaik' : 'memburuk';
+      parts.push('Dibanding bulan sebelumnya, posisi ini ' + arah + ' sebesar ' + fmtRupiah(Math.abs(delta)) + '.');
+    }
+    if (keys.length > 1) {
+      parts.push('Posisi terbaik ada di <b>' + escapeHTML(keys[maxIdx]) + '</b> (' + fmtRupiah(values[maxIdx]) + '), posisi terlemah di <b>' + escapeHTML(keys[minIdx]) + '</b> (' + fmtRupiah(values[minIdx]) + ').');
+    }
+    return '<p style="font-size:12.5px; line-height:1.65; color:var(--ink-soft); margin-top:12px; padding-top:12px; border-top:1px solid var(--line);">' + parts.join(' ') + '</p>';
   }
 
   // Filter hutang/piutang by jenis (client-side filter, NOT calculation)
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
 
-  const monthNames = ['January 2026','February 2026','March 2026','April 2026','May 2026','June 2026',
-                      'July 2026','August 2026','September 2026','October 2026','November 2026','December 2026'];
-  const curMonth = monthNames[now.getMonth()];
   const kasRow = d.kasRow || null;
   const bankRow = d.bankRow || null;
   const labaRugi = d.labaRugiRow || {};
+  const latestKas = latestMonthEntry(kasRow);
+  const latestBank = latestMonthEntry(bankRow);
 
   return `
     <div class="greeting">QFinance 💰</div>
     <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
-
-    <div class="card" style="background:#111; color:#0f0; margin-bottom:12px; font-family:var(--font-mono); font-size:10.5px; white-space:pre-wrap; word-break:break-all; max-height:260px; overflow-y:auto;">
-      <div style="color:#fff; font-weight:700; margin-bottom:6px;">🔧 DEBUG (baca langsung dari server, apa adanya):</div>
-      ${((d._debugErrors && d._debugErrors.length) ? d._debugErrors.map(x => '❌ ' + escapeHTML(String(x))).join('<br>') + '<br>' : '')}${(d._debugInfo && d._debugInfo.length) ? d._debugInfo.map(x => escapeHTML(String(x))).join('<br>') : '(tidak ada _debugInfo -- berarti kode lama yang jalan)'}
-    </div>
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
@@ -2370,28 +2432,19 @@ function qfinDashboardHTML(){
     </div>
     `}
 
-    <div class="section-title">💵 Kas</div>
-    <div class="card" style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-kas">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:18px;">💵</span>
-          <div style="font-weight:600; font-size:14px;">${escapeHTML((kasRow && kasRow.pos_akun) || '1.1 Kas')} (sheet Neraca)</div>
+    <div class="section-title">💰 Kas & Bank Saat Ini</div>
+    <div class="card card-hero" style="margin-bottom:12px;">
+      <div class="hero-row" style="align-items:stretch; flex-wrap:wrap; gap:20px;">
+        <div style="flex:1; min-width:140px;">
+          <div class="hero-label">💵 Cash on Hand · ${escapeHTML((latestKas && latestKas.month) || '-')}</div>
+          <div class="hero-big">${latestKas ? fmtRupiah(latestKas.value) : '—'}</div>
         </div>
-        <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandKas ? '⌃' : '⌄'}</span>
-      </div>
-      ${expandKas ? renderMonthlyTable(kasRow, monthNames, curMonth) : ''}
-    </div>
-
-    <div class="section-title">🏦 Bank</div>
-    <div class="card" style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-bank">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:18px;">🏦</span>
-          <div style="font-weight:600; font-size:14px;">${escapeHTML((bankRow && bankRow.pos_akun) || '1.2 Bank')} (sheet Neraca)</div>
+        <div style="flex:1; min-width:140px;">
+          <div class="hero-label">🏦 Cash in Bank · ${escapeHTML((latestBank && latestBank.month) || '-')}</div>
+          <div class="hero-big">${latestBank ? fmtRupiah(latestBank.value) : '—'}</div>
         </div>
-        <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandBank ? '⌃' : '⌄'}</span>
       </div>
-      ${expandBank ? renderMonthlyTable(bankRow, monthNames, curMonth) : ''}
+      <div class="muted" style="font-size:11px; margin-top:12px;">Baris '1.1 Kas' &amp; '1.2 Bank' · sheet Neraca</div>
     </div>
 
     <div class="section-title">📋 Hutang Usaha</div>
@@ -2432,14 +2485,12 @@ function qfinDashboardHTML(){
 
     <div class="section-title">📈 Laba Rugi Bulanan</div>
     <div class="card" style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-laba">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:18px;">📈</span>
-          <div style="font-weight:600; font-size:14px;">${escapeHTML(labaRugi.pos_akun || 'Laba Berjalan')} (sheet Neraca)</div>
-        </div>
-        <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandLaba ? '⌃' : '⌄'}</span>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px;">📈</span>
+        <div style="font-weight:600; font-size:14px;">${escapeHTML(labaRugi.pos_akun || 'Laba Berjalan')} (sheet Neraca)</div>
       </div>
-      ${expandLaba ? renderMonthlyTable(d.labaRugiRow || null, monthNames, curMonth) : ''}
+      ${renderLabaRugiChart(d.labaRugiRow || null)}
+      ${labaRugiAnalysis(d.labaRugiRow || null)}
     </div>
 
     <div class="section-title">☕ Stock Kopi</div>
