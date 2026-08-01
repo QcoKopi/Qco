@@ -2221,15 +2221,28 @@ async function fetchQFinData(){
   state.qfinLoading = true;
   state.qfinError = null;
   render();
+
+  // Safety timeout: force reset loading after 20s even if JSONP hangs
+  const safetyTimeout = setTimeout(() => {
+    if (state.qfinLoading) {
+      state.qfinLoading = false;
+      state.qfinError = 'Timeout: GAS tidak merespons dalam 20 detik. Pastikan 08_QFinance.gs sudah di-save & deploy ulang, dan fungsi qfin_getDashboard() tersedia.';
+      showToast('QFinance: ' + state.qfinError);
+      render();
+    }
+  }, 20000);
+
   try {
     const result = await apiCall('qfin_getDashboard');
+    clearTimeout(safetyTimeout);
     if (result && typeof result === 'object' && !result.error) {
       state.qfinData = result;
+      state.qfinLoading = false;
     } else {
       throw new Error((result && result.error) || 'Response tidak valid dari server');
     }
-    state.qfinLoading = false;
   } catch(e) {
+    clearTimeout(safetyTimeout);
     state.qfinLoading = false;
     state.qfinError = e.message || 'Gagal memuat data QFinance. Pastikan sheet "GL" ada dan 08_QFinance.gs + 05_WebApp.gs sudah di-deploy.';
     showToast('QFinance: ' + state.qfinError);
