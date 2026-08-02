@@ -2469,6 +2469,71 @@ function qfinDashboardHTML(){
     return '<p style="font-size:12.5px; line-height:1.65; color:var(--ink-soft); margin-top:12px; padding-top:12px; border-top:1px solid var(--line);">' + parts.join(' ') + '</p>';
   }
 
+  // Chart Target Bulanan: bar Revenue per bulan + garis putus-putus Target
+  // (satu angka tetap, dari (rata-rata pengeluaran + rata-rata hutang) x 1.3)
+  function renderTargetChart(monthKeys, penjualanMap, targetValue) {
+    if (!monthKeys.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
+    const values = monthKeys.map(k => Number(penjualanMap[k]) || 0);
+    const w = 640, h = 220, padL = 8, padR = 8, padT = 14, padB = 26;
+    const innerW = w - padL - padR, innerH = h - padT - padB;
+    const allVals = values.concat([targetValue, 0]);
+    const maxV = Math.max(...allVals);
+    const minV = Math.min(0, ...allVals);
+    const range = (maxV - minV) || 1;
+    const xStep = innerW / monthKeys.length;
+    const barW = xStep * 0.55;
+    const yOf = v => padT + innerH - ((v - minV) / range) * innerH;
+    const zeroY = yOf(0);
+    const targetY = yOf(targetValue);
+
+    const bars = values.map((v, i) => {
+      const x = padL + i * xStep + (xStep - barW) / 2;
+      const y = yOf(Math.max(v, 0));
+      const barH = Math.abs(yOf(v) - zeroY);
+      const achieved = v >= targetValue;
+      return '<rect x="' + x.toFixed(1) + '" y="' + Math.min(y, zeroY).toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(barH, 1).toFixed(1) + '" fill="' + (achieved ? 'var(--success)' : 'var(--accent-soft)') + '" rx="2"/>';
+    }).join('');
+
+    const labels = monthKeys.map((k, i) =>
+      '<text x="' + (padL + i * xStep + xStep / 2).toFixed(1) + '" y="' + (h - 8) + '" font-size="9.5" fill="var(--ink-faint)" text-anchor="middle">' + escapeHTML(String(k).split(' ')[0].slice(0, 3)) + '</text>'
+    ).join('');
+
+    return `
+      <div style="display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; font-size:11px; color:var(--ink-soft);">
+        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px; height:10px; background:var(--success); display:inline-block; border-radius:2px;"></span>Revenue (tercapai target)</span>
+        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:10px; height:10px; background:var(--accent-soft); display:inline-block; border-radius:2px;"></span>Revenue (belum tercapai)</span>
+        <span style="display:inline-flex; align-items:center; gap:5px;"><span style="width:16px; height:0; border-top:2px dashed var(--danger); display:inline-block;"></span>Target</span>
+      </div>
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block; margin-top:8px;">
+        <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+        ${bars}
+        <line x1="${padL}" y1="${targetY.toFixed(1)}" x2="${w - padR}" y2="${targetY.toFixed(1)}" stroke="var(--danger)" stroke-width="1.5" stroke-dasharray="6,4"/>
+        ${labels}
+      </svg>
+    `;
+  }
+
+  function renderTargetTable(monthKeys, penjualanMap, targetValue) {
+    if (!monthKeys.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
+    return '<div class="table-wrap" style="margin-top:12px; border:none; border-radius:8px;">' +
+      '<table class="task-table" style="font-size:11.5px;">' +
+      '<thead><tr><th>Bulan</th><th>Revenue</th><th>Target</th><th>Gap</th><th>Status</th></tr></thead>' +
+      '<tbody>' +
+      monthKeys.map(k => {
+        const v = Number(penjualanMap[k]) || 0;
+        const gap = v - targetValue;
+        const achieved = gap >= 0;
+        return '<tr>' +
+          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-weight:600;">' + escapeHTML(k) + '</td>' +
+          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono);">' + fmtRupiah(v) + '</td>' +
+          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:var(--ink-faint);">' + fmtRupiah(targetValue) + '</td>' +
+          '<td style="padding:6px 8px; border-top:1px solid var(--line); font-family:var(--font-mono); color:' + (achieved ? 'var(--success)' : 'var(--danger)') + ';">' + (achieved ? '+' : '') + fmtRupiah(gap) + '</td>' +
+          '<td style="padding:6px 8px; border-top:1px solid var(--line);"><span style="font-size:10.5px; padding:2px 8px; border-radius:99px; background:' + (achieved ? 'var(--success-soft)' : 'var(--danger-soft)') + '; color:' + (achieved ? 'var(--success)' : 'var(--danger)') + '; font-weight:600;">' + (achieved ? 'Tercapai' : 'Belum') + '</span></td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
   // Filter hutang/piutang by jenis (client-side filter, NOT calculation)
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
@@ -2541,6 +2606,24 @@ function qfinDashboardHTML(){
       ${renderPLChart(plMonthKeys, d.penjualanBulanan || {}, d.pengeluaranBulanan || {}, d.labaBulanan || {})}
       ${labaRugiAnalysis(plMonthKeys, d.penjualanBulanan || {}, d.pengeluaranBulanan || {}, d.labaBulanan || {})}
     </div>
+
+    ${(d.targetBulanan && (state.currentUser === 'owner' || state.currentUser === 'rizky')) ? `
+    <div class="section-title">🎯 Target Bulanan (Marketing &amp; Sales)</div>
+    <div class="card card-hero" style="margin-bottom:12px;">
+      <div class="hero-label">Target / bulan</div>
+      <div class="hero-big">${fmtRupiah(d.targetBulanan.target)}</div>
+      <div class="muted" style="font-size:11px; margin-top:8px;">
+        (Rata-rata pengeluaran ${fmtRupiah(d.targetBulanan.rataRataPengeluaran)} + rata-rata hutang ${fmtRupiah(d.targetBulanan.rataRataHutang)}) × 1.3
+      </div>
+      <div class="muted" style="font-size:10.5px; margin-top:4px;">
+        Total hutang saat ini ${fmtRupiah(d.targetBulanan.totalHutang)} ÷ ${d.targetBulanan.jumlahBulan} bulan berjalan
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      ${renderTargetChart(plMonthKeys, d.penjualanBulanan || {}, d.targetBulanan.target)}
+      ${renderTargetTable(plMonthKeys, d.penjualanBulanan || {}, d.targetBulanan.target)}
+    </div>
+    ` : ''}
 
     <div class="section-title">📋 Hutang Usaha</div>
     <div class="card" style="margin-bottom:12px;">
