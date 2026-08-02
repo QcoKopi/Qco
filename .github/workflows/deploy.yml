@@ -1,0 +1,60 @@
+name: Deploy to GitHub Pages
+
+# Jalan otomatis tiap push ke main, atau manual lewat tab Actions > Run workflow
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # config.js di-generate DI SINI, langsung dari GitHub Secrets.
+      # File hasilnya cuma ada di runner sementara (untuk dipaketkan ke
+      # artifact deploy) — TIDAK pernah di-commit / masuk git history.
+      - name: Generate config.js dari Secrets
+        env:
+          GAS_URL: ${{ secrets.GAS_URL }}
+          QSALES_PORTAL_URL: ${{ secrets.QSALES_PORTAL_URL }}
+          QFIN_PORTAL_URL: ${{ secrets.QFIN_PORTAL_URL }}
+        run: |
+          cat > config.js << EOF
+          // File ini di-generate OTOMATIS oleh GitHub Actions saat deploy.
+          // JANGAN edit manual / commit file ini.
+          // Untuk ganti nilainya: Settings > Secrets and variables > Actions
+          window.QSYSTEM_CONFIG = {
+            GAS_URL: "${GAS_URL}",
+            QSALES_PORTAL_URL: "${QSALES_PORTAL_URL}",
+            QFIN_PORTAL_URL: "${QFIN_PORTAL_URL}"
+          };
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # path: '.' = seluruh isi repo (index.html, config.js hasil generate,
+      # asset lain) di root. Ganti kalau situs Anda ada di subfolder.
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
