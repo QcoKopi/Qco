@@ -419,7 +419,7 @@
 <script src="config.js"></script>
 <script>
 /* ============================================================
-   QSYSTEM — KONFIGURASI 
+   QSYSTEM — KONFIGURASI
    ============================================================ */
 const CONFIG = {
   // Nilai asli (URL deployment, dsb) TIDAK lagi hardcode di sini — file
@@ -2086,7 +2086,7 @@ function qsalesKPIHTML(){
       const bsRate = m.target > 0 ? Math.round((bs.count / m.target) * 100) : 0;
       return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--line); font-size:12px;">
         <span>${escapeHTML(bs.sales)}</span>
-        <span><b>${bs.count}</b> visit <span style="color:var(--ink-faint);">(${bsRate}%)</span></span>
+        <span><b>${bs.count}</b> visit <span style="color:var(--ink-faint);">(${bsRate}%)</span> · <b>${bs.visitDays||0}</b> hari visit</span>
       </div>`;
     }).join('');
 
