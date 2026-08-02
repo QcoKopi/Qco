@@ -416,19 +416,26 @@
 <div id="app"></div>
 <div id="toast" class="toast"></div>
 
+<script src="config.js"></script>
 <script>
 /* ============================================================
    QSYSTEM — KONFIGURASI
    ============================================================ */
 const CONFIG = {
-  // GANTI dengan URL deployment Web App GAS Anda
-  // Setelah merge QSales, GAS_URL ini sudah support semua endpoint QSystem + QSales
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbxETc9Xv6udc7U0N9yflz7DrosN3PH1STUhF-d1qrW0ST48DKjFU4w8Kafuadm09XU/exec',
-  // URL QSales Portal (frontend lengkap — terpisah atau sama)
-  QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
-  // URL QFinance Portal (frontend lengkap — terpisah)
-  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
+  // Nilai asli (URL deployment, dsb) TIDAK lagi hardcode di sini — file
+  // ini membaca dari window.QSYSTEM_CONFIG, yang didefinisikan di
+  // config.js (dimuat lewat <script src="config.js"> di atas).
+  // config.js TIDAK ikut di-commit ke repo publik (lihat .gitignore) —
+  // yang di-commit cuma config.example.js sebagai template. Setiap
+  // deployment (GitHub Pages, dsb) perlu config.js miliknya sendiri
+  // dengan URL yang sesuai.
+  GAS_URL: (window.QSYSTEM_CONFIG && window.QSYSTEM_CONFIG.GAS_URL) || '',
+  QSALES_PORTAL_URL: (window.QSYSTEM_CONFIG && window.QSYSTEM_CONFIG.QSALES_PORTAL_URL) || '',
+  QFIN_PORTAL_URL: (window.QSYSTEM_CONFIG && window.QSYSTEM_CONFIG.QFIN_PORTAL_URL) || '',
 };
+if (!CONFIG.GAS_URL) {
+  console.error('[QSystem] config.js tidak termuat atau GAS_URL kosong! Cek apakah config.js ada di folder yang sama dengan index.html, dan sudah diisi sesuai config.example.js.');
+}
 
 function fmtRupiah(n){
   if (n === null || n === undefined || isNaN(n)) return 'Rp 0';
