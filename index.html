@@ -740,8 +740,13 @@ let state = {
   crmSelectedCustomer: null, // nama_customer yang lagi dibuka detailnya
   crmLogFormOpen: false, // form tambah aktivitas/tugas lagi kebuka atau tidak
   crmWaFormOpen: false, // form kirim WhatsApp lagi kebuka atau tidak
+  crmWaSelectedTemplate: null, // cluster key yang lagi dipilih di dropdown template, atau 'manual'
+  crmWaMessageDraft: '', // isi textarea pesan WA saat ini
   broadcastFormOpen: false, // form broadcast WhatsApp staff lagi kebuka atau tidak
   broadcastLastResult: null, // hasil broadcast terakhir (utk ditampilkan)
+  broadcastTargetType: 'all', // all | dept | staff
+  broadcastTargetDept: 'sm', // sm | po | mgmt
+  broadcastTargetStaff: [], // array employee id yang dipilih (utk targetType='staff')
   crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
   crmTaskFilterStatus: 'Pending', // filter list tugas: Pending | Selesai | all
   currentUser: null,
@@ -1674,17 +1679,57 @@ function qtaskSettingsHTML(){
 
     <div class="section-title">💬 Broadcast WhatsApp Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Kirim pesan ke semua staff sekaligus (nomor dari sheet Employees, kolom NoWA).</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Kirim pesan WhatsApp ke staff (nomor dari sheet Employees, kolom NoWA).</div>
       <button class="btn ${state.broadcastFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="toggle-broadcast-form">
         ${state.broadcastFormOpen ? '✕ Tutup' : '💬 Tulis Broadcast'}
       </button>
       ${state.broadcastFormOpen ? `
         <form id="form-broadcast" style="margin-top:12px;">
           <div class="field">
-            <label>Pesan</label>
-            <textarea name="message" placeholder="Pengumuman untuk semua staff..." required></textarea>
+            <label>Kirim ke</label>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+                <input type="radio" name="broadcast-target-type" value="all" ${state.broadcastTargetType==='all'?'checked':''} data-action="set-broadcast-target-type"> Semua Staff
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+                <input type="radio" name="broadcast-target-type" value="dept" ${state.broadcastTargetType==='dept'?'checked':''} data-action="set-broadcast-target-type"> Departemen Tertentu
+              </label>
+              <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+                <input type="radio" name="broadcast-target-type" value="staff" ${state.broadcastTargetType==='staff'?'checked':''} data-action="set-broadcast-target-type"> Staff Tertentu
+              </label>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">💬 Kirim ke Semua Staff</button>
+
+          ${state.broadcastTargetType === 'dept' ? `
+          <div class="field">
+            <label>Departemen</label>
+            <select class="inline-select" data-action="set-broadcast-target-dept" style="width:100%;">
+              <option value="sm" ${state.broadcastTargetDept==='sm'?'selected':''}>${DEPT_NAMES.sm}</option>
+              <option value="po" ${state.broadcastTargetDept==='po'?'selected':''}>${DEPT_NAMES.po}</option>
+              <option value="mgmt" ${state.broadcastTargetDept==='mgmt'?'selected':''}>${DEPT_NAMES.mgmt}</option>
+            </select>
+          </div>
+          ` : ''}
+
+          ${state.broadcastTargetType === 'staff' ? `
+          <div class="field">
+            <label>Pilih Staff</label>
+            <div style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:8px;">
+              ${getEmployees().map(emp2 => `
+                <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+                  <input type="checkbox" value="${escapeHTML(emp2.id)}" ${state.broadcastTargetStaff.includes(emp2.id)?'checked':''} data-action="toggle-broadcast-target-staff">
+                  ${escapeHTML(emp2.name)} <span class="faint">(${DEPT_NAMES[emp2.dept]})</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          ` : ''}
+
+          <div class="field">
+            <label>Pesan</label>
+            <textarea name="message" placeholder="Pengumuman untuk staff..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">💬 Kirim</button>
         </form>
       ` : ''}
       ${state.broadcastLastResult ? `
@@ -2914,7 +2959,7 @@ function crmCustomerDetailHTML(d, custName){
       <button class="btn ${state.crmWaFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="crm-toggle-waform">
         ${state.crmWaFormOpen ? '✕ Tutup' : '💬 Kirim Pesan ke ' + escapeHTML(cust.telepon)}
       </button>
-      ${state.crmWaFormOpen ? crmWaFormHTML(custName) : ''}
+      ${state.crmWaFormOpen ? crmWaFormHTML(cust, d.curMonthLabel || d.curMonth || '-', d.prevMonthLabel || d.prevMonth || '-') : ''}
     </div>
     ` : `
     <div class="card" style="margin-bottom:12px;">
@@ -2987,12 +3032,46 @@ function crmLogFormHTML(custName){
   `;
 }
 
-function crmWaFormHTML(custName){
+// Template pesan WhatsApp per cluster CRM, sudah terisi data histori
+// pembelian asli customer (nama, nilai order bulan ini/lalu, jumlah
+// transaksi). Semua angka diambil dari data yang sudah ada, tidak ada
+// hitungan baru.
+function crmWaTemplateText_(cust, curLabel, prevLabel){
+  const nama = cust.nama_customer;
+  const curVal = fmtRupiah(cust.curValue);
+  const prevVal = fmtRupiah(cust.prevValue);
+  const curCount = cust.curCount;
+  const pct = cust.deltaPct !== null ? Math.abs(cust.deltaPct).toFixed(0) + '%' : null;
+
+  const templates = {
+    'Meningkat': `Halo ${nama} 👋\n\nTerima kasih banyak sudah jadi pelanggan setia kami! Kami lihat order dari ${nama} di ${curLabel} naik jadi ${curVal}${pct ? ' (naik ' + pct + ')' : ''} dibanding ${prevLabel} yang ${prevVal} — senang banget bisa terus mendukung kebutuhan kopi Anda 🙏\n\nAda yang bisa kami bantu untuk order berikutnya?`,
+
+    'Menurun': `Halo ${nama} 👋\n\nKami perhatikan order dari ${nama} di ${curLabel} turun jadi ${curVal}${pct ? ' (turun ' + pct + ')' : ''}, dari sebelumnya ${prevVal} di ${prevLabel}.\n\nSemoga semuanya baik-baik saja di sana. Ada kendala yang bisa kami bantu, atau ada masukan soal produk/pelayanan kami? Kami mau pastikan kebutuhan ${nama} tetap terpenuhi dengan baik 🙏`,
+
+    'Stabil': `Halo ${nama} 👋\n\nTerima kasih terus percaya sama kami — order di ${curLabel} (${curVal}) konsisten seperti ${prevLabel}. Kami senang bisa jadi partner kopi yang reliable buat ${nama}.\n\nAda yang bisa kami bantu untuk kebutuhan berikutnya?`,
+
+    'Customer Baru': `Halo ${nama} 👋\n\nTerima kasih banyak sudah order pertama kali di ${curLabel} (${curVal}${curCount > 1 ? ', ' + curCount + ' transaksi' : ''})! Senang banget bisa mulai kerja sama dengan ${nama} 🎉\n\nKalau ada pertanyaan soal produk atau butuh bantuan apa pun, jangan ragu hubungi kami ya. Semoga kopi kami cocok buat kebutuhan Anda!`,
+
+    'Tidak Ada Order Bulan Ini': `Halo ${nama} 👋\n\nKami perhatikan belum ada order dari ${nama} di ${curLabel}, padahal ${prevLabel} masih order ${prevVal}.\n\nSemoga semua baik-baik saja. Ada yang bisa kami bantu, atau mungkin ada kendala stok/pengiriman kemarin? Kami siap bantu kapan pun dibutuhkan 🙏`,
+
+    'Tidak Ada Order': `Halo ${nama} 👋\n\nSudah lama nih kita nggak dengar kabar dari ${nama} 😊 Kami kangen bisa bantu kebutuhan kopi Anda lagi.\n\nKalau ada waktu, boleh kabari kami kalau butuh restock atau ada perubahan kebutuhan? Kami siap bantu kapan saja!`
+  };
+  return templates[cust.cluster] || `Halo ${nama} 👋\n\n`;
+}
+
+function crmWaFormHTML(cust, curLabel, prevLabel){
   return `
-    <form id="form-crm-wa" data-customer="${escapeHTML(custName)}" style="margin-top:12px;">
+    <form id="form-crm-wa" data-customer="${escapeHTML(cust.nama_customer)}" style="margin-top:12px;">
+      <div class="field">
+        <label>Template</label>
+        <select class="inline-select" data-action="set-crm-wa-template" style="width:100%;">
+          <option value="manual" ${state.crmWaSelectedTemplate==='manual'?'selected':''}>-- Tulis manual --</option>
+          ${CRM_CLUSTER_ORDER.map(c => `<option value="${escapeHTML(c)}" ${state.crmWaSelectedTemplate===c?'selected':''}>${c === cust.cluster ? '⭐ ' : ''}${escapeHTML(c)}${c === cust.cluster ? ' (cluster customer ini)' : ''}</option>`).join('')}
+        </select>
+      </div>
       <div class="field">
         <label>Pesan</label>
-        <textarea name="message" placeholder="Tulis pesan WhatsApp..." required></textarea>
+        <textarea name="message" placeholder="Tulis pesan WhatsApp...">${escapeHTML(state.crmWaMessageDraft || '')}</textarea>
       </div>
       <button type="submit" class="btn btn-primary btn-block">💬 Kirim</button>
     </form>
@@ -3605,6 +3684,15 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'crm-toggle-waform'){
     state.crmWaFormOpen = !state.crmWaFormOpen;
+    if (state.crmWaFormOpen && state.crmData && state.crmSelectedCustomer) {
+      const cust = (state.crmData.customers || []).find(c => c.nama_customer === state.crmSelectedCustomer);
+      if (cust) {
+        const curLabel = state.crmData.curMonthLabel || state.crmData.curMonth || '-';
+        const prevLabel = state.crmData.prevMonthLabel || state.crmData.prevMonth || '-';
+        state.crmWaSelectedTemplate = cust.cluster;
+        state.crmWaMessageDraft = crmWaTemplateText_(cust, curLabel, prevLabel);
+      }
+    }
     render();
   }
   else if (el.dataset.action === 'toggle-broadcast-form'){
@@ -3739,8 +3827,41 @@ document.addEventListener('change', function(e){
     state.crmTaskFilterStatus = e.target.value;
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'set-crm-wa-template'){
+    const key = e.target.value;
+    state.crmWaSelectedTemplate = key;
+    if (key === 'manual') {
+      state.crmWaMessageDraft = '';
+    } else if (state.crmData && state.crmSelectedCustomer) {
+      const cust = (state.crmData.customers || []).find(c => c.nama_customer === state.crmSelectedCustomer);
+      if (cust) {
+        const custForTemplate = Object.assign({}, cust, { cluster: key }); // pakai cluster dari dropdown, bukan cluster asli customer
+        const curLabel = state.crmData.curMonthLabel || state.crmData.curMonth || '-';
+        const prevLabel = state.crmData.prevMonthLabel || state.crmData.prevMonth || '-';
+        state.crmWaMessageDraft = crmWaTemplateText_(custForTemplate, curLabel, prevLabel);
+      }
+    }
+    render();
+  }
   else if (e.target.dataset && e.target.dataset.action === 'set-crm-logform-tipe'){
     state.crmLogFormTipe = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-broadcast-target-type'){
+    state.broadcastTargetType = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-broadcast-target-dept'){
+    state.broadcastTargetDept = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'toggle-broadcast-target-staff'){
+    const id = e.target.value;
+    if (e.target.checked) {
+      if (!state.broadcastTargetStaff.includes(id)) state.broadcastTargetStaff.push(id);
+    } else {
+      state.broadcastTargetStaff = state.broadcastTargetStaff.filter(x => x !== id);
+    }
     render();
   }
 });
@@ -3751,8 +3872,20 @@ document.addEventListener('submit', function(e){
     const fd = new FormData(e.target);
     const message = String(fd.get('message')||'').trim();
     if (!message) { showToast('Pesan tidak boleh kosong'); return; }
+
+    let targetNames = undefined; // undefined = semua staff (backend default)
+    if (state.broadcastTargetType === 'dept') {
+      targetNames = getEmployees().filter(emp2 => emp2.dept === state.broadcastTargetDept).map(emp2 => emp2.name);
+      if (!targetNames.length) { showToast('Tidak ada staff di departemen ini'); return; }
+    } else if (state.broadcastTargetType === 'staff') {
+      targetNames = getEmployees().filter(emp2 => state.broadcastTargetStaff.includes(emp2.id)).map(emp2 => emp2.name);
+      if (!targetNames.length) { showToast('Pilih minimal 1 staff dulu'); return; }
+    }
+
     showToast('Mengirim broadcast…');
-    apiCall('broadcast_sendToStaff', { message: message }).then(res=>{
+    const payload = { message: message };
+    if (targetNames) payload.targetNames = targetNames;
+    apiCall('broadcast_sendToStaff', payload).then(res=>{
       state.broadcastLastResult = res;
       state.broadcastFormOpen = false;
       render();
