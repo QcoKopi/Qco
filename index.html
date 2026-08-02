@@ -730,7 +730,6 @@ let state = {
   crmLoading: false,
   crmError: null,
   crmFetchAttempted: false,
-  crmFilterCluster: 'all', // all | Meningkat | Menurun | Stabil | Customer Baru | Tidak Ada Order Bulan Ini | Tidak Ada Order
   crmSelectedCustomer: null, // nama_customer yang lagi dibuka detailnya
   crmLogFormOpen: false, // form tambah aktivitas/tugas lagi kebuka atau tidak
   crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
@@ -886,6 +885,17 @@ function timelineBadge(task){
 }
 function tasksOf(employeeId){
   return state.data.tasks.filter(t=>t.employeeId===employeeId).sort((a,b)=> (b.updatedAt||0)-(a.updatedAt||0));
+}
+function recentProgressForEmployee(employeeId, limit){
+  const taskIds = new Set(state.data.tasks.filter(t => t.employeeId === employeeId).map(t => t.id));
+  const taskById = {};
+  state.data.tasks.forEach(t => { taskById[t.id] = t; });
+  return state.data.progress
+    .filter(p => taskIds.has(p.taskId))
+    .slice()
+    .sort((a,b)=> b.date===a.date ? (b.createdAt||0)-(a.createdAt||0) : (a.date < b.date ? 1 : -1))
+    .slice(0, limit || 5)
+    .map(p => Object.assign({}, p, { taskTitle: (taskById[p.taskId] || {}).title || '(task dihapus)' }));
 }
 function daysBetweenDates(a,b){
   const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
@@ -1526,6 +1536,28 @@ function qtaskTeamHTML(){
     </div>
     <div class="section-title">Semua Task Tim (${allTasks.length})</div>
     ${taskTableHTML(allTasks, {showEmployee:true, showDept:crossDept})}
+
+    <div class="section-title">Update 5 Terakhir per Staff</div>
+    ${memberIds.map(id => {
+      const memberEmp = findEmp(id);
+      if (!memberEmp) return '';
+      const recent = recentProgressForEmployee(id, 5);
+      return `
+        <div class="card" style="margin-bottom:12px; padding:0; overflow:hidden;">
+          <div style="padding:10px 14px; background:var(--surface-alt); font-weight:700; font-size:13px;">${escapeHTML(memberEmp.name)}</div>
+          ${recent.length ? recent.map(p => `
+            <div style="padding:9px 14px; border-top:1px solid var(--line);">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                <div style="font-weight:600; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;">${escapeHTML(p.taskTitle)}</div>
+                <span class="badge ${p.status==='stop' ? 'badge-overdue' : 'badge-active'}" style="flex-shrink:0;">${p.status==='stop' ? 'Stop' : 'Ongoing'}</span>
+              </div>
+              <div style="font-size:12px; color:var(--ink-soft); margin-top:3px;">${escapeHTML(p.note)}</div>
+              <div class="faint" style="font-size:10.5px; margin-top:3px;">📅 ${fmtDate(p.date)}</div>
+            </div>
+          `).join('') : '<div class="faint" style="font-size:12px; padding:12px;">Belum ada update progress</div>'}
+        </div>
+      `;
+    }).join('')}
   `;
 }
 function qtaskReportHTML(){
@@ -1855,17 +1887,6 @@ function qsalesDashboardHTML(){
     </div>
   ` : '';
 
-  // Show debug info if available
-  const debugInfo = d.debug ? `
-    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
-      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
-      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
-      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
-      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
-      <div>isStaff: ${d.debug.isStaff}</div>
-      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
-    </div>
-  ` : '';
 
   return `
     <div class="greeting">QSales Intelligence 🎯</div>
@@ -1875,7 +1896,6 @@ function qsalesDashboardHTML(){
       ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
-    ${debugInfo}
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
@@ -2147,18 +2167,6 @@ function qsalesKPIHTML(){
     </div>
   `).join('');
 
-  // Show debug info if available
-  const debugInfoKPI = d.debug ? `
-    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
-      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
-      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
-      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
-      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
-      <div>isStaff: ${d.debug.isStaff}</div>
-      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
-    </div>
-  ` : '';
-
   return `
     <div class="greeting">KPI Sales 📈</div>
     <div class="greeting-sub">
@@ -2167,7 +2175,6 @@ function qsalesKPIHTML(){
       ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
-    ${debugInfoKPI}
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
@@ -2371,67 +2378,86 @@ function qfinDashboardHTML(){
   // Chart garis sederhana (SVG murni, tanpa library) untuk Laba Rugi
   // Bulanan — dari bulan pertama sampai bulan terakhir yang ADA datanya
   // di sheet. Nilainya dipakai apa adanya dari backend, cuma digambar.
-  function renderLabaRugiChart(row) {
-    const keys = monthKeysOf(row);
-    if (!keys.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
-    const values = keys.map(k => Number(row[k]) || 0);
-    const w = 640, h = 210, padL = 8, padR = 8, padT = 14, padB = 26;
+  // Chart 3-garis: Penjualan, Pengeluaran, Laba — semua bulanan (bukan
+  // kumulatif), dihitung backend dari sheet GL. SVG murni, tanpa library.
+  function renderPLChart(monthKeys, penjualanMap, pengeluaranMap, labaMap) {
+    if (!monthKeys.length) return '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada data</div>';
+    const series = [
+      { label: 'Penjualan', color: 'var(--success)', values: monthKeys.map(k => Number(penjualanMap[k]) || 0) },
+      { label: 'Pengeluaran', color: 'var(--danger)', values: monthKeys.map(k => Number(pengeluaranMap[k]) || 0) },
+      { label: 'Laba/Rugi', color: 'var(--ink)', dashed: true, values: monthKeys.map(k => Number(labaMap[k]) || 0) },
+    ];
+    const w = 640, h = 220, padL = 8, padR = 8, padT = 14, padB = 26;
     const innerW = w - padL - padR, innerH = h - padT - padB;
-    let minV = Math.min(0, ...values), maxV = Math.max(0, ...values);
+    const allVals = series.flatMap(s => s.values);
+    let minV = Math.min(0, ...allVals), maxV = Math.max(0, ...allVals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
     const range = maxV - minV;
-    const xStep = values.length > 1 ? innerW / (values.length - 1) : 0;
+    const xStep = monthKeys.length > 1 ? innerW / (monthKeys.length - 1) : 0;
     const xOf = i => padL + i * xStep;
     const yOf = v => padT + innerH - ((v - minV) / range) * innerH;
     const zeroY = yOf(0);
 
-    const pathD = values.map((v, i) => (i === 0 ? 'M' : 'L') + xOf(i).toFixed(1) + ',' + yOf(v).toFixed(1)).join(' ');
-    const areaD = pathD +
-      ' L' + xOf(values.length - 1).toFixed(1) + ',' + zeroY.toFixed(1) +
-      ' L' + xOf(0).toFixed(1) + ',' + zeroY.toFixed(1) + ' Z';
-    const dots = values.map((v, i) =>
-      '<circle cx="' + xOf(i).toFixed(1) + '" cy="' + yOf(v).toFixed(1) + '" r="3.5" fill="' + (v >= 0 ? 'var(--success)' : 'var(--danger)') + '" stroke="#fff" stroke-width="1"/>'
-    ).join('');
-    const labels = keys.map((k, i) =>
+    const linesSvg = series.map(s => {
+      const pathD = s.values.map((v, i) => (i === 0 ? 'M' : 'L') + xOf(i).toFixed(1) + ',' + yOf(v).toFixed(1)).join(' ');
+      const dots = s.values.map((v, i) =>
+        '<circle cx="' + xOf(i).toFixed(1) + '" cy="' + yOf(v).toFixed(1) + '" r="3" fill="' + s.color + '" stroke="#fff" stroke-width="1"/>'
+      ).join('');
+      return '<path d="' + pathD + '" fill="none" stroke="' + s.color + '" stroke-width="2.2"' + (s.dashed ? ' stroke-dasharray="5,3"' : '') + '/>' + dots;
+    }).join('');
+
+    const labels = monthKeys.map((k, i) =>
       '<text x="' + xOf(i).toFixed(1) + '" y="' + (h - 8) + '" font-size="9.5" fill="var(--ink-faint)" text-anchor="middle">' + escapeHTML(String(k).split(' ')[0].slice(0, 3)) + '</text>'
     ).join('');
 
+    const legend = series.map(s =>
+      '<span style="display:inline-flex; align-items:center; gap:5px; margin-right:14px; font-size:11px; color:var(--ink-soft);">' +
+      '<span style="width:16px; height:0; border-top:2.5px ' + (s.dashed ? 'dashed' : 'solid') + ' ' + s.color + '; display:inline-block;"></span>' +
+      escapeHTML(s.label) + '</span>'
+    ).join('');
+
     return `
-      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block; margin-top:10px;">
+      <div style="display:flex; flex-wrap:wrap; margin-top:10px;">${legend}</div>
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; display:block; margin-top:8px;">
         <line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${w - padR}" y2="${zeroY.toFixed(1)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="3,3"/>
-        <path d="${areaD}" fill="var(--accent-soft)" opacity="0.6"/>
-        <path d="${pathD}" fill="none" stroke="var(--accent-dark)" stroke-width="2.2"/>
-        ${dots}
+        ${linesSvg}
         ${labels}
       </svg>
     `;
   }
 
-  // Analisa deskriptif singkat dari data Laba Rugi Bulanan yang sudah
-  // ada (posisi terakhir, perubahan vs bulan sebelumnya, bulan
-  // terbaik/terlemah). Semua angka diambil langsung dari data backend,
-  // tidak ada hitungan ulang dari sheet mentah.
-  function labaRugiAnalysis(row) {
-    const keys = monthKeysOf(row);
-    if (!keys.length) return '';
-    const values = keys.map(k => Number(row[k]) || 0);
-    const latest = values[values.length - 1];
-    const latestMonth = keys[keys.length - 1];
-    const prev = values.length > 1 ? values[values.length - 2] : null;
-    const delta = prev !== null ? latest - prev : null;
+  // Analisa deskriptif mengikuti chart 3-garis: posisi bulan terakhir
+  // (Penjualan/Pengeluaran/Laba + margin), perubahan vs bulan
+  // sebelumnya, dan bulan dengan laba terbaik/terlemah. Semua angka
+  // dari data yang sama yang dipakai chart, tidak ada hitungan baru.
+  function labaRugiAnalysis(monthKeys, penjualanMap, pengeluaranMap, labaMap) {
+    if (!monthKeys.length) return '';
+    const latest = monthKeys[monthKeys.length - 1];
+    const prevM = monthKeys.length > 1 ? monthKeys[monthKeys.length - 2] : null;
+    const pLatest = Number(penjualanMap[latest]) || 0, eLatest = Number(pengeluaranMap[latest]) || 0, lLatest = Number(labaMap[latest]) || 0;
+    const margin = pLatest > 0 ? (lLatest / pLatest * 100) : null;
 
-    let minIdx = 0, maxIdx = 0;
-    values.forEach((v, i) => { if (v < values[minIdx]) minIdx = i; if (v > values[maxIdx]) maxIdx = i; });
-
-    const posisi = latest >= 0 ? 'laba' : 'rugi';
+    const posisi = lLatest >= 0 ? 'laba' : 'rugi';
     const parts = [];
-    parts.push('Per <b>' + escapeHTML(latestMonth) + '</b>, posisi kumulatif adalah <b style="color:' + (latest >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + posisi + ' ' + fmtRupiah(Math.abs(latest)) + '</b>.');
-    if (delta !== null) {
-      const arah = delta >= 0 ? 'membaik' : 'memburuk';
-      parts.push('Dibanding bulan sebelumnya, posisi ini ' + arah + ' sebesar ' + fmtRupiah(Math.abs(delta)) + '.');
+    parts.push('Per <b>' + escapeHTML(latest) + '</b>: Penjualan ' + fmtRupiah(pLatest) + ', Pengeluaran ' + fmtRupiah(eLatest) + ', hasil <b style="color:' + (lLatest >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + posisi + ' ' + fmtRupiah(Math.abs(lLatest)) + '</b>' + (margin !== null ? ' (margin ' + margin.toFixed(1) + '%)' : '') + '.');
+
+    if (prevM) {
+      const pPrev = Number(penjualanMap[prevM]) || 0, ePrev = Number(pengeluaranMap[prevM]) || 0;
+      if (pPrev > 0) {
+        const pDelta = (pLatest - pPrev) / pPrev * 100;
+        parts.push('Penjualan ' + (pDelta >= 0 ? 'naik' : 'turun') + ' ' + Math.abs(pDelta).toFixed(0) + '% dibanding bulan lalu.');
+      }
+      if (ePrev > 0) {
+        const eDelta = (eLatest - ePrev) / ePrev * 100;
+        parts.push('Pengeluaran ' + (eDelta >= 0 ? 'naik' : 'turun') + ' ' + Math.abs(eDelta).toFixed(0) + '% dibanding bulan lalu.');
+      }
     }
-    if (keys.length > 1) {
-      parts.push('Posisi terbaik ada di <b>' + escapeHTML(keys[maxIdx]) + '</b> (' + fmtRupiah(values[maxIdx]) + '), posisi terlemah di <b>' + escapeHTML(keys[minIdx]) + '</b> (' + fmtRupiah(values[minIdx]) + ').');
+
+    if (monthKeys.length > 1) {
+      const lVals = monthKeys.map(k => Number(labaMap[k]) || 0);
+      let maxIdx = 0, minIdx = 0;
+      lVals.forEach((v, i) => { if (v > lVals[maxIdx]) maxIdx = i; if (v < lVals[minIdx]) minIdx = i; });
+      parts.push('Bulan dengan laba terbaik: <b>' + escapeHTML(monthKeys[maxIdx]) + '</b> (' + fmtRupiah(lVals[maxIdx]) + '), terlemah: <b>' + escapeHTML(monthKeys[minIdx]) + '</b> (' + fmtRupiah(lVals[minIdx]) + ').');
     }
     return '<p style="font-size:12.5px; line-height:1.65; color:var(--ink-soft); margin-top:12px; padding-top:12px; border-top:1px solid var(--line);">' + parts.join(' ') + '</p>';
   }
@@ -2452,6 +2478,7 @@ function qfinDashboardHTML(){
   const kasRow = d.kasRow || null;
   const bankRow = d.bankRow || null;
   const labaRugi = d.labaRugiRow || {};
+  const plMonthKeys = monthKeysOf(d.penjualanBulanan || {});
   const latestKas = latestMonthEntry(kasRow);
   const latestBank = latestMonthEntry(bankRow);
 
@@ -2498,14 +2525,14 @@ function qfinDashboardHTML(){
       <div class="muted" style="font-size:11px; margin-top:12px;">Baris '1.1 Kas' &amp; '1.2 Bank' · sheet Neraca</div>
     </div>
 
-    <div class="section-title">📈 Laba Rugi Bulanan</div>
+    <div class="section-title">📈 Penjualan, Pengeluaran &amp; Laba Bulanan</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:18px;">📈</span>
-        <div style="font-weight:600; font-size:14px;">${escapeHTML(labaRugi.pos_akun || 'Laba Berjalan')} (sheet Neraca)</div>
+        <div style="font-weight:600; font-size:14px;">Dihitung dari sheet GL (per bulan, bukan kumulatif)</div>
       </div>
-      ${renderLabaRugiChart(d.labaRugiRow || null)}
-      ${labaRugiAnalysis(d.labaRugiRow || null)}
+      ${renderPLChart(plMonthKeys, d.penjualanBulanan || {}, d.pengeluaranBulanan || {}, d.labaBulanan || {})}
+      ${labaRugiAnalysis(plMonthKeys, d.penjualanBulanan || {}, d.pengeluaranBulanan || {}, d.labaBulanan || {})}
     </div>
 
     <div class="section-title">📋 Hutang Usaha</div>
@@ -2636,37 +2663,34 @@ function crmDashboardHTML(){
   const customers = d.customers || [];
   const logs = d.logs || [];
 
-  const counts = {};
-  CRM_CLUSTER_ORDER.forEach(c => counts[c] = 0);
-  customers.forEach(c => { counts[c.cluster] = (counts[c.cluster]||0) + 1; });
-
-  const filtered = customers
-    .filter(c => state.crmFilterCluster === 'all' || c.cluster === state.crmFilterCluster)
-    .sort((a,b) => b.curValue - a.curValue);
+  const byCluster = {};
+  CRM_CLUSTER_ORDER.forEach(c => byCluster[c] = []);
+  customers.forEach(c => { if (byCluster[c.cluster]) byCluster[c.cluster].push(c); });
+  Object.keys(byCluster).forEach(c => byCluster[c].sort((a,b) => b.curValue - a.curValue));
 
   const tasks = logs.filter(l => l.tipe === 'Tugas')
     .filter(l => state.crmTaskFilterStatus === 'all' || (l.status||'Pending') === state.crmTaskFilterStatus)
     .sort((a,b) => String(a.tanggal).localeCompare(String(b.tanggal)));
 
+  const activities = logs.filter(l => l.tipe === 'Aktivitas')
+    .sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0, 8);
+
+  function crmCustomerRow(c){
+    return `
+      <div data-action="crm-open-customer" data-customer="${escapeHTML(c.nama_customer)}" style="cursor:pointer; padding:10px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="flex:1; min-width:0; font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(c.nama_customer)}</div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div style="font-family:var(--font-mono); font-weight:600; font-size:12.5px;">${fmtRupiah(c.curValue)}</div>
+          <div class="faint" style="font-size:10px;">${c.deltaPct !== null ? (c.deltaPct>=0?'▲ +':'▼ ') + c.deltaPct.toFixed(0) + '%' : (c.curValue>0 ? 'baru' : '-')}</div>
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="greeting">CRM 👥</div>
     <div class="greeting-sub">Existing client · membandingkan ${escapeHTML(d.curMonthLabel||d.curMonth||'-')} vs ${escapeHTML(d.prevMonthLabel||d.prevMonth||'-')} <span class="faint">(update tgl 15/bulan)</span></div>
-
-    <div class="section-title">Ringkasan Cluster</div>
-    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
-      <div data-action="crm-filter-cluster" data-cluster="all" style="cursor:pointer; padding:8px 12px; border-radius:12px; border:1.5px solid ${state.crmFilterCluster==='all' ? 'var(--ink)' : 'var(--line)'}; background:${state.crmFilterCluster==='all' ? 'var(--ink)' : '#fff'};">
-        <div style="font-size:16px; font-weight:700; color:${state.crmFilterCluster==='all' ? '#fff' : 'var(--ink)'};">${customers.length}</div>
-        <div style="font-size:10.5px; color:${state.crmFilterCluster==='all' ? '#fff' : 'var(--ink-soft)'};">Semua</div>
-      </div>
-      ${CRM_CLUSTER_ORDER.map(c => {
-        const meta = CRM_CLUSTER_META[c];
-        const active = state.crmFilterCluster === c;
-        return `<div data-action="crm-filter-cluster" data-cluster="${c}" style="cursor:pointer; padding:8px 12px; border-radius:12px; border:1.5px solid ${active ? meta.color : 'var(--line)'}; background:${active ? meta.bg : '#fff'};">
-          <div style="font-size:16px; font-weight:700; color:${meta.color};">${counts[c]||0}</div>
-          <div style="font-size:10.5px; color:var(--ink-soft);">${meta.icon} ${escapeHTML(c)}</div>
-        </div>`;
-      }).join('')}
-    </div>
 
     <div class="section-title">📌 Tugas &amp; Reminder Follow-up</div>
     <div class="card" style="margin-bottom:16px;">
@@ -2686,21 +2710,31 @@ function crmDashboardHTML(){
       `).join('') : '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada tugas</div>'}
     </div>
 
-    <div class="section-title">Daftar Customer (${filtered.length})</div>
-    <div class="card" style="margin-bottom:12px; padding:0; overflow:hidden;">
-      ${filtered.length ? filtered.map(c => `
-        <div data-action="crm-open-customer" data-customer="${escapeHTML(c.nama_customer)}" style="cursor:pointer; padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px;">
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:600; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(c.nama_customer)}</div>
-            <div style="margin-top:4px;">${crmClusterBadge(c.cluster)}</div>
-          </div>
-          <div style="text-align:right; flex-shrink:0;">
-            <div style="font-family:var(--font-mono); font-weight:600; font-size:13px;">${fmtRupiah(c.curValue)}</div>
-            <div class="faint" style="font-size:10.5px;">${c.deltaPct !== null ? (c.deltaPct>=0?'▲ +':'▼ ') + c.deltaPct.toFixed(0) + '%' : (c.curValue>0 ? 'baru' : '-')}</div>
-          </div>
+    <div class="section-title">📝 Aktivitas Terbaru</div>
+    <div class="card" style="margin-bottom:16px;">
+      ${activities.length ? activities.map(a => `
+        <div style="cursor:pointer; padding:8px 0; border-top:1px solid var(--line);" data-action="crm-open-customer" data-customer="${escapeHTML(a.customer)}">
+          <div style="font-weight:600; font-size:13px;">${escapeHTML(a.judul)}</div>
+          <div class="faint" style="font-size:11px;">👤 ${escapeHTML(a.customer)} · 📅 ${escapeHTML(a.tanggal)} · oleh ${escapeHTML(a.dibuat_oleh||'-')}</div>
+          ${a.catatan ? `<div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">${escapeHTML(a.catatan)}</div>` : ''}
         </div>
-      `).join('') : '<div class="faint" style="font-size:12px; padding:16px; text-align:center;">Tidak ada customer di cluster ini</div>'}
+      `).join('') : '<div class="faint" style="font-size:12px; padding:8px;">Belum ada aktivitas tercatat</div>'}
     </div>
+
+    <div class="section-title">Cluster Customer (${customers.length} total)</div>
+    ${CRM_CLUSTER_ORDER.map(c => {
+      const meta = CRM_CLUSTER_META[c];
+      const list = byCluster[c];
+      return `
+        <div class="card" style="margin-bottom:12px; padding:0; overflow:hidden; border-color:${meta.bg};">
+          <div style="padding:12px 14px; background:${meta.bg}; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:13.5px; color:${meta.color};">${meta.icon} ${escapeHTML(c)}</div>
+            <div style="font-weight:700; font-size:13.5px; color:${meta.color};">${list.length}</div>
+          </div>
+          ${list.length ? list.map(crmCustomerRow).join('') : '<div class="faint" style="font-size:12px; padding:14px; text-align:center;">Tidak ada customer di cluster ini</div>'}
+        </div>
+      `;
+    }).join('')}
 
     <p class="hint" style="text-align:center; margin-top:8px;">
       Data live dari sheet Costumer &amp; GL · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
@@ -3406,10 +3440,6 @@ document.addEventListener('click', function(e){
     state.crmFetchAttempted = false;
     fetchCRMData();
   }
-  else if (el.dataset.action === 'crm-filter-cluster'){
-    state.crmFilterCluster = el.dataset.cluster || 'all';
-    render();
-  }
   else if (el.dataset.action === 'crm-open-customer'){
     state.crmSelectedCustomer = el.dataset.customer;
     state.crmLogFormOpen = false;
@@ -3817,8 +3847,10 @@ function getAllowedApps(userId){
     }
   }
   if (allowed.includes('crm')) {
-    const canSeeCRMTab = emp.role === 'owner' || emp.role === 'spv';
-    if (!canSeeCRMTab) {
+    // Named-ID, BUKAN role-based: cuma 3 orang ini persis yang boleh buka
+    // CRM, walau nanti ada spv baru ditambahkan lewat Manajemen Staff.
+    const CRM_ALLOWED_IDS = ['owner', 'rizky', 'umay'];
+    if (!CRM_ALLOWED_IDS.includes(userId)) {
       allowed = allowed.filter(a => a !== 'crm');
     }
   }
