@@ -711,6 +711,8 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
    ============================================================ */
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
+  qfinStockFilterProduk: 'all', // all | nama_produk
+  qfinStockOnlySisa: false, // true = cuma tampilkan baris dengan sisa > 0
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
@@ -2398,6 +2400,15 @@ function qfinDashboardHTML(){
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
 
+  // Filter Stock: dropdown per produk + toggle "hanya ada sisa" (client-side filter, NOT calculation)
+  const stockAll = d.stockKopiRows || [];
+  const stockProdukOptions = [...new Set(stockAll.map(r => r.nama_produk).filter(Boolean))].sort();
+  const stockRows = stockAll.filter(r => {
+    if (state.qfinStockFilterProduk !== 'all' && r.nama_produk !== state.qfinStockFilterProduk) return false;
+    if (state.qfinStockOnlySisa && !(Number(r.sisa) > 0)) return false;
+    return true;
+  });
+
   const kasRow = d.kasRow || null;
   const bankRow = d.bankRow || null;
   const labaRugi = d.labaRugiRow || {};
@@ -2447,6 +2458,16 @@ function qfinDashboardHTML(){
       <div class="muted" style="font-size:11px; margin-top:12px;">Baris '1.1 Kas' &amp; '1.2 Bank' · sheet Neraca</div>
     </div>
 
+    <div class="section-title">📈 Laba Rugi Bulanan</div>
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:18px;">📈</span>
+        <div style="font-weight:600; font-size:14px;">${escapeHTML(labaRugi.pos_akun || 'Laba Berjalan')} (sheet Neraca)</div>
+      </div>
+      ${renderLabaRugiChart(d.labaRugiRow || null)}
+      ${labaRugiAnalysis(d.labaRugiRow || null)}
+    </div>
+
     <div class="section-title">📋 Hutang Usaha</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-hutang">
@@ -2488,11 +2509,23 @@ function qfinDashboardHTML(){
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-stock">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">☕</span>
-          <div style="font-weight:600; font-size:14px;">Stock Kopi (sheet Stock)</div>
+          <div style="font-weight:600; font-size:14px;">Stock Kopi (sheet Stock) · ${stockRows.length}/${stockAll.length} baris</div>
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStock ? '⌃' : '⌄'}</span>
       </div>
-      ${expandStock ? renderRows(d.stockKopiRows || [], [
+      ${expandStock ? `
+      <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);" onclick="event.stopPropagation()">
+        <select class="inline-select" data-action="set-qfin-stock-produk" style="max-width:220px;">
+          <option value="all" ${state.qfinStockFilterProduk==='all'?'selected':''}>Semua Produk (${stockProdukOptions.length})</option>
+          ${stockProdukOptions.map(p => `<option value="${escapeHTML(p)}" ${state.qfinStockFilterProduk===p?'selected':''}>${escapeHTML(p)}</option>`).join('')}
+        </select>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer;">
+          <input type="checkbox" data-action="toggle-qfin-stock-sisa" ${state.qfinStockOnlySisa ? 'checked' : ''} style="cursor:pointer;">
+          Hanya yang masih ada sisa
+        </label>
+      </div>
+      ` : ''}
+      ${expandStock ? renderRows(stockRows, [
         {label:'Produk', key:'nama_produk'},
         {label:'ID', key:'id_produk'},
         {label:'Batch', key:'batch_no'},
@@ -3170,6 +3203,14 @@ document.addEventListener('change', function(e){
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-qfin-filter'){
     state.qfinFilterSumber = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-qfin-stock-produk'){
+    state.qfinStockFilterProduk = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'toggle-qfin-stock-sisa'){
+    state.qfinStockOnlySisa = e.target.checked;
     render();
   }
 });
