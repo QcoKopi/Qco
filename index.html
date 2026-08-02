@@ -740,6 +740,8 @@ let state = {
   crmSelectedCustomer: null, // nama_customer yang lagi dibuka detailnya
   crmLogFormOpen: false, // form tambah aktivitas/tugas lagi kebuka atau tidak
   crmWaFormOpen: false, // form kirim WhatsApp lagi kebuka atau tidak
+  broadcastFormOpen: false, // form broadcast WhatsApp staff lagi kebuka atau tidak
+  broadcastLastResult: null, // hasil broadcast terakhir (utk ditampilkan)
   crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
   crmTaskFilterStatus: 'Pending', // filter list tugas: Pending | Selesai | all
   currentUser: null,
@@ -1668,6 +1670,34 @@ function qtaskSettingsHTML(){
         </div>
       </div>
       <button class="btn btn-primary btn-block" data-action="open-add-employee">＋ Tambah Staff Baru</button>
+    </div>
+
+    <div class="section-title">💬 Broadcast WhatsApp Staff</div>
+    <div class="card">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Kirim pesan ke semua staff sekaligus (nomor dari sheet Employees, kolom NoWA).</div>
+      <button class="btn ${state.broadcastFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="toggle-broadcast-form">
+        ${state.broadcastFormOpen ? '✕ Tutup' : '💬 Tulis Broadcast'}
+      </button>
+      ${state.broadcastFormOpen ? `
+        <form id="form-broadcast" style="margin-top:12px;">
+          <div class="field">
+            <label>Pesan</label>
+            <textarea name="message" placeholder="Pengumuman untuk semua staff..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">💬 Kirim ke Semua Staff</button>
+        </form>
+      ` : ''}
+      ${state.broadcastLastResult ? `
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--line); font-size:12px;">
+          <div style="font-weight:600; margin-bottom:6px;">${escapeHTML(state.broadcastLastResult.message || '')}</div>
+          ${(state.broadcastLastResult.results || []).map(r => `
+            <div style="display:flex; justify-content:space-between; padding:3px 0; color:${r.success ? 'var(--success)' : 'var(--danger)'};">
+              <span>${r.success ? '✓' : '✕'} ${escapeHTML(r.nama)}</span>
+              ${!r.success ? `<span class="faint" style="font-size:10.5px;">${escapeHTML(r.message||'')}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
     ` : ''}
 
@@ -3577,6 +3607,10 @@ document.addEventListener('click', function(e){
     state.crmWaFormOpen = !state.crmWaFormOpen;
     render();
   }
+  else if (el.dataset.action === 'toggle-broadcast-form'){
+    state.broadcastFormOpen = !state.broadcastFormOpen;
+    render();
+  }
   else if (el.dataset.action === 'crm-toggle-task'){
     const id = el.dataset.id;
     const newStatus = el.dataset.newstatus;
@@ -3712,7 +3746,22 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-crm-wa'){
+  if (e.target.id === 'form-broadcast'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const message = String(fd.get('message')||'').trim();
+    if (!message) { showToast('Pesan tidak boleh kosong'); return; }
+    showToast('Mengirim broadcast…');
+    apiCall('broadcast_sendToStaff', { message: message }).then(res=>{
+      state.broadcastLastResult = res;
+      state.broadcastFormOpen = false;
+      render();
+      showToast(res && res.message ? res.message : 'Broadcast selesai');
+    }).catch(err=>{
+      showToast('Gagal broadcast: ' + (err.message || 'coba lagi'));
+    });
+  }
+  else if (e.target.id === 'form-crm-wa'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const customer = e.target.dataset.customer;
