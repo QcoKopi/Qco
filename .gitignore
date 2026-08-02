@@ -1,0 +1,10 @@
+// config.js
+// PERINGATAN: file ini berisi URL deployment yang sebenarnya.
+// JANGAN commit file ini ke repository publik.
+// Tambahkan baris "config.js" ke .gitignore, lalu commit config.example.js
+// saja sebagai template untuk device/kontributor lain.
+window.QSYSTEM_CONFIG = {
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxETc9Xv6udc7U0N9yflz7DrosN3PH1STUhF-d1qrW0ST48DKjFU4w8Kafuadm09XU/exec',
+  QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
+};
