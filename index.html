@@ -3334,6 +3334,16 @@ function wabotTakeoverHTML(){
   if (!state.wabotEscalatedFetched && !state.wabotEscalatedLoading) { fetchWabotEscalated(); }
   const list = state.wabotEscalatedList || [];
   const selected = list.find(c => c.phone === state.wabotSelectedPhone);
+  // BARU (2026-08-03): sesi CRM simpan riwayat di crmMessages, sesi affiliate
+  // di claudeMessages -- pilih yang mana ada isinya (conversationKind='crm'
+  // yang jadi penentu utama, fallback ke cek array kalau field itu kosong).
+  const wabotMsgsFor = (session) => {
+    if (!session) return [];
+    if (session.conversationKind === 'crm') return session.crmMessages || [];
+    if (session.crmMessages && session.crmMessages.length) return session.crmMessages;
+    return session.claudeMessages || [];
+  };
+  const wabotIsCrm = (session) => !!(session && (session.conversationKind === 'crm' || (session.crmMessages && session.crmMessages.length)));
 
   return `
     <div class="card" style="margin-bottom:12px;">
@@ -3345,13 +3355,20 @@ function wabotTakeoverHTML(){
       ${state.wabotEscalatedLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` :
         list.length === 0 ? `<div class="faint" style="font-size:12px;">Tidak ada percakapan yang perlu ditangani manual saat ini ✅</div>` :
         list.map(c => {
-          const msgs = (c.session && c.session.claudeMessages) || [];
+          const isCrm = wabotIsCrm(c.session);
+          const msgs = wabotMsgsFor(c.session);
           const lastMsg = msgs.length ? wabotExtractMessageText_(msgs[msgs.length-1]) : '(belum ada pesan)';
           const since = c.session && c.session.takeoverSince ? new Date(c.session.takeoverSince).toLocaleString('id-ID') : '-';
           const isActive = c.phone === state.wabotSelectedPhone;
           return `
             <div style="padding:10px 12px; border:1px solid ${isActive?'var(--accent)':'var(--line)'}; background:${isActive?'var(--accent-soft)':'transparent'}; border-radius:8px; margin-bottom:6px; cursor:pointer;" data-action="wabot-open-escalated" data-phone="${escapeHTML(c.phone)}">
-              <div style="display:flex; justify-content:space-between;"><strong style="font-size:13px;">${escapeHTML(c.phone)}</strong><span class="faint" style="font-size:10.5px;">sejak ${since}</span></div>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <strong style="font-size:13px;">${escapeHTML(c.phone)}</strong>
+                  <span style="font-size:10px; padding:1px 7px; border-radius:99px; background:${isCrm?'#F3E8FD':'#E8F0FE'}; color:${isCrm?'#8430CE':'#1A73E8'}; font-weight:600;">${isCrm?'CRM':'Affiliate'}</span>
+                </div>
+                <span class="faint" style="font-size:10.5px;">sejak ${since}</span>
+              </div>
               <div class="faint" style="font-size:11.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(lastMsg)}</div>
             </div>
           `;
@@ -3361,10 +3378,10 @@ function wabotTakeoverHTML(){
 
     ${selected ? `
     <div class="card">
-      <div style="font-weight:600; font-size:14px; margin-bottom:8px;">Balas ke ${escapeHTML(selected.phone)}</div>
+      <div style="font-weight:600; font-size:14px; margin-bottom:8px;">Balas ke ${escapeHTML(selected.phone)} ${wabotIsCrm(selected.session) ? '<span style="font-size:10px; padding:1px 7px; border-radius:99px; background:#F3E8FD; color:#8430CE; font-weight:600;">CRM</span>' : ''}</div>
       <div style="background:var(--bg-soft); border:1px solid var(--line); border-radius:8px; height:280px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;">
         ${(() => {
-          const msgs = (selected.session && selected.session.claudeMessages) || [];
+          const msgs = wabotMsgsFor(selected.session);
           if (!msgs.length) return `<div style="text-align:center; color:var(--ink-faint); font-size:11.5px; font-style:italic;">Belum ada riwayat pesan</div>`;
           return msgs.map(m => {
             const isUser = m.role === 'user';
@@ -4523,8 +4540,14 @@ document.addEventListener('submit', function(e){
         const convo = state.wabotEscalatedList.find(c => c.phone === phone);
         if (convo) {
           convo.session = convo.session || {};
-          convo.session.claudeMessages = convo.session.claudeMessages || [];
-          convo.session.claudeMessages.push({ role: 'assistant', content: [{ type: 'text', text: message }] });
+          const isCrm = convo.session.conversationKind === 'crm' || (convo.session.crmMessages && convo.session.crmMessages.length);
+          if (isCrm) {
+            convo.session.crmMessages = convo.session.crmMessages || [];
+            convo.session.crmMessages.push({ role: 'assistant', content: message });
+          } else {
+            convo.session.claudeMessages = convo.session.claudeMessages || [];
+            convo.session.claudeMessages.push({ role: 'assistant', content: [{ type: 'text', text: message }] });
+          }
         }
         render();
       } else {
