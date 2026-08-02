@@ -364,6 +364,7 @@
   .app-icon.qsales{background:#FCE8E6; color:#C5221F;}
   .app-icon.qaff{background:#E6F4EA; color:#137333;}
   .app-icon.crm{background:#F3E8FD; color:#8430CE;}
+  .app-icon.wabot{background:#FFF3E0; color:#E65100;}
   .app-info{flex:1;}
   .app-name{font-weight:700; font-size:15px;}
   .app-desc{font-size:12px; color:var(--ink-soft); margin-top:2px;}
@@ -710,6 +711,7 @@ const APPS = [
   { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'live', color:'qfin' },
   { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'live', color:'qsales' },
   { id:'crm', name:'CRM', desc:'Cluster & aktivitas existing client', icon:'👥', status:'live', color:'crm' },
+  { id:'wabot', name:'WA Bot', desc:'Kelola persona, ambil-alih & eskalasi chatbot', icon:'🤖', status:'live', color:'wabot' },
   { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
 ];
 
@@ -747,6 +749,21 @@ let state = {
   broadcastTargetType: 'all', // all | dept | staff
   broadcastTargetDept: 'sm', // sm | po | mgmt
   broadcastTargetStaff: [], // array employee id yang dipilih (utk targetType='staff')
+
+  // ===== WA Bot admin (tab 'wabot') =====
+  wabotSubTab: 'dashboard', // dashboard | persona | testbot | takeover | history | salesmgmt
+  wabotStats: null, wabotStatsLoading: false, wabotStatsFetched: false,
+  wabotVersionInfo: null, // {waBotVersion, mainGasVersion} dari getStats, ditampilkan apa adanya
+  wabotPrompt: '', wabotPromptIsDefault: true, wabotPromptLoading: false, wabotPromptSaving: false, wabotPromptFetched: false,
+  wabotChatMessages: [], // [{role:'user'|'bot'|'system', text}] utk render bubble uji coba
+  wabotChatHistory: null, // JSON string riwayat percakapan format Claude
+  wabotChatSending: false,
+  wabotEscalatedList: [], wabotEscalatedLoading: false, wabotEscalatedFetched: false,
+  wabotSelectedPhone: null, // nomor yg lagi dibuka di panel balas cepat
+  wabotHistoryList: [], wabotHistoryLoading: false, wabotHistoryFilter: 'all', wabotHistoryFetched: false,
+  wabotSalesUsers: [], wabotSalesLoading: false, wabotSalesFetched: false,
+  wabotGeneratedPasswordInfo: null, // {name, password} -- modal reveal password sekali tampil
+  wabotEditSalesInfo: null, // {id, name, phone} -- modal edit staff
   crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
   crmTaskFilterStatus: 'Pending', // filter list tugas: Pending | Selesai | all
   currentUser: null,
@@ -3078,6 +3095,387 @@ function crmWaFormHTML(cust, curLabel, prevLabel){
   `;
 }
 
+/* ============================================================
+   WA BOT ADMIN — proxy ke WA-Bot.gs (persona, ambil-alih, eskalasi, sales)
+   Login terpisah TIDAK diperlukan -- akses dijaga PIN QSystem (lihat
+   getAllowedApps), password dashboard bot disuntik di server (10_WhatsApp.gs
+   / 11_WABotAdmin.gs), tidak pernah terlihat di browser.
+   ============================================================ */
+
+async function wabotCall(subAction, params){
+  return apiCall('wabot_proxy', { subAction: subAction, params: params || {} });
+}
+
+function wabotSubNavHTML(){
+  const tabs = [
+    {id:'dashboard', label:'Dashboard', icon:'📊'},
+    {id:'persona', label:'Persona Bot', icon:'🤖'},
+    {id:'testbot', label:'Uji Coba', icon:'💬'},
+    {id:'takeover', label:'Ambil Alih', icon:'✋', badge: state.wabotEscalatedList.length || 0},
+    {id:'history', label:'Riwayat', icon:'📜'},
+    {id:'salesmgmt', label:'Kelola Sales', icon:'👤'},
+  ];
+  return `
+    <div class="row gap-6 wrap" style="margin-bottom:14px;">
+      ${tabs.map(t => `
+        <button class="btn btn-sm ${state.wabotSubTab===t.id?'btn-primary':'btn-ghost'}" style="position:relative;" data-action="wabot-switch-tab" data-tab="${t.id}">
+          ${t.icon} ${t.label}${t.badge ? ` <span style="background:var(--danger); color:white; border-radius:99px; padding:1px 6px; font-size:10px; margin-left:2px;">${t.badge}</span>` : ''}
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function wabotHTML(){
+  let body = '';
+  if (state.wabotSubTab === 'persona') body = wabotPersonaHTML();
+  else if (state.wabotSubTab === 'testbot') body = wabotTestBotHTML();
+  else if (state.wabotSubTab === 'takeover') body = wabotTakeoverHTML();
+  else if (state.wabotSubTab === 'history') body = wabotHistoryHTML();
+  else if (state.wabotSubTab === 'salesmgmt') body = wabotSalesMgmtHTML();
+  else body = wabotDashboardHTML();
+
+  return `
+    <div class="greeting">🤖 WA Bot Admin</div>
+    ${wabotSubNavHTML()}
+    ${body}
+  `;
+}
+
+/* ---------- Dashboard ---------- */
+async function fetchWabotStats(){
+  if (state.wabotStatsLoading) return;
+  state.wabotStatsLoading = true;
+  state.wabotStatsFetched = true;
+  render();
+  try {
+    const res = await wabotCall('getStats', {});
+    if (res && res.success) {
+      state.wabotStats = res.stats || {};
+      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-' };
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat statistik'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotStatsLoading = false;
+  render();
+}
+
+function wabotDashboardHTML(){
+  if (!state.wabotStatsFetched && !state.wabotStatsLoading) { fetchWabotStats(); }
+  const s = state.wabotStats || {};
+  return `
+    <div class="row gap-6" style="margin-bottom:14px;">
+      <div class="card" style="flex:1; text-align:center;">
+        <div style="font-size:26px; font-weight:700;">${state.wabotStatsLoading ? '…' : (s.totalOrders ?? '-')}</div>
+        <div class="faint" style="font-size:11.5px; margin-top:4px;">Total Order via WA</div>
+      </div>
+      <div class="card" style="flex:1; text-align:center;">
+        <div style="font-size:26px; font-weight:700;">${state.wabotStatsLoading ? '…' : (s.pending ?? '-')}</div>
+        <div class="faint" style="font-size:11.5px; margin-top:4px;">Menunggu Diproses</div>
+      </div>
+      <div class="card" style="flex:1; text-align:center;">
+        <div style="font-size:26px; font-weight:700;">${state.wabotStatsLoading ? '…' : (s.today ?? '-')}</div>
+        <div class="faint" style="font-size:11.5px; margin-top:4px;">Order Hari Ini</div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" data-action="wabot-refresh-stats">🔄 Refresh</button>
+      <p class="faint" style="font-size:12px; margin-top:10px;">Order yang masuk lewat WhatsApp langsung muncul di panel affiliate (bukan di sini). Halaman ini khusus kelola cara bot "berpikir" dan menjawab, plus ambil-alih percakapan kalau perlu.</p>
+      ${state.wabotVersionInfo ? `
+        <div class="faint" style="font-size:11px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);">
+          Versi live -- WA-Bot.gs: <code>${escapeHTML(state.wabotVersionInfo.waBotVersion)}</code> · Code.gs (affiliate): <code>${escapeHTML(state.wabotVersionInfo.mainGasVersion)}</code>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+/* ---------- Persona Bot ---------- */
+async function fetchWabotPrompt(){
+  if (state.wabotPromptLoading) return;
+  state.wabotPromptLoading = true;
+  state.wabotPromptFetched = true;
+  render();
+  try {
+    const res = await wabotCall('getSystemPrompt', {});
+    if (res && res.success) {
+      state.wabotPrompt = res.prompt || '';
+      state.wabotPromptIsDefault = !!res.isDefault;
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat persona'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotPromptLoading = false;
+  render();
+}
+
+function wabotPersonaHTML(){
+  if (!state.wabotPromptFetched && !state.wabotPromptLoading) { fetchWabotPrompt(); }
+  return `
+    <div class="card">
+      <div style="font-weight:600; font-size:14px; margin-bottom:2px;">System Prompt</div>
+      <p class="faint" style="font-size:12px; margin-bottom:10px;">Instruksi yang menentukan kepribadian, gaya bicara, dan aturan bot saat menjawab pembeli (jalur affiliate/e-commerce). Ubah kalimatnya untuk sesuaikan gaya jualan atau tambah aturan -- tidak perlu edit kode.</p>
+      ${state.wabotPromptFetched ? `<div style="margin-bottom:8px;"><span class="badge" style="background:${state.wabotPromptIsDefault ? '#E8E8E8' : '#E8F5E9'}; color:${state.wabotPromptIsDefault ? 'var(--ink-faint)' : 'var(--success)'}; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600;">${state.wabotPromptIsDefault ? 'Memakai persona bawaan' : 'Memakai persona custom'}</span></div>` : ''}
+      <form id="form-wabot-prompt">
+        <textarea name="prompt" rows="16" style="font-size:12.5px; line-height:1.6;" placeholder="${state.wabotPromptLoading ? 'Memuat...' : ''}">${escapeHTML(state.wabotPrompt || '')}</textarea>
+        <div class="row gap-6" style="margin-top:12px;">
+          <button type="submit" class="btn btn-primary" ${state.wabotPromptSaving ? 'disabled' : ''}>${state.wabotPromptSaving ? 'Menyimpan…' : '💾 Simpan Perubahan'}</button>
+          <button type="button" class="btn btn-ghost" data-action="wabot-reset-prompt">↩️ Kembalikan ke Bawaan</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+/* ---------- Uji Coba Bot ---------- */
+function wabotTestBotHTML(){
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:600; font-size:14px;">Uji Coba Bot</div>
+        <button class="btn btn-ghost btn-sm" data-action="wabot-reset-chat-test">🧹 Mulai Ulang</button>
+      </div>
+      <p class="faint" style="font-size:12px; margin-bottom:10px;">Chat langsung dengan bot (jalur affiliate) untuk lihat bagaimana dia menjawab -- termasuk cek produk, hitung ongkir, sampai buat pesanan. <strong>Aman dicoba</strong>, tapi kalau sampai submit order, itu akan benar-benar tercatat.</p>
+      <div style="background:var(--bg-soft); border:1px solid var(--line); border-radius:8px; height:340px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;" id="wabot-chat-window">
+        ${state.wabotChatMessages.length === 0 ? `<div style="text-align:center; color:var(--ink-faint); font-size:11.5px; font-style:italic;">Ketik pesan di bawah untuk mulai uji coba</div>` : ''}
+        ${state.wabotChatMessages.map(m => {
+          if (m.role === 'system') return `<div style="align-self:center; color:var(--ink-faint); font-size:11px; font-style:italic;">${escapeHTML(m.text)}</div>`;
+          const isUser = m.role === 'user';
+          return `<div style="max-width:80%; padding:8px 12px; border-radius:12px; font-size:12.5px; line-height:1.4; white-space:pre-wrap; align-self:${isUser?'flex-end':'flex-start'}; background:${isUser?'var(--accent)':'white'}; color:${isUser?'white':'var(--ink)'}; border:${isUser?'none':'1px solid var(--line)'};">${escapeHTML(m.text)}</div>`;
+        }).join('')}
+      </div>
+      <form id="form-wabot-test-chat" style="display:flex; gap:8px;">
+        <input type="text" name="message" placeholder="Ketik pesan seperti pembeli..." style="flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:13px;" ${state.wabotChatSending ? 'disabled' : ''} autocomplete="off">
+        <button type="submit" class="btn btn-primary" ${state.wabotChatSending ? 'disabled' : ''}>${state.wabotChatSending ? '…' : '➤'}</button>
+      </form>
+    </div>
+  `;
+}
+
+/* ---------- Ambil Alih Percakapan ---------- */
+function wabotExtractMessageText_(msg){
+  if (typeof msg.content === 'string') return msg.content;
+  if (!Array.isArray(msg.content)) return '(kosong)';
+  return msg.content.map(block => {
+    if (block.type === 'text') return block.text;
+    if (block.type === 'tool_use') return '[memanggil: ' + block.name + ']';
+    if (block.type === 'tool_result') return '[hasil sistem: ' + String(block.content).substring(0,80) + '...]';
+    return '';
+  }).filter(Boolean).join(' ') || '(kosong)';
+}
+
+async function fetchWabotEscalated(){
+  if (state.wabotEscalatedLoading) return;
+  state.wabotEscalatedLoading = true;
+  render();
+  try {
+    const res = await wabotCall('getEscalatedConversations', {});
+    if (res && res.success) {
+      state.wabotEscalatedList = res.conversations || [];
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat daftar ambil-alih'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotEscalatedFetched = true;
+  state.wabotEscalatedLoading = false;
+  render();
+}
+
+function wabotTakeoverHTML(){
+  if (!state.wabotEscalatedFetched && !state.wabotEscalatedLoading) { fetchWabotEscalated(); }
+  const list = state.wabotEscalatedList || [];
+  const selected = list.find(c => c.phone === state.wabotSelectedPhone);
+
+  return `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:600; font-size:14px;">Percakapan Perlu Ditangani</div>
+        <button class="btn btn-ghost btn-sm" data-action="wabot-refresh-takeover">🔄 Refresh</button>
+      </div>
+      <p class="faint" style="font-size:12px; margin-bottom:10px;">Bot berhenti membalas otomatis ke nomor di bawah ini (komplain/pertanyaan di luar kemampuan bot). Balas manual di sini, atau kembalikan ke bot kalau sudah selesai.</p>
+      ${state.wabotEscalatedLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` :
+        list.length === 0 ? `<div class="faint" style="font-size:12px;">Tidak ada percakapan yang perlu ditangani manual saat ini ✅</div>` :
+        list.map(c => {
+          const msgs = (c.session && c.session.claudeMessages) || [];
+          const lastMsg = msgs.length ? wabotExtractMessageText_(msgs[msgs.length-1]) : '(belum ada pesan)';
+          const since = c.session && c.session.takeoverSince ? new Date(c.session.takeoverSince).toLocaleString('id-ID') : '-';
+          const isActive = c.phone === state.wabotSelectedPhone;
+          return `
+            <div style="padding:10px 12px; border:1px solid ${isActive?'var(--accent)':'var(--line)'}; background:${isActive?'var(--accent-soft)':'transparent'}; border-radius:8px; margin-bottom:6px; cursor:pointer;" data-action="wabot-open-escalated" data-phone="${escapeHTML(c.phone)}">
+              <div style="display:flex; justify-content:space-between;"><strong style="font-size:13px;">${escapeHTML(c.phone)}</strong><span class="faint" style="font-size:10.5px;">sejak ${since}</span></div>
+              <div class="faint" style="font-size:11.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(lastMsg)}</div>
+            </div>
+          `;
+        }).join('')
+      }
+    </div>
+
+    ${selected ? `
+    <div class="card">
+      <div style="font-weight:600; font-size:14px; margin-bottom:8px;">Balas ke ${escapeHTML(selected.phone)}</div>
+      <div style="background:var(--bg-soft); border:1px solid var(--line); border-radius:8px; height:280px; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; margin-bottom:10px;">
+        ${(() => {
+          const msgs = (selected.session && selected.session.claudeMessages) || [];
+          if (!msgs.length) return `<div style="text-align:center; color:var(--ink-faint); font-size:11.5px; font-style:italic;">Belum ada riwayat pesan</div>`;
+          return msgs.map(m => {
+            const isUser = m.role === 'user';
+            const text = wabotExtractMessageText_(m);
+            return `<div style="max-width:80%; padding:8px 12px; border-radius:12px; font-size:12.5px; line-height:1.4; white-space:pre-wrap; align-self:${isUser?'flex-end':'flex-start'}; background:${isUser?'var(--accent)':'white'}; color:${isUser?'white':'var(--ink)'}; border:${isUser?'none':'1px solid var(--line)'};">${escapeHTML(text)}</div>`;
+          }).join('');
+        })()}
+      </div>
+      <form id="form-wabot-admin-reply" style="display:flex; gap:8px; margin-bottom:12px;">
+        <input type="text" name="message" placeholder="Ketik balasan Anda..." style="flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:13px;" autocomplete="off">
+        <button type="submit" class="btn btn-primary">➤</button>
+      </form>
+      <div class="row gap-6">
+        <button class="btn btn-primary btn-sm" data-action="wabot-mark-resolved">✅ Tandai Selesai</button>
+        <button class="btn btn-ghost btn-sm" data-action="wabot-resume-bot">🤖 Kembalikan ke Bot</button>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+/* ---------- Riwayat Eskalasi ---------- */
+async function fetchWabotHistory(){
+  if (state.wabotHistoryLoading) return;
+  state.wabotHistoryLoading = true;
+  render();
+  try {
+    const res = await wabotCall('getEscalationHistory', { filter: state.wabotHistoryFilter });
+    if (res && res.success) {
+      state.wabotHistoryList = res.escalations || [];
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat riwayat'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotHistoryFetched = true;
+  state.wabotHistoryLoading = false;
+  render();
+}
+
+function wabotHistoryHTML(){
+  if (!state.wabotHistoryFetched && !state.wabotHistoryLoading) { fetchWabotHistory(); }
+  const list = state.wabotHistoryList || [];
+  return `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:600; font-size:14px;">Riwayat Eskalasi</div>
+        <button class="btn btn-ghost btn-sm" data-action="wabot-refresh-history">🔄 Refresh</button>
+      </div>
+      <select class="inline-select" data-action="wabot-set-history-filter" style="margin-bottom:12px; max-width:200px;">
+        <option value="all" ${state.wabotHistoryFilter==='all'?'selected':''}>Semua</option>
+        <option value="open" ${state.wabotHistoryFilter==='open'?'selected':''}>Belum Selesai</option>
+        <option value="resolved" ${state.wabotHistoryFilter==='resolved'?'selected':''}>Sudah Selesai</option>
+      </select>
+      ${state.wabotHistoryLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` :
+        list.length === 0 ? `<div class="faint" style="font-size:12px;">Tidak ada data</div>` :
+        list.map(e => {
+          const isOpen = String(e.status).toLowerCase() === 'open';
+          return `
+            <div style="padding:10px 12px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:start;">
+                <strong style="font-size:13px;">${escapeHTML(e.phone)}</strong>
+                <span style="font-size:10.5px; padding:2px 8px; border-radius:99px; background:${isOpen?'#FFF3E0':'#E8F5E9'}; color:${isOpen?'var(--warning)':'var(--success)'}; font-weight:600;">${isOpen?'Belum Selesai':'Selesai'}</span>
+              </div>
+              <div class="faint" style="font-size:11.5px; margin-top:4px;">${escapeHTML(e.reason || '-')}</div>
+              <div class="faint" style="font-size:10.5px; margin-top:4px;">Eskalasi: ${new Date(e.escalatedat).toLocaleString('id-ID')}</div>
+              ${!isOpen ? `<div class="faint" style="font-size:10.5px; margin-top:2px;">Ditangani oleh <strong>${escapeHTML(e.resolvedby || '-')}</strong> pada ${new Date(e.resolvedat).toLocaleString('id-ID')}</div>` : ''}
+            </div>
+          `;
+        }).join('')
+      }
+    </div>
+  `;
+}
+
+/* ---------- Kelola Sales (staff affiliate, bukan staff QSystem) ---------- */
+async function fetchWabotSalesUsers(){
+  if (state.wabotSalesLoading) return;
+  state.wabotSalesLoading = true;
+  render();
+  try {
+    const res = await wabotCall('getSalesUsers', {});
+    if (res && res.success) {
+      state.wabotSalesUsers = res.users || [];
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat daftar sales'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotSalesFetched = true;
+  state.wabotSalesLoading = false;
+  render();
+}
+
+function wabotSalesMgmtHTML(){
+  if (!state.wabotSalesFetched && !state.wabotSalesLoading) { fetchWabotSalesUsers(); }
+  const users = state.wabotSalesUsers || [];
+  return `
+    <div class="card">
+      <div style="font-weight:600; font-size:14px; margin-bottom:2px;">Kelola Sales/Marketing (Affiliate)</div>
+      <p class="faint" style="font-size:12px; margin-bottom:14px;">Staff yang menangani eskalasi chat customer <strong>affiliate/e-commerce</strong> (beda dari staff QSystem). Tiap orang dapat password sendiri (tampil sekali saat dibuat/direset). Nomor WA wajib diisi supaya notifikasi eskalasi terkirim langsung ke orangnya.</p>
+      <form id="form-wabot-add-sales" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+        <input type="text" name="name" placeholder="Nama staff baru" style="flex:1.2; min-width:140px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:12.5px;">
+        <input type="text" name="phone" placeholder="No WA (cth: 6281234567890)" style="flex:1; min-width:140px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:12.5px;">
+        <button type="submit" class="btn btn-primary btn-sm">➕ Tambah</button>
+      </form>
+      ${state.wabotSalesLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` :
+        users.length === 0 ? `<div class="faint" style="font-size:12px;">Belum ada staff terdaftar.</div>` :
+        users.map(u => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 10px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px;">
+            <span style="font-size:12.5px;">${escapeHTML(u.name)} <span class="faint">(${escapeHTML(u.phone || 'no HP belum diisi')})</span></span>
+            <div class="row gap-6">
+              <button class="btn btn-ghost btn-sm" data-action="wabot-edit-sales" data-id="${escapeHTML(u.id)}" data-name="${escapeHTML(u.name)}" data-phone="${escapeHTML(u.phone||'')}" title="Edit">✏️</button>
+              <button class="btn btn-ghost btn-sm" data-action="wabot-reset-sales-password" data-id="${escapeHTML(u.id)}" data-name="${escapeHTML(u.name)}" title="Reset password">🔑</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-action="wabot-delete-sales" data-id="${escapeHTML(u.id)}" data-name="${escapeHTML(u.name)}" title="Hapus">🗑️</button>
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+
+    ${state.wabotGeneratedPasswordInfo ? `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:500; padding:16px;">
+      <div class="card" style="max-width:380px; width:100%;">
+        <div style="font-weight:700; font-size:15px; margin-bottom:6px;">🔑 Password untuk ${escapeHTML(state.wabotGeneratedPasswordInfo.name)}</div>
+        <p class="faint" style="font-size:12px; margin-bottom:12px;">Salin dan kirimkan ke orangnya lewat chat pribadi/telepon -- password ini TIDAK akan ditampilkan lagi setelah ditutup.</p>
+        <input type="text" readonly value="${escapeHTML(state.wabotGeneratedPasswordInfo.password)}" style="width:100%; font-family:monospace; font-size:15px; text-align:center; font-weight:700; padding:10px; border:1px solid var(--line); border-radius:8px; margin-bottom:12px;" onclick="this.select()">
+        <button class="btn btn-primary btn-block" data-action="wabot-close-password-modal">Sudah Disalin, Tutup</button>
+      </div>
+    </div>
+    ` : ''}
+
+    ${state.wabotEditSalesInfo ? `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:500; padding:16px;">
+      <div class="card" style="max-width:380px; width:100%;">
+        <div style="font-weight:700; font-size:15px; margin-bottom:6px;">✏️ Edit Staff</div>
+        <p class="faint" style="font-size:12px; margin-bottom:12px;">Password TIDAK ikut berubah -- pakai tombol reset password (ikon 🔑) terpisah kalau perlu.</p>
+        <form id="form-wabot-edit-sales" data-id="${escapeHTML(state.wabotEditSalesInfo.id)}">
+          <input type="text" name="name" value="${escapeHTML(state.wabotEditSalesInfo.name)}" placeholder="Nama" style="width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:12.5px; margin-bottom:8px;">
+          <input type="text" name="phone" value="${escapeHTML(state.wabotEditSalesInfo.phone)}" placeholder="No WA" style="width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:12.5px; margin-bottom:12px;">
+          <div class="row gap-6">
+            <button type="submit" class="btn btn-primary" style="flex:1;">Simpan</button>
+            <button type="button" class="btn btn-ghost" data-action="wabot-close-edit-modal">Batal</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
 
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
@@ -3435,6 +3833,8 @@ function render(){
     body = qfinDashboardHTML();
   } else if (state.appTab === 'crm'){
     body = crmDashboardHTML();
+  } else if (state.appTab === 'wabot'){
+    body = wabotHTML();
   } else if (state.appTab === 'qsales'){
     if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
@@ -3540,6 +3940,116 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'switch-qtask-tab'){
     state.qtaskTab = el.dataset.tab;
     render();
+  }
+  else if (el.dataset.action === 'wabot-switch-tab'){
+    state.wabotSubTab = el.dataset.tab;
+    if (el.dataset.tab === 'takeover') { state.wabotSelectedPhone = null; }
+    render();
+  }
+  else if (el.dataset.action === 'wabot-refresh-stats'){
+    state.wabotStatsFetched = false;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-reset-prompt'){
+    if (!confirm('Kembalikan ke persona bawaan? Perubahan custom akan hilang.')) return;
+    (async () => {
+      const res = await wabotCall('resetSystemPrompt', {});
+      if (res && res.success) {
+        showToast('Dikembalikan ke persona bawaan');
+        state.wabotPromptFetched = false;
+        render();
+      } else {
+        showToast('Gagal reset: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
+  }
+  else if (el.dataset.action === 'wabot-reset-chat-test'){
+    state.wabotChatMessages = [];
+    state.wabotChatHistory = null;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-refresh-takeover'){
+    state.wabotEscalatedFetched = false;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-open-escalated'){
+    state.wabotSelectedPhone = el.dataset.phone;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-mark-resolved'){
+    if (!state.wabotSelectedPhone) return;
+    const emp = findEmp(state.currentUser);
+    const name = emp ? emp.name : state.currentUser;
+    (async () => {
+      const res = await wabotCall('markEscalationResolved', { phone: state.wabotSelectedPhone, resolvedBy: name });
+      if (res && res.success) {
+        showToast('Ditandai selesai oleh ' + name);
+        state.wabotSelectedPhone = null;
+        state.wabotEscalatedFetched = false;
+        state.wabotHistoryFetched = false;
+        render();
+      } else {
+        showToast('Gagal: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
+  }
+  else if (el.dataset.action === 'wabot-resume-bot'){
+    if (!state.wabotSelectedPhone) return;
+    if (!confirm('Kembalikan percakapan ini ke bot? Bot akan mulai membalas otomatis lagi ke nomor ini.')) return;
+    (async () => {
+      const res = await wabotCall('resumeBot', { phone: state.wabotSelectedPhone });
+      if (res && res.success) {
+        showToast('Dikembalikan ke bot');
+        state.wabotSelectedPhone = null;
+        state.wabotEscalatedFetched = false;
+        render();
+      } else {
+        showToast('Gagal: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
+  }
+  else if (el.dataset.action === 'wabot-refresh-history'){
+    state.wabotHistoryFetched = false;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-edit-sales'){
+    state.wabotEditSalesInfo = { id: el.dataset.id, name: el.dataset.name, phone: el.dataset.phone };
+    render();
+  }
+  else if (el.dataset.action === 'wabot-close-edit-modal'){
+    state.wabotEditSalesInfo = null;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-close-password-modal'){
+    state.wabotGeneratedPasswordInfo = null;
+    render();
+  }
+  else if (el.dataset.action === 'wabot-reset-sales-password'){
+    const id = el.dataset.id, name = el.dataset.name;
+    if (!confirm('Reset password untuk "' + name + '"? Password lama otomatis tidak berlaku lagi.')) return;
+    (async () => {
+      const res = await wabotCall('resetSalesUserPassword', { id: id });
+      if (res && res.success) {
+        state.wabotGeneratedPasswordInfo = { name: name, password: res.password };
+        render();
+      } else {
+        showToast('Gagal reset password: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
+  }
+  else if (el.dataset.action === 'wabot-delete-sales'){
+    const id = el.dataset.id, name = el.dataset.name;
+    if (!confirm('Hapus "' + name + '" dari daftar? Riwayat eskalasi yang sudah tercatat atas nama ini TIDAK berubah, tapi orang ini tidak bisa login lagi.')) return;
+    (async () => {
+      const res = await wabotCall('deleteSalesUser', { id: id });
+      if (res && res.success) {
+        showToast('Staff dihapus dari daftar');
+        state.wabotSalesFetched = false;
+        render();
+      } else {
+        showToast('Gagal menghapus: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
   }
   else if (el.dataset.action === 'open-add'){
     openModal(el.dataset.mode, el.dataset.task);
@@ -3864,10 +4374,129 @@ document.addEventListener('change', function(e){
     }
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'wabot-set-history-filter'){
+    state.wabotHistoryFilter = e.target.value;
+    state.wabotHistoryFetched = false;
+    render();
+  }
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-broadcast'){
+  if (e.target.id === 'form-wabot-prompt'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const prompt = String(fd.get('prompt')||'').trim();
+    if (!prompt || prompt.length < 20) { showToast('Isi prompt terlalu pendek/kosong'); return; }
+    state.wabotPromptSaving = true;
+    render();
+    wabotCall('saveSystemPrompt', { prompt: prompt }).then(res => {
+      state.wabotPromptSaving = false;
+      if (res && res.success) {
+        showToast('Persona bot berhasil disimpan');
+        state.wabotPromptFetched = false;
+        render();
+      } else {
+        showToast('Gagal menyimpan: ' + ((res && res.error) || 'coba lagi'));
+        render();
+      }
+    }).catch(() => {
+      state.wabotPromptSaving = false;
+      showToast('Gagal menghubungi server');
+      render();
+    });
+  }
+  else if (e.target.id === 'form-wabot-test-chat'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const message = String(fd.get('message')||'').trim();
+    if (!message) return;
+    e.target.reset();
+    state.wabotChatMessages.push({ role: 'user', text: message });
+    state.wabotChatSending = true;
+    render();
+    const params = { message: message };
+    if (state.wabotChatHistory) params.history = state.wabotChatHistory;
+    wabotCall('testAgentReply', params).then(res => {
+      state.wabotChatSending = false;
+      if (res && res.success) {
+        state.wabotChatMessages.push({ role: 'bot', text: res.reply });
+        state.wabotChatHistory = res.history;
+      } else {
+        state.wabotChatMessages.push({ role: 'system', text: '[Error] ' + ((res && res.error) || 'Gagal dapat balasan') });
+      }
+      render();
+    }).catch(() => {
+      state.wabotChatSending = false;
+      state.wabotChatMessages.push({ role: 'system', text: '[Error] Gagal menghubungi server' });
+      render();
+    });
+  }
+  else if (e.target.id === 'form-wabot-admin-reply'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const message = String(fd.get('message')||'').trim();
+    if (!message || !state.wabotSelectedPhone) return;
+    e.target.reset();
+    const phone = state.wabotSelectedPhone;
+    wabotCall('sendAdminReply', { phone: phone, message: message }).then(res => {
+      if (res && res.success) {
+        // Selipkan balasan ke cache lokal supaya langsung kelihatan, tanpa
+        // nunggu refresh -- backend WA-Bot.gs sudah simpan giliran ini juga.
+        const convo = state.wabotEscalatedList.find(c => c.phone === phone);
+        if (convo) {
+          convo.session = convo.session || {};
+          convo.session.claudeMessages = convo.session.claudeMessages || [];
+          convo.session.claudeMessages.push({ role: 'assistant', content: [{ type: 'text', text: message }] });
+        }
+        render();
+      } else {
+        showToast('Gagal mengirim balasan: ' + ((res && res.error) || 'coba lagi'));
+      }
+    }).catch(() => {
+      showToast('Gagal menghubungi server');
+    });
+  }
+  else if (e.target.id === 'form-wabot-add-sales'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const name = String(fd.get('name')||'').trim();
+    const phone = String(fd.get('phone')||'').trim();
+    if (!name) { showToast('Nama wajib diisi'); return; }
+    if (!phone) { showToast('Nomor WA wajib diisi'); return; }
+    wabotCall('saveSalesUser', { name: name, phone: phone }).then(res => {
+      if (res && res.success) {
+        e.target.reset();
+        state.wabotSalesFetched = false;
+        state.wabotGeneratedPasswordInfo = { name: res.name, password: res.password };
+        render();
+      } else {
+        showToast('Gagal menambahkan: ' + ((res && res.error) || 'coba lagi'));
+      }
+    }).catch(() => {
+      showToast('Gagal menghubungi server');
+    });
+  }
+  else if (e.target.id === 'form-wabot-edit-sales'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const id = e.target.dataset.id;
+    const name = String(fd.get('name')||'').trim();
+    const phone = String(fd.get('phone')||'').trim();
+    if (!name || !phone) { showToast('Nama dan nomor WA wajib diisi'); return; }
+    wabotCall('editSalesUser', { id: id, name: name, phone: phone }).then(res => {
+      if (res && res.success) {
+        showToast('Perubahan tersimpan');
+        state.wabotEditSalesInfo = null;
+        state.wabotSalesFetched = false;
+        render();
+      } else {
+        showToast('Gagal menyimpan: ' + ((res && res.error) || 'coba lagi'));
+      }
+    }).catch(() => {
+      showToast('Gagal menghubungi server');
+    });
+  }
+  else if (e.target.id === 'form-broadcast'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const message = String(fd.get('message')||'').trim();
@@ -4140,12 +4769,12 @@ function getAllowedApps(userId){
   if (!rules) {
     // Fallback: Spv & Owner = semua, staff = dashboard + qtask
     if (emp.role === 'spv' || emp.role === 'owner') {
-      allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm'];
+      allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm', 'wabot'];
     } else {
       allowed = ['dashboard', 'qtask'];
     }
   } else if (rules.toLowerCase() === 'all') {
-    allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm'];
+    allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm', 'wabot'];
   } else {
     // Parse string rules: "Hanya bisa membuka Dashboard, Task, Sales"
     const appMap = {
@@ -4183,6 +4812,14 @@ function getAllowedApps(userId){
     const CRM_ALLOWED_IDS = ['owner', 'rizky', 'umay'];
     if (!CRM_ALLOWED_IDS.includes(userId)) {
       allowed = allowed.filter(a => a !== 'crm');
+    }
+  }
+  if (allowed.includes('wabot')) {
+    // Sama seperti CRM: named-ID, karena bisa edit persona bot, ambil-alih
+    // percakapan customer, dan reset password staff sales affiliate.
+    const WABOT_ALLOWED_IDS = ['owner', 'rizky', 'umay'];
+    if (!WABOT_ALLOWED_IDS.includes(userId)) {
+      allowed = allowed.filter(a => a !== 'wabot');
     }
   }
   return allowed;
