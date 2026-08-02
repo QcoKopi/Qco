@@ -739,6 +739,7 @@ let state = {
   crmFetchAttempted: false,
   crmSelectedCustomer: null, // nama_customer yang lagi dibuka detailnya
   crmLogFormOpen: false, // form tambah aktivitas/tugas lagi kebuka atau tidak
+  crmWaFormOpen: false, // form kirim WhatsApp lagi kebuka atau tidak
   crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
   crmTaskFilterStatus: 'Pending', // filter list tugas: Pending | Selesai | all
   currentUser: null,
@@ -2877,6 +2878,20 @@ function crmCustomerDetailHTML(d, custName){
     </div>
     ` : ''}
 
+    ${cust.telepon ? `
+    <div class="section-title">💬 Kirim WhatsApp</div>
+    <div class="card" style="margin-bottom:12px;">
+      <button class="btn ${state.crmWaFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="crm-toggle-waform">
+        ${state.crmWaFormOpen ? '✕ Tutup' : '💬 Kirim Pesan ke ' + escapeHTML(cust.telepon)}
+      </button>
+      ${state.crmWaFormOpen ? crmWaFormHTML(custName) : ''}
+    </div>
+    ` : `
+    <div class="card" style="margin-bottom:12px;">
+      <div class="faint" style="font-size:12px;">💬 Tidak bisa kirim WhatsApp — nomor telepon customer ini kosong di sheet Costumer.</div>
+    </div>
+    `}
+
     <div class="section-title">Aktivitas &amp; Tugas</div>
     <div class="card" style="margin-bottom:12px;">
       <button class="btn ${state.crmLogFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="crm-toggle-logform">
@@ -2938,6 +2953,18 @@ function crmLogFormHTML(custName){
         <input type="date" name="tanggal" value="${todayStr}">
       </div>
       <button type="submit" class="btn btn-primary btn-block">Simpan</button>
+    </form>
+  `;
+}
+
+function crmWaFormHTML(custName){
+  return `
+    <form id="form-crm-wa" data-customer="${escapeHTML(custName)}" style="margin-top:12px;">
+      <div class="field">
+        <label>Pesan</label>
+        <textarea name="message" placeholder="Tulis pesan WhatsApp..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">💬 Kirim</button>
     </form>
   `;
 }
@@ -3533,15 +3560,21 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'crm-open-customer'){
     state.crmSelectedCustomer = el.dataset.customer;
     state.crmLogFormOpen = false;
+    state.crmWaFormOpen = false;
     render();
   }
   else if (el.dataset.action === 'crm-back'){
     state.crmSelectedCustomer = null;
     state.crmLogFormOpen = false;
+    state.crmWaFormOpen = false;
     render();
   }
   else if (el.dataset.action === 'crm-toggle-logform'){
     state.crmLogFormOpen = !state.crmLogFormOpen;
+    render();
+  }
+  else if (el.dataset.action === 'crm-toggle-waform'){
+    state.crmWaFormOpen = !state.crmWaFormOpen;
     render();
   }
   else if (el.dataset.action === 'crm-toggle-task'){
@@ -3679,7 +3712,33 @@ document.addEventListener('change', function(e){
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-crm-log'){
+  if (e.target.id === 'form-crm-wa'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const customer = e.target.dataset.customer;
+    const message = String(fd.get('message')||'').trim();
+    const emp = findEmp(state.currentUser);
+    if (!message) { showToast('Pesan tidak boleh kosong'); return; }
+    showToast('Mengirim WhatsApp…');
+    apiCall('crm_sendWhatsApp', { customer: customer, message: message, dibuat_oleh: emp ? emp.name : state.currentUser }).then(res=>{
+      if (!res || res.success === false) throw new Error((res && res.message) || 'Gagal mengirim');
+      if (state.crmData) {
+        if (!state.crmData.logs) state.crmData.logs = [];
+        state.crmData.logs.push({
+          id: 'local-' + Date.now(), customer: customer, tipe: 'Aktivitas',
+          tanggal: new Date().toISOString().slice(0,10), judul: '💬 WhatsApp terkirim',
+          catatan: message, status: '', dibuat_oleh: emp ? emp.name : state.currentUser,
+          created_at: new Date().toISOString()
+        });
+      }
+      state.crmWaFormOpen = false;
+      render();
+      showToast('WhatsApp terkirim ke ' + customer);
+    }).catch(err=>{
+      showToast('Gagal kirim WhatsApp: ' + (err.message || 'coba lagi'));
+    });
+  }
+  else if (e.target.id === 'form-crm-log'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const customer = e.target.dataset.customer;
