@@ -1838,16 +1838,16 @@ function qsalesDashboardHTML(){
   ` : '';
 
   // Show debug info if available
-  const debugInfo = d.debug ? `
-    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
-      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
-      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
-      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
-      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
-      <div>isStaff: ${d.debug.isStaff}</div>
-      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
-    </div>
-  ` : '';
+  //const debugInfo = d.debug ? `
+   // <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
+  //    <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
+    //  <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
+    //  <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
+    //  <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
+   //   <div>isStaff: ${d.debug.isStaff}</div>
+   //   <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
+   // </div>
+ // ` : '';
 
   return `
     <div class="greeting">QSales Intelligence 🎯</div>
@@ -1857,7 +1857,7 @@ function qsalesDashboardHTML(){
       ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
     </div>
 
-    ${debugInfo}
+   // ${debugInfo}
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
 
