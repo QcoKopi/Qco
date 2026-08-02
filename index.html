@@ -755,6 +755,7 @@ let state = {
   wabotStats: null, wabotStatsLoading: false, wabotStatsFetched: false,
   wabotVersionInfo: null, // {waBotVersion, mainGasVersion} dari getStats, ditampilkan apa adanya
   wabotPrompt: '', wabotPromptIsDefault: true, wabotPromptLoading: false, wabotPromptSaving: false, wabotPromptFetched: false,
+  wabotCrmPrompt: '', wabotCrmPromptIsDefault: true, wabotCrmPromptLoading: false, wabotCrmPromptSaving: false, wabotCrmPromptFetched: false,
   wabotChatMessages: [], // [{role:'user'|'bot'|'system', text}] utk render bubble uji coba
   wabotChatHistory: null, // JSON string riwayat percakapan format Claude
   wabotChatSending: false,
@@ -3214,21 +3215,62 @@ async function fetchWabotPrompt(){
   render();
 }
 
-function wabotPersonaHTML(){
-  if (!state.wabotPromptFetched && !state.wabotPromptLoading) { fetchWabotPrompt(); }
+async function fetchWabotCrmPrompt(){
+  if (state.wabotCrmPromptLoading) return;
+  state.wabotCrmPromptLoading = true;
+  state.wabotCrmPromptFetched = true;
+  render();
+  try {
+    const res = await wabotCall('getCRMSystemPrompt', {});
+    if (res && res.success) {
+      state.wabotCrmPrompt = res.prompt || '';
+      state.wabotCrmPromptIsDefault = !!res.isDefault;
+    } else {
+      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat persona CRM'));
+    }
+  } catch(e) {
+    showToast('WA Bot: gagal menghubungi server');
+  }
+  state.wabotCrmPromptLoading = false;
+  render();
+}
+
+function wabotPersonaCardHTML_(opts){
+  // opts: {title, hint, prompt, isDefault, loading, saving, fetched, formId, resetAction}
   return `
-    <div class="card">
-      <div style="font-weight:600; font-size:14px; margin-bottom:2px;">System Prompt</div>
-      <p class="faint" style="font-size:12px; margin-bottom:10px;">Instruksi yang menentukan kepribadian, gaya bicara, dan aturan bot saat menjawab pembeli (jalur affiliate/e-commerce). Ubah kalimatnya untuk sesuaikan gaya jualan atau tambah aturan -- tidak perlu edit kode.</p>
-      ${state.wabotPromptFetched ? `<div style="margin-bottom:8px;"><span class="badge" style="background:${state.wabotPromptIsDefault ? '#E8E8E8' : '#E8F5E9'}; color:${state.wabotPromptIsDefault ? 'var(--ink-faint)' : 'var(--success)'}; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600;">${state.wabotPromptIsDefault ? 'Memakai persona bawaan' : 'Memakai persona custom'}</span></div>` : ''}
-      <form id="form-wabot-prompt">
-        <textarea name="prompt" rows="16" style="font-size:12.5px; line-height:1.6;" placeholder="${state.wabotPromptLoading ? 'Memuat...' : ''}">${escapeHTML(state.wabotPrompt || '')}</textarea>
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-weight:600; font-size:14px; margin-bottom:2px;">${opts.title}</div>
+      <p class="faint" style="font-size:12px; margin-bottom:10px;">${opts.hint}</p>
+      ${opts.fetched ? `<div style="margin-bottom:8px;"><span class="badge" style="background:${opts.isDefault ? '#E8E8E8' : '#E8F5E9'}; color:${opts.isDefault ? 'var(--ink-faint)' : 'var(--success)'}; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600;">${opts.isDefault ? 'Memakai persona bawaan' : 'Memakai persona custom'}</span></div>` : ''}
+      <form id="${opts.formId}">
+        <textarea name="prompt" style="width:100%; height:440px; font-size:12.5px; line-height:1.7; font-family:ui-monospace, 'SF Mono', Consolas, monospace; padding:12px; border:1px solid var(--line); border-radius:8px; resize:vertical;" placeholder="${opts.loading ? 'Memuat...' : ''}">${escapeHTML(opts.prompt || '')}</textarea>
         <div class="row gap-6" style="margin-top:12px;">
-          <button type="submit" class="btn btn-primary" ${state.wabotPromptSaving ? 'disabled' : ''}>${state.wabotPromptSaving ? 'Menyimpan…' : '💾 Simpan Perubahan'}</button>
-          <button type="button" class="btn btn-ghost" data-action="wabot-reset-prompt">↩️ Kembalikan ke Bawaan</button>
+          <button type="submit" class="btn btn-primary" ${opts.saving ? 'disabled' : ''}>${opts.saving ? 'Menyimpan…' : '💾 Simpan Perubahan'}</button>
+          <button type="button" class="btn btn-ghost" data-action="${opts.resetAction}">↩️ Kembalikan ke Bawaan</button>
         </div>
       </form>
     </div>
+  `;
+}
+
+function wabotPersonaHTML(){
+  if (!state.wabotPromptFetched && !state.wabotPromptLoading) { fetchWabotPrompt(); }
+  if (!state.wabotCrmPromptFetched && !state.wabotCrmPromptLoading) { fetchWabotCrmPrompt(); }
+  return `
+    ${wabotPersonaCardHTML_({
+      title: '🤝 Persona Affiliate / E-commerce',
+      hint: 'Dipakai untuk nomor yang BUKAN customer CRM -- pembeli retail, calon affiliator. Menentukan gaya jualan, cara jawab produk/ongkir/order.',
+      prompt: state.wabotPrompt, isDefault: state.wabotPromptIsDefault,
+      loading: state.wabotPromptLoading, saving: state.wabotPromptSaving, fetched: state.wabotPromptFetched,
+      formId: 'form-wabot-prompt', resetAction: 'wabot-reset-prompt'
+    })}
+    ${wabotPersonaCardHTML_({
+      title: '👥 Persona CRM (Client Wholesale/B2B)',
+      hint: 'Dipakai KHUSUS untuk nomor yang terdaftar sebagai customer CRM di QSystem (dicek otomatis dari sheet Costumer). Terpisah total dari persona affiliate di atas -- tidak ada tool order/checkout di sini.',
+      prompt: state.wabotCrmPrompt, isDefault: state.wabotCrmPromptIsDefault,
+      loading: state.wabotCrmPromptLoading, saving: state.wabotCrmPromptSaving, fetched: state.wabotCrmPromptFetched,
+      formId: 'form-wabot-crm-prompt', resetAction: 'wabot-reset-crm-prompt'
+    })}
   `;
 }
 
@@ -3963,6 +4005,19 @@ document.addEventListener('click', function(e){
       }
     })();
   }
+  else if (el.dataset.action === 'wabot-reset-crm-prompt'){
+    if (!confirm('Kembalikan persona CRM ke bawaan? Perubahan custom akan hilang.')) return;
+    (async () => {
+      const res = await wabotCall('resetCRMSystemPrompt', {});
+      if (res && res.success) {
+        showToast('Persona CRM dikembalikan ke bawaan');
+        state.wabotCrmPromptFetched = false;
+        render();
+      } else {
+        showToast('Gagal reset: ' + ((res && res.error) || 'coba lagi'));
+      }
+    })();
+  }
   else if (el.dataset.action === 'wabot-reset-chat-test'){
     state.wabotChatMessages = [];
     state.wabotChatHistory = null;
@@ -4401,6 +4456,29 @@ document.addEventListener('submit', function(e){
       }
     }).catch(() => {
       state.wabotPromptSaving = false;
+      showToast('Gagal menghubungi server');
+      render();
+    });
+  }
+  else if (e.target.id === 'form-wabot-crm-prompt'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const prompt = String(fd.get('prompt')||'').trim();
+    if (!prompt || prompt.length < 20) { showToast('Isi prompt terlalu pendek/kosong'); return; }
+    state.wabotCrmPromptSaving = true;
+    render();
+    wabotCall('saveCRMSystemPrompt', { prompt: prompt }).then(res => {
+      state.wabotCrmPromptSaving = false;
+      if (res && res.success) {
+        showToast('Persona CRM berhasil disimpan');
+        state.wabotCrmPromptFetched = false;
+        render();
+      } else {
+        showToast('Gagal menyimpan: ' + ((res && res.error) || 'coba lagi'));
+        render();
+      }
+    }).catch(() => {
+      state.wabotCrmPromptSaving = false;
       showToast('Gagal menghubungi server');
       render();
     });
