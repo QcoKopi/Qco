@@ -363,6 +363,7 @@
   .app-icon.qfin{background:#E8F0FE; color:#1A73E8;}
   .app-icon.qsales{background:#FCE8E6; color:#C5221F;}
   .app-icon.qaff{background:#E6F4EA; color:#137333;}
+  .app-icon.crm{background:#F3E8FD; color:#8430CE;}
   .app-info{flex:1;}
   .app-name{font-weight:700; font-size:15px;}
   .app-desc{font-size:12px; color:var(--ink-soft); margin-top:2px;}
@@ -515,6 +516,13 @@ function gsJSONP(fnName, ...args){
       params.set('id', args[0]);
       params.set('isActive', String(args[1]));
       console.log('[gsJSONP] toggleManagementNote:', { id: args[0], isActive: args[1] });
+    }
+    else if (fnName === 'crm_updateLogStatus') {
+      params.set('id', args[0]);
+      params.set('status', args[1]);
+    }
+    else if (fnName === 'crm_deleteLog') {
+      params.set('id', args[0]);
     }
     else if (args.length === 1) {
       params.set('payload', JSON.stringify(args[0]));
@@ -694,6 +702,7 @@ const APPS = [
   { id:'qtask', name:'QTask', desc:'Tracker tugas & progress tim', icon:'📋', status:'live', color:'qtask' },
   { id:'qfin', name:'QFinance', desc:'Manajemen keuangan, GL, neraca, HPP', icon:'💰', status:'live', color:'qfin' },
   { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'live', color:'qsales' },
+  { id:'crm', name:'CRM', desc:'Cluster & aktivitas existing client', icon:'👥', status:'live', color:'crm' },
   { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
 ];
 
@@ -717,6 +726,15 @@ let state = {
   qfinLoading: false,
   qfinError: null,
   qfinFetchAttempted: false,
+  crmData: null,
+  crmLoading: false,
+  crmError: null,
+  crmFetchAttempted: false,
+  crmFilterCluster: 'all', // all | Meningkat | Menurun | Stabil | Customer Baru | Tidak Ada Order Bulan Ini | Tidak Ada Order
+  crmSelectedCustomer: null, // nama_customer yang lagi dibuka detailnya
+  crmLogFormOpen: false, // form tambah aktivitas/tugas lagi kebuka atau tidak
+  crmLogFormTipe: 'Aktivitas', // Aktivitas | Tugas
+  crmTaskFilterStatus: 'Pending', // filter list tugas: Pending | Selesai | all
   currentUser: null,
   appTab: 'dashboard', // dashboard | qtask | qfin | qsales | qaff
   // QTask sub-state
@@ -1839,14 +1857,14 @@ function qsalesDashboardHTML(){
 
   // Show debug info if available
   const debugInfo = d.debug ? `
-   // <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
-  //    <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
-    //  <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
-    //  <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
-    //  <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
-   //   <div>isStaff: ${d.debug.isStaff}</div>
-   //   <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
-   // </div>
+    <div class="card" style="background:#f0f0f0; border-color:#ccc; margin-bottom:10px; font-size:11px; color:#666;">
+      <div style="font-weight:700; margin-bottom:4px;">🔧 Debug Info (GAS):</div>
+      <div>receivedSalesName: ${escapeHTML(String(d.debug.receivedSalesName || 'null'))}</div>
+      <div>receivedUserRole: ${escapeHTML(String(d.debug.receivedUserRole || 'null'))}</div>
+      <div>filterApplied: ${escapeHTML(String(d.debug.filterApplied || 'null'))}</div>
+      <div>isStaff: ${d.debug.isStaff}</div>
+      <div>allRowsCount: ${d.debug.allRowsCount} → filteredRowsCount: ${d.debug.filteredRowsCount}</div>
+    </div>
   ` : '';
 
   return `
@@ -2249,6 +2267,28 @@ async function fetchQFinData(){
   render();
 }
 
+async function fetchCRMData(){
+  if (state.crmLoading || state.crmFetchAttempted) return;
+  state.crmFetchAttempted = true;
+  state.crmLoading = true;
+  state.crmError = null;
+  render();
+  try {
+    const result = await apiCall('crm_getDashboard');
+    if (result && typeof result === 'object') {
+      state.crmData = result;
+      state.crmLoading = false;
+    } else {
+      throw new Error('Response tidak valid');
+    }
+  } catch(e) {
+    state.crmLoading = false;
+    state.crmError = e.message || 'Gagal memuat data CRM';
+    showToast('CRM: ' + state.crmError);
+  }
+  render();
+}
+
 function qfinDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
@@ -2540,6 +2580,241 @@ function qfinDashboardHTML(){
     <p class="hint" style="text-align:center; margin-top:8px;">
       Data live dari sheet Neraca, Hutang_Piutang, Stock · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
     </p>
+  `;
+}
+
+
+/* ============================================================
+   CRM — existing clients: cluster order + aktivitas/tugas
+   (live dari sheet Costumer & GL via backend crm_getDashboard(),
+   lihat 09_CRM.gs)
+   ============================================================ */
+const CRM_CLUSTER_META = {
+  'Meningkat': { color: 'var(--success)', bg: 'var(--success-soft)', icon: '📈' },
+  'Menurun': { color: 'var(--danger)', bg: 'var(--danger-soft)', icon: '📉' },
+  'Stabil': { color: 'var(--accent-dark)', bg: 'var(--accent-soft)', icon: '➖' },
+  'Customer Baru': { color: '#8430CE', bg: '#F3E8FD', icon: '✨' },
+  'Tidak Ada Order Bulan Ini': { color: 'var(--warning)', bg: 'var(--warning-soft)', icon: '⚠️' },
+  'Tidak Ada Order': { color: 'var(--ink-faint)', bg: 'var(--line)', icon: '💤' },
+};
+const CRM_CLUSTER_ORDER = ['Meningkat','Menurun','Customer Baru','Tidak Ada Order Bulan Ini','Stabil','Tidak Ada Order'];
+
+function crmClusterBadge(cluster){
+  const meta = CRM_CLUSTER_META[cluster] || { color:'var(--ink-faint)', bg:'var(--line)', icon:'•' };
+  return `<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:99px; background:${meta.bg}; color:${meta.color}; font-size:11px; font-weight:600; white-space:nowrap;">${meta.icon} ${escapeHTML(cluster)}</span>`;
+}
+
+function crmDashboardHTML(){
+  if (state.crmLoading){
+    return `
+      <div class="greeting">CRM 👥</div>
+      <div class="empty-state"><span class="icon">👥</span><p>Memuat data dari sheet...</p></div>
+    `;
+  }
+  if (state.crmError){
+    return `
+      <div class="greeting">CRM 👥</div>
+      <div class="empty-state">
+        <span class="icon">⚠️</span>
+        <p>${escapeHTML(state.crmError)}</p>
+        <button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="crm-refresh">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+  const d = state.crmData || {};
+  if (!d.lastUpdated){
+    return `
+      <div class="greeting">CRM 👥</div>
+      <div class="empty-state"><span class="icon">👥</span><p>Data belum dimuat.</p><button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="crm-refresh">🔄 Muat Data</button></div>
+    `;
+  }
+
+  if (state.crmSelectedCustomer){
+    return crmCustomerDetailHTML(d, state.crmSelectedCustomer);
+  }
+
+  const customers = d.customers || [];
+  const logs = d.logs || [];
+
+  const counts = {};
+  CRM_CLUSTER_ORDER.forEach(c => counts[c] = 0);
+  customers.forEach(c => { counts[c.cluster] = (counts[c.cluster]||0) + 1; });
+
+  const filtered = customers
+    .filter(c => state.crmFilterCluster === 'all' || c.cluster === state.crmFilterCluster)
+    .sort((a,b) => b.curValue - a.curValue);
+
+  const tasks = logs.filter(l => l.tipe === 'Tugas')
+    .filter(l => state.crmTaskFilterStatus === 'all' || (l.status||'Pending') === state.crmTaskFilterStatus)
+    .sort((a,b) => String(a.tanggal).localeCompare(String(b.tanggal)));
+
+  return `
+    <div class="greeting">CRM 👥</div>
+    <div class="greeting-sub">Existing client · membandingkan ${escapeHTML(d.curMonthLabel||d.curMonth||'-')} vs ${escapeHTML(d.prevMonthLabel||d.prevMonth||'-')} <span class="faint">(update tgl 15/bulan)</span></div>
+
+    <div class="section-title">Ringkasan Cluster</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;">
+      <div data-action="crm-filter-cluster" data-cluster="all" style="cursor:pointer; padding:8px 12px; border-radius:12px; border:1.5px solid ${state.crmFilterCluster==='all' ? 'var(--ink)' : 'var(--line)'}; background:${state.crmFilterCluster==='all' ? 'var(--ink)' : '#fff'};">
+        <div style="font-size:16px; font-weight:700; color:${state.crmFilterCluster==='all' ? '#fff' : 'var(--ink)'};">${customers.length}</div>
+        <div style="font-size:10.5px; color:${state.crmFilterCluster==='all' ? '#fff' : 'var(--ink-soft)'};">Semua</div>
+      </div>
+      ${CRM_CLUSTER_ORDER.map(c => {
+        const meta = CRM_CLUSTER_META[c];
+        const active = state.crmFilterCluster === c;
+        return `<div data-action="crm-filter-cluster" data-cluster="${c}" style="cursor:pointer; padding:8px 12px; border-radius:12px; border:1.5px solid ${active ? meta.color : 'var(--line)'}; background:${active ? meta.bg : '#fff'};">
+          <div style="font-size:16px; font-weight:700; color:${meta.color};">${counts[c]||0}</div>
+          <div style="font-size:10.5px; color:var(--ink-soft);">${meta.icon} ${escapeHTML(c)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-title">📌 Tugas &amp; Reminder Follow-up</div>
+    <div class="card" style="margin-bottom:16px;">
+      <select class="inline-select" data-action="set-crm-task-filter" style="margin-bottom:10px;">
+        <option value="Pending" ${state.crmTaskFilterStatus==='Pending'?'selected':''}>Pending</option>
+        <option value="Selesai" ${state.crmTaskFilterStatus==='Selesai'?'selected':''}>Selesai</option>
+        <option value="all" ${state.crmTaskFilterStatus==='all'?'selected':''}>Semua</option>
+      </select>
+      ${tasks.length ? tasks.map(t => `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-top:1px solid var(--line);">
+          <div style="flex:1; min-width:0; cursor:pointer;" data-action="crm-open-customer" data-customer="${escapeHTML(t.customer)}">
+            <div style="font-weight:600; font-size:13px;">${escapeHTML(t.judul)}</div>
+            <div class="faint" style="font-size:11px;">👤 ${escapeHTML(t.customer)} · 📅 ${escapeHTML(t.tanggal)}</div>
+          </div>
+          ${(t.status||'Pending') !== 'Selesai' ? `<button class="btn btn-ghost btn-sm" data-action="crm-toggle-task" data-id="${escapeHTML(t.id)}" data-newstatus="Selesai">✓ Selesai</button>` : `<button class="btn btn-ghost btn-sm" data-action="crm-toggle-task" data-id="${escapeHTML(t.id)}" data-newstatus="Pending">↺ Buka lagi</button>`}
+        </div>
+      `).join('') : '<div class="faint" style="font-size:12px; padding:8px;">Tidak ada tugas</div>'}
+    </div>
+
+    <div class="section-title">Daftar Customer (${filtered.length})</div>
+    <div class="card" style="margin-bottom:12px; padding:0; overflow:hidden;">
+      ${filtered.length ? filtered.map(c => `
+        <div data-action="crm-open-customer" data-customer="${escapeHTML(c.nama_customer)}" style="cursor:pointer; padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(c.nama_customer)}</div>
+            <div style="margin-top:4px;">${crmClusterBadge(c.cluster)}</div>
+          </div>
+          <div style="text-align:right; flex-shrink:0;">
+            <div style="font-family:var(--font-mono); font-weight:600; font-size:13px;">${fmtRupiah(c.curValue)}</div>
+            <div class="faint" style="font-size:10.5px;">${c.deltaPct !== null ? (c.deltaPct>=0?'▲ +':'▼ ') + c.deltaPct.toFixed(0) + '%' : (c.curValue>0 ? 'baru' : '-')}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="faint" style="font-size:12px; padding:16px; text-align:center;">Tidak ada customer di cluster ini</div>'}
+    </div>
+
+    <p class="hint" style="text-align:center; margin-top:8px;">
+      Data live dari sheet Costumer &amp; GL · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
+    </p>
+  `;
+}
+
+function crmCustomerDetailHTML(d, custName){
+  const cust = (d.customers || []).find(c => c.nama_customer === custName);
+  const custLogs = (d.logs || []).filter(l => l.customer === custName).sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)));
+
+  if (!cust) {
+    return `
+      <div class="greeting">CRM 👥</div>
+      <button class="btn btn-ghost btn-sm" data-action="crm-back" style="margin-bottom:12px;">← Kembali</button>
+      <div class="empty-state"><p>Customer "${escapeHTML(custName)}" tidak ditemukan.</p></div>
+    `;
+  }
+
+  return `
+    <button class="btn btn-ghost btn-sm" data-action="crm-back" style="margin-bottom:12px;">← Kembali ke Daftar</button>
+
+    <div class="card card-hero" style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <div>
+          <div style="font-size:18px; font-weight:600;">${escapeHTML(cust.nama_customer)}</div>
+          <div class="muted" style="font-size:12px; margin-top:4px;">${escapeHTML(cust.id_customer || '-')} · ${escapeHTML(cust.status || '-')}</div>
+        </div>
+        ${crmClusterBadge(cust.cluster)}
+      </div>
+      <div class="hero-row" style="margin-top:16px; gap:20px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:120px;">
+          <div class="hero-label">Bulan ini (${escapeHTML(d.curMonthLabel||d.curMonth||'-')})</div>
+          <div class="hero-big" style="font-size:21px;">${fmtRupiah(cust.curValue)}</div>
+          <div class="muted" style="font-size:11px;">${cust.curCount} transaksi</div>
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <div class="hero-label">Bulan lalu (${escapeHTML(d.prevMonthLabel||d.prevMonth||'-')})</div>
+          <div class="hero-big" style="font-size:21px;">${fmtRupiah(cust.prevValue)}</div>
+          <div class="muted" style="font-size:11px;">${cust.prevCount} transaksi</div>
+        </div>
+      </div>
+    </div>
+
+    ${(cust.telepon || cust.alamat || cust.email) ? `
+    <div class="card" style="margin-bottom:12px; font-size:12.5px; line-height:1.7;">
+      ${cust.telepon ? `<div>📞 ${escapeHTML(cust.telepon)}</div>` : ''}
+      ${cust.email ? `<div>✉️ ${escapeHTML(cust.email)}</div>` : ''}
+      ${cust.alamat ? `<div>📍 ${escapeHTML(cust.alamat)}</div>` : ''}
+    </div>
+    ` : ''}
+
+    <div class="section-title">Aktivitas &amp; Tugas</div>
+    <div class="card" style="margin-bottom:12px;">
+      <button class="btn ${state.crmLogFormOpen ? 'btn-ghost' : 'btn-primary'} btn-block" data-action="crm-toggle-logform">
+        ${state.crmLogFormOpen ? '✕ Tutup Form' : '+ Tambah Aktivitas / Tugas'}
+      </button>
+      ${state.crmLogFormOpen ? crmLogFormHTML(custName) : ''}
+    </div>
+
+    <div class="card" style="margin-bottom:12px; padding:0; overflow:hidden;">
+      ${custLogs.length ? custLogs.map(l => `
+        <div style="padding:12px 14px; border-bottom:1px solid var(--line);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span style="font-size:11px; padding:2px 8px; border-radius:99px; background:${l.tipe==='Tugas' ? 'var(--warning-soft)' : 'var(--accent-soft)'}; color:${l.tipe==='Tugas' ? 'var(--warning)' : 'var(--accent-dark)'}; font-weight:600;">${l.tipe==='Tugas' ? '📌 Tugas' : '📝 Aktivitas'}</span>
+              ${l.tipe==='Tugas' ? `<span style="font-size:11px; padding:2px 8px; border-radius:99px; background:${l.status==='Selesai' ? 'var(--success-soft)':'var(--danger-soft)'}; color:${l.status==='Selesai' ? 'var(--success)':'var(--danger)'}; font-weight:600;">${escapeHTML(l.status||'Pending')}</span>` : ''}
+            </div>
+            <div class="faint" style="font-size:10.5px; white-space:nowrap;">${escapeHTML(l.tanggal)}</div>
+          </div>
+          <div style="font-weight:600; font-size:13px; margin-top:6px;">${escapeHTML(l.judul)}</div>
+          ${l.catatan ? `<div style="font-size:12px; color:var(--ink-soft); margin-top:3px;">${escapeHTML(l.catatan)}</div>` : ''}
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+            <div class="faint" style="font-size:10px;">oleh ${escapeHTML(l.dibuat_oleh || '-')}</div>
+            <div style="display:flex; gap:6px;">
+              ${l.tipe==='Tugas' ? `<button class="btn btn-ghost btn-sm" data-action="crm-toggle-task" data-id="${escapeHTML(l.id)}" data-newstatus="${l.status==='Selesai'?'Pending':'Selesai'}">${l.status==='Selesai' ? '↺ Buka lagi' : '✓ Selesai'}</button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-action="crm-delete-log" data-id="${escapeHTML(l.id)}">🗑</button>
+            </div>
+          </div>
+        </div>
+      `).join('') : '<div class="faint" style="font-size:12px; padding:16px; text-align:center;">Belum ada aktivitas/tugas untuk customer ini</div>'}
+    </div>
+  `;
+}
+
+function crmLogFormHTML(custName){
+  const todayStr = new Date().toISOString().slice(0,10);
+  return `
+    <form id="form-crm-log" data-customer="${escapeHTML(custName)}" style="margin-top:12px;">
+      <div class="field">
+        <label>Tipe</label>
+        <div style="display:flex; gap:14px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+            <input type="radio" name="crm-log-tipe" value="Aktivitas" ${state.crmLogFormTipe==='Aktivitas'?'checked':''} data-action="set-crm-logform-tipe"> 📝 Aktivitas
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:400; cursor:pointer;">
+            <input type="radio" name="crm-log-tipe" value="Tugas" ${state.crmLogFormTipe==='Tugas'?'checked':''} data-action="set-crm-logform-tipe"> 📌 Tugas
+          </label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Judul</label>
+        <input type="text" name="judul" placeholder="${state.crmLogFormTipe==='Tugas' ? 'Contoh: Follow-up ulang order' : 'Contoh: Kunjungan / Telepon konfirmasi'}" required>
+      </div>
+      <div class="field">
+        <label>Catatan (opsional)</label>
+        <textarea name="catatan" placeholder="Detail tambahan..."></textarea>
+      </div>
+      <div class="field">
+        <label>${state.crmLogFormTipe==='Tugas' ? 'Tanggal jatuh tempo' : 'Tanggal'}</label>
+        <input type="date" name="tanggal" value="${todayStr}">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Simpan</button>
+    </form>
   `;
 }
 
@@ -2898,6 +3173,8 @@ function render(){
     else { state.qtaskTab='home'; body += qtaskHomeHTML(); }
   } else if (state.appTab === 'qfin'){
     body = qfinDashboardHTML();
+  } else if (state.appTab === 'crm'){
+    body = crmDashboardHTML();
   } else if (state.appTab === 'qsales'){
     if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
@@ -2994,6 +3271,9 @@ document.addEventListener('click', function(e){
     }
     if (state.appTab === 'qfin' && !state.qfinData && !state.qfinLoading) {
       fetchQFinData();
+    }
+    if (state.appTab === 'crm' && !state.crmData && !state.crmLoading) {
+      fetchCRMData();
     }
     render();
   }
@@ -3120,6 +3400,61 @@ document.addEventListener('click', function(e){
     state.qfinFetchAttempted = false;
     fetchQFinData();
   }
+  else if (el.dataset.action === 'crm-refresh'){
+    state.crmError = null;
+    state.crmData = null;
+    state.crmFetchAttempted = false;
+    fetchCRMData();
+  }
+  else if (el.dataset.action === 'crm-filter-cluster'){
+    state.crmFilterCluster = el.dataset.cluster || 'all';
+    render();
+  }
+  else if (el.dataset.action === 'crm-open-customer'){
+    state.crmSelectedCustomer = el.dataset.customer;
+    state.crmLogFormOpen = false;
+    render();
+  }
+  else if (el.dataset.action === 'crm-back'){
+    state.crmSelectedCustomer = null;
+    state.crmLogFormOpen = false;
+    render();
+  }
+  else if (el.dataset.action === 'crm-toggle-logform'){
+    state.crmLogFormOpen = !state.crmLogFormOpen;
+    render();
+  }
+  else if (el.dataset.action === 'crm-toggle-task'){
+    const id = el.dataset.id;
+    const newStatus = el.dataset.newstatus;
+    showToast('Menyimpan…');
+    apiCall('crm_updateLogStatus', id, newStatus).then(res=>{
+      if (res && res.success === false) throw new Error(res.error || 'Gagal update');
+      if (state.crmData && state.crmData.logs) {
+        const l = state.crmData.logs.find(x => x.id === id);
+        if (l) l.status = newStatus;
+      }
+      render();
+      showToast(newStatus === 'Selesai' ? 'Tugas ditandai selesai' : 'Tugas dibuka kembali');
+    }).catch(err=>{
+      showToast('Gagal: ' + (err.message || 'coba lagi'));
+    });
+  }
+  else if (el.dataset.action === 'crm-delete-log'){
+    const id = el.dataset.id;
+    if (!confirm('Hapus catatan ini?')) return;
+    showToast('Menghapus…');
+    apiCall('crm_deleteLog', id).then(res=>{
+      if (res && res.success === false) throw new Error(res.error || 'Gagal hapus');
+      if (state.crmData && state.crmData.logs) {
+        state.crmData.logs = state.crmData.logs.filter(x => x.id !== id);
+      }
+      render();
+      showToast('Catatan dihapus');
+    }).catch(err=>{
+      showToast('Gagal: ' + (err.message || 'coba lagi'));
+    });
+  }
   else if (el.dataset.action === 'reset-filter'){
     state.filter = { dept:'all', nama:'all' };
     render();
@@ -3213,10 +3548,52 @@ document.addEventListener('change', function(e){
     state.qfinStockOnlySisa = e.target.checked;
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'set-crm-task-filter'){
+    state.crmTaskFilterStatus = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-crm-logform-tipe'){
+    state.crmLogFormTipe = e.target.value;
+    render();
+  }
 });
 
 document.addEventListener('submit', function(e){
-  if (e.target.id === 'form-employee'){
+  if (e.target.id === 'form-crm-log'){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const customer = e.target.dataset.customer;
+    const emp = findEmp(state.currentUser);
+    const payload = {
+      customer: customer,
+      tipe: state.crmLogFormTipe,
+      judul: String(fd.get('judul')||'').trim(),
+      catatan: String(fd.get('catatan')||'').trim(),
+      tanggal: fd.get('tanggal') || '',
+      status: state.crmLogFormTipe === 'Tugas' ? 'Pending' : '',
+      dibuat_oleh: emp ? emp.name : state.currentUser
+    };
+    if (!payload.judul) { showToast('Judul wajib diisi'); return; }
+    showToast('Menyimpan…');
+    apiCall('crm_addLog', payload).then(res=>{
+      if (res && res.success === false) throw new Error(res.error || 'Gagal simpan');
+      if (state.crmData) {
+        if (!state.crmData.logs) state.crmData.logs = [];
+        state.crmData.logs.push({
+          id: res.id, customer: payload.customer, tipe: payload.tipe,
+          tanggal: payload.tanggal, judul: payload.judul, catatan: payload.catatan,
+          status: payload.status, dibuat_oleh: payload.dibuat_oleh,
+          created_at: new Date().toISOString()
+        });
+      }
+      state.crmLogFormOpen = false;
+      render();
+      showToast((payload.tipe === 'Tugas' ? 'Tugas' : 'Aktivitas') + ' tersimpan');
+    }).catch(err=>{
+      showToast('Gagal: ' + (err.message || 'coba lagi'));
+    });
+  }
+  else if (e.target.id === 'form-employee'){
     e.preventDefault();
     const fd = new FormData(e.target);
     const emp = {
@@ -3402,12 +3779,12 @@ function getAllowedApps(userId){
   if (!rules) {
     // Fallback: Spv & Owner = semua, staff = dashboard + qtask
     if (emp.role === 'spv' || emp.role === 'owner') {
-      allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+      allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm'];
     } else {
       allowed = ['dashboard', 'qtask'];
     }
   } else if (rules.toLowerCase() === 'all') {
-    allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff'];
+    allowed = ['dashboard', 'qtask', 'qfin', 'qsales', 'qaff', 'crm'];
   } else {
     // Parse string rules: "Hanya bisa membuka Dashboard, Task, Sales"
     const appMap = {
@@ -3416,6 +3793,8 @@ function getAllowedApps(userId){
       'sales': 'qsales',
       'finance': 'qfin',
       'affiliator': 'qaff',
+      'crm': 'crm',
+      'customer': 'crm',
       'qtask': 'qtask',
       'qsales': 'qsales',
       'qfin': 'qfin',
@@ -3428,12 +3807,19 @@ function getAllowedApps(userId){
       }
     });
   }
-  // RESTRICT QFIN Tab: Spv (semua dept) dan Owner bisa lihat tab QFinance
-  // Razak (staff, po) = asisten, tidak mendapat akses QFinance
+  // RESTRICT QFIN & CRM Tab: Spv (semua dept) dan Owner bisa lihat tab
+  // QFinance & CRM (data keuangan/customer sensitif). Razak (staff, po) =
+  // asisten, tidak mendapat akses ini.
   if (allowed.includes('qfin')) {
     const canSeeQFinTab = emp.role === 'owner' || emp.role === 'spv';
     if (!canSeeQFinTab) {
       allowed = allowed.filter(a => a !== 'qfin');
+    }
+  }
+  if (allowed.includes('crm')) {
+    const canSeeCRMTab = emp.role === 'owner' || emp.role === 'spv';
+    if (!canSeeCRMTab) {
+      allowed = allowed.filter(a => a !== 'crm');
     }
   }
   return allowed;
