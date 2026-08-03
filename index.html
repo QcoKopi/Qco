@@ -727,6 +727,11 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 /* ============================================================
    QSYSTEM State
    ============================================================ */
+// Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
+// apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
+// (perlu commit+push, bukan cuma download file).
+const QSYSTEM_HTML_VERSION = '2026-08-03-2200-fix-persona-draft-blink-lockfix';
+
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
   qfinStockFilterProduk: 'all', // all | nama_produk
@@ -3166,7 +3171,7 @@ async function fetchWabotStats(){
     const res = await wabotCall('getStats', {});
     if (res && res.success) {
       state.wabotStats = res.stats || {};
-      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-' };
+      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-', qsystemGasVersion: res.qsystemGasVersion || '-' };
     } else {
       showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat statistik'));
     }
@@ -3199,8 +3204,12 @@ function wabotDashboardHTML(){
       <button class="btn btn-ghost btn-sm" data-action="wabot-refresh-stats">🔄 Refresh</button>
       <p class="faint" style="font-size:12px; margin-top:10px;">Order yang masuk lewat WhatsApp langsung muncul di panel affiliate (bukan di sini). Halaman ini khusus kelola cara bot "berpikir" dan menjawab, plus ambil-alih percakapan kalau perlu.</p>
       ${state.wabotVersionInfo ? `
-        <div class="faint" style="font-size:11px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);">
-          Versi live -- WA-Bot.gs: <code>${escapeHTML(state.wabotVersionInfo.waBotVersion)}</code> · Code.gs (affiliate): <code>${escapeHTML(state.wabotVersionInfo.mainGasVersion)}</code>
+        <div class="faint" style="font-size:11px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); line-height:1.8;">
+          Versi live saat ini (cek SEMUA harus versi terbaru, bukan cuma sebagian):<br>
+          • WA-Bot.gs: <code>${escapeHTML(state.wabotVersionInfo.waBotVersion)}</code><br>
+          • QSystem (05_WebApp.gs): <code>${escapeHTML(state.wabotVersionInfo.qsystemGasVersion || '-')}</code><br>
+          • Code.gs (affiliate): <code>${escapeHTML(state.wabotVersionInfo.mainGasVersion)}</code><br>
+          • index.html (halaman ini): <code>${QSYSTEM_HTML_VERSION}</code>
         </div>
       ` : ''}
     </div>
