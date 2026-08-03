@@ -3249,14 +3249,14 @@ async function fetchWabotCrmPrompt(){
 }
 
 function wabotPersonaCardHTML_(opts){
-  // opts: {title, hint, prompt, isDefault, loading, saving, fetched, formId, resetAction}
+  // opts: {title, hint, prompt, isDefault, loading, saving, fetched, formId, resetAction, stateField}
   return `
     <div class="card" style="margin-bottom:14px;">
       <div style="font-weight:600; font-size:14px; margin-bottom:2px;">${opts.title}</div>
       <p class="faint" style="font-size:12px; margin-bottom:10px;">${opts.hint}</p>
       ${opts.fetched ? `<div style="margin-bottom:8px;"><span class="badge" style="background:${opts.isDefault ? '#E8E8E8' : '#E8F5E9'}; color:${opts.isDefault ? 'var(--ink-faint)' : 'var(--success)'}; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:600;">${opts.isDefault ? 'Memakai persona bawaan' : 'Memakai persona custom'}</span></div>` : ''}
       <form id="${opts.formId}">
-        <textarea name="prompt" style="width:100%; height:440px; font-size:12.5px; line-height:1.7; font-family:ui-monospace, 'SF Mono', Consolas, monospace; padding:12px; border:1px solid var(--line); border-radius:8px; resize:vertical;" placeholder="${opts.loading ? 'Memuat...' : ''}">${escapeHTML(opts.prompt || '')}</textarea>
+        <textarea name="prompt" data-action="wabot-sync-prompt-draft" data-field="${opts.stateField}" style="width:100%; height:440px; font-size:12.5px; line-height:1.7; font-family:ui-monospace, 'SF Mono', Consolas, monospace; padding:12px; border:1px solid var(--line); border-radius:8px; resize:vertical;" placeholder="${opts.loading ? 'Memuat...' : ''}">${escapeHTML(opts.prompt || '')}</textarea>
         <div class="row gap-6" style="margin-top:12px;">
           <button type="submit" class="btn btn-primary" ${opts.saving ? 'disabled' : ''}>${opts.saving ? 'Menyimpan…' : '💾 Simpan Perubahan'}</button>
           <button type="button" class="btn btn-ghost" data-action="${opts.resetAction}">↩️ Kembalikan ke Bawaan</button>
@@ -3275,14 +3275,14 @@ function wabotPersonaHTML(){
       hint: 'Dipakai untuk nomor yang BUKAN customer CRM -- pembeli retail, calon affiliator. Menentukan gaya jualan, cara jawab produk/ongkir/order.',
       prompt: state.wabotPrompt, isDefault: state.wabotPromptIsDefault,
       loading: state.wabotPromptLoading, saving: state.wabotPromptSaving, fetched: state.wabotPromptFetched,
-      formId: 'form-wabot-prompt', resetAction: 'wabot-reset-prompt'
+      formId: 'form-wabot-prompt', resetAction: 'wabot-reset-prompt', stateField: 'wabotPrompt'
     })}
     ${wabotPersonaCardHTML_({
       title: '👥 Persona CRM (Client Wholesale/B2B)',
       hint: 'Dipakai KHUSUS untuk nomor yang terdaftar sebagai customer CRM di QSystem (dicek otomatis dari sheet Costumer). Terpisah total dari persona affiliate di atas -- tidak ada tool order/checkout di sini.',
       prompt: state.wabotCrmPrompt, isDefault: state.wabotCrmPromptIsDefault,
       loading: state.wabotCrmPromptLoading, saving: state.wabotCrmPromptSaving, fetched: state.wabotCrmPromptFetched,
-      formId: 'form-wabot-crm-prompt', resetAction: 'wabot-reset-crm-prompt'
+      formId: 'form-wabot-crm-prompt', resetAction: 'wabot-reset-crm-prompt', stateField: 'wabotCrmPrompt'
     })}
   `;
 }
@@ -4362,6 +4362,22 @@ document.addEventListener('click', function(e){
       const existingMN = document.getElementById('mn-modal-overlay');
       if (existingMN) existingMN.remove();
     }
+  }
+});
+
+// BARU (2026-08-03, FIX BUG SERIUS): app ini re-render SELURUH innerHTML
+// setiap ada perubahan state (mis. polling refreshData() tiap 30 detik) --
+// textarea yang lagi diketik/paste user IKUT DIBANGUN ULANG dari state lama
+// setiap render() itu terjadi, jadi draft yang belum disimpan HILANG/
+// "kembali ke teks lama" (persis keluhan user: paste lalu balik lagi dengan
+// cepat). Listener ini sinkronkan isi textarea ke state SETIAP ketikan/paste
+// (TANPA memanggil render() -- itu justru boros & bisa bikin kursor
+// lompat), supaya kalau render() lain terpicu di tengah proses, hasil
+// render itu pakai draft TERBARU, bukan yang sudah basi.
+document.addEventListener('input', function(e){
+  if (e.target.dataset && e.target.dataset.action === 'wabot-sync-prompt-draft'){
+    const field = e.target.dataset.field;
+    if (field) state[field] = e.target.value;
   }
 });
 
