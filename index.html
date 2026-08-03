@@ -730,7 +730,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-03-2200-fix-persona-draft-blink-lockfix';
+const QSYSTEM_HTML_VERSION = '2026-08-03-2330-notes-expandable';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -797,6 +797,7 @@ let state = {
   mnLoading: false,
   mnModalOpen: false,
   mnEditingId: null,
+  mnExpandedIds: [], // id notes yang lagi di-expand (baca selengkapnya)
 };
 
 function defaultData(){
@@ -1027,7 +1028,18 @@ async function refreshData(){
     }
   }
 }
-setInterval(()=>{ if (state.currentUser) refreshData(); }, 30000);
+// BARU (2026-08-03, FIX MASALAH FUNDAMENTAL): sebelumnya refreshData() (yang
+// memanggil getData + getAllManagementNotes) jalan tiap 30 detik TANPA PEDULI
+// tab apa yang sedang aktif -- kalau user lagi di QFinance/CRM/QSales/WA Bot
+// Admin, fetch ini TETAP jalan sia-sia di belakang layar (datanya bahkan
+// tidak terlihat sama sekali di tab-tab itu), cuma menambah beban request
+// yang berjalan bersamaan. Data ini (state.data, Management Notes) HANYA
+// ditampilkan di tab 'dashboard'/'qtask' -- jadi polling-nya sekarang cuma
+// jalan kalau user BENAR-BENAR sedang di salah satu tab itu.
+setInterval(()=>{
+  if (!state.currentUser) return;
+  if (state.appTab === 'dashboard' || state.appTab === 'qtask') refreshData();
+}, 30000);
 window.addEventListener('online', ()=>{ if (state.currentUser) refreshData(); });
 document.addEventListener('visibilitychange', ()=>{
   if (document.visibilityState === 'visible' && state.currentUser) refreshData();
@@ -1422,21 +1434,33 @@ function bottomNavHTML(){
 function mnBannerHTML(){
   const notes = state.mnNotes || [];
   if (!notes.length) return '';
-  return notes.map(n => `
+  const MN_PREVIEW_LEN = 100;
+  return notes.map(n => {
+    const isExpanded = (state.mnExpandedIds || []).includes(n.id);
+    const fullContent = String(n.content || '');
+    const needsTruncate = fullContent.length > MN_PREVIEW_LEN;
+    const shownContent = (isExpanded || !needsTruncate) ? fullContent : fullContent.substring(0, MN_PREVIEW_LEN) + '…';
+    return `
     <div class="card" style="background:linear-gradient(135deg, #FFF8E7 0%, #FFF0C7 100%); border-color:#E6C68E; margin-bottom:14px;">
       <div style="display:flex; align-items:flex-start; gap:10px;">
         <span style="font-size:22px; flex:none;">&#128227;</span>
         <div style="flex:1;">
           <div style="font-weight:700; font-size:13px; color:#8A5620; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;">&#128227; Notes from Management</div>
           <div style="font-weight:700; font-size:15px; color:var(--ink); margin-bottom:6px;">${escapeHTML(n.title)}</div>
-          <div style="font-size:13.5px; color:var(--ink-soft); line-height:1.5;">${escapeHTML(n.content).replace(/\n/g,'<br>')}</div>
+          <div style="font-size:13.5px; color:var(--ink-soft); line-height:1.5;">${escapeHTML(shownContent).replace(/\n/g,'<br>')}</div>
+          ${needsTruncate ? `
+            <div data-action="mn-toggle-expand" data-id="${escapeHTML(n.id)}" style="font-size:12px; font-weight:600; color:#8A5620; margin-top:6px; cursor:pointer; display:inline-block;">
+              ${isExpanded ? '▲ Sembunyikan' : '▼ Baca selengkapnya'}
+            </div>
+          ` : ''}
           <div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">
             ${fmtDate(String(n.timestamp).split(' ')[0])} &#183; ${n.targetType === 'all' ? '&#127760; Semua Staff' : '&#128101; Staff Tertentu'}
           </div>
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function dashboardHTML(){
@@ -1788,13 +1812,23 @@ function qtaskSettingsHTML(){
       <div style="margin-bottom:12px;">
         <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Daftar Announcement (${state.mnNotes.length})</div>
         ${(state.mnNotes || []).length === 0 ? '<div style="font-size:12.5px; color:var(--ink-faint); margin-bottom:8px;">Belum ada notes.</div>' : ''}
-        ${(state.mnNotes || []).map(n => `
+        ${(state.mnNotes || []).map(n => {
+          const isExpanded = (state.mnExpandedIds || []).includes(n.id);
+          const fullContent = String(n.content || '');
+          const needsTruncate = fullContent.length > 80;
+          const shownContent = (isExpanded || !needsTruncate) ? fullContent : fullContent.substring(0, 80) + '…';
+          return `
           <div style="padding:10px; background:var(--surface-alt); border-radius:8px; margin-bottom:8px; border-left:3px solid var(--accent); opacity:${n.isActive ? '1' : '.5'};">
             <div style="display:flex; justify-content:space-between; align-items:flex-start;">
               <div style="font-weight:600; font-size:13px; flex:1;">${escapeHTML(n.title)} ${!n.isActive ? '<span class="badge" style="background:var(--ink-faint); color:#fff;">Nonaktif</span>' : ''}</div>
               <div style="font-size:11px; color:var(--ink-faint); white-space:nowrap;">${fmtDate(String(n.timestamp).split(' ')[0])}</div>
             </div>
-            <div style="font-size:12px; color:var(--ink-soft); margin-top:3px;">${escapeHTML(n.content).substring(0,80)}${n.content.length>80?'...':''}</div>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:3px; white-space:pre-wrap;">${escapeHTML(shownContent)}</div>
+            ${needsTruncate ? `
+              <div data-action="mn-toggle-expand" data-id="${escapeHTML(n.id)}" style="font-size:11px; font-weight:600; color:var(--accent); margin-top:3px; cursor:pointer; display:inline-block;">
+                ${isExpanded ? '▲ Sembunyikan' : '▼ Baca selengkapnya'}
+              </div>
+            ` : ''}
             <div style="font-size:11px; color:var(--ink-faint); margin-top:4px;">
               ${n.targetType==='all'?'&#127760; Semua Staff':'&#128101; ' + (n.targetStaff || []).map(id => (findEmp(id)||{}).name || id).join(', ')}
             </div>
@@ -1804,7 +1838,8 @@ function qtaskSettingsHTML(){
               <button class="btn btn-danger-ghost btn-sm" data-action="mn-delete" data-id="${n.id}">&#128465;&#65039; Hapus</button>
             </div>
           </div>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
       <button class="btn btn-primary btn-block" data-action="mn-open-modal">＋ Buat Notes Baru</button>
     </div>
@@ -4016,6 +4051,13 @@ document.addEventListener('click', function(e){
     if (state.appTab === 'crm' && !state.crmData && !state.crmLoading) {
       fetchCRMData();
     }
+    // BARU: begitu pindah KE dashboard/qtask, langsung refresh sekali supaya
+    // datanya segar seketika -- bukan nunggu sampai centang interval 30 detik
+    // berikutnya (karena polling otomatisnya sekarang HANYA jalan selagi
+    // sedang di salah satu tab ini, lihat setInterval di atas).
+    if (state.appTab === 'dashboard' || state.appTab === 'qtask') {
+      refreshData();
+    }
     render();
   }
   else if (el.dataset.action === 'switch-qtask-tab'){
@@ -4351,6 +4393,13 @@ document.addEventListener('click', function(e){
     apiCall('deleteManagementNote', el.dataset.id).then(()=>{
       showToast('Notes dihapus'); fetchManagementNotes();
     }).catch(err=>showToast('Gagal: ' + (err.message||err)));
+  }
+  else if (el.dataset.action === 'mn-toggle-expand'){
+    const id = el.dataset.id;
+    const idx = (state.mnExpandedIds || []).indexOf(id);
+    if (idx === -1) state.mnExpandedIds.push(id);
+    else state.mnExpandedIds.splice(idx, 1);
+    render();
   }
   else if (el.dataset.action === 'mn-toggle'){
     const id = el.dataset.id;
