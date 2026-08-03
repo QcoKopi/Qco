@@ -975,9 +975,22 @@ async function initData(){
 }
 async function fetchManagementNotes(){
   if (!state.currentUser) return;
-  state.mnNotes = []; // clear dulu supaya tidak flash notes user lama
+  // BARU (2026-08-03, FIX BLINKING): TIDAK LAGI mengosongkan state.mnNotes di
+  // sini sebelum fetch -- itu yang bikin notes "berkedip" (kosong sesaat lalu
+  // muncul lagi) SETIAP refresh 30 detik, karena render() sempat menampilkan
+  // array kosong di antara dua render. Data LAMA sekarang tetap tampil apa
+  // adanya sampai data BARU datang dan langsung menggantikannya sekaligus --
+  // tidak ada jeda kosong yang terlihat sama sekali. Kasus "notes user lama
+  // kelihatan sesaat" yang jadi alasan awal baris ini SUDAH ditangani terpisah
+  // oleh selectUser() sendiri (lihat state.mnNotes=[] di sana saat ganti user),
+  // jadi baris ini di sini murni redundan & jadi sumber blink untuk semua
+  // pemanggilan LAIN (refresh berkala, setelah tambah/hapus/toggle notes).
+  // BARU: render() SEBELUM fetch dihapus juga -- mnLoading tidak dipakai di
+  // rendering manapun (dicek: tidak ada satu pun "state.mnLoading ?" di kode),
+  // jadi render() di sini cuma render ekstra yang tidak mengubah apa pun
+  // secara visual, tapi tetap berisiko jadi sumber flicker (DOM digambar
+  // ulang walau isinya sama). Cukup satu render() SETELAH data baru datang.
   state.mnLoading = true;
-  if(!state.modal.open && !state.mnModalOpen) render();
   try {
     const emp = findEmp(state.currentUser);
     const isOwner = emp && emp.role === 'owner';
