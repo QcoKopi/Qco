@@ -480,6 +480,7 @@ function gsJSONP(fnName, ...args){
     else if (fnName === 'updatePin') {
       params.set('userId', args[0]);
       params.set('newPin', args[1]);
+      params.set('oldPin', args[2] || '');
     }
     else if (fnName === 'addEmployee') {
       params.set('payload', JSON.stringify(args[0]));
@@ -730,7 +731,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-03-2345-fix-sirkular-getstats';
+const QSYSTEM_HTML_VERSION = '2026-08-03-2400-dashboard-auto-retry';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3202,16 +3203,27 @@ async function fetchWabotStats(){
   state.wabotStatsLoading = true;
   state.wabotStatsFetched = true;
   render();
-  try {
-    const res = await wabotCall('getStats', {});
-    if (res && res.success) {
-      state.wabotStats = res.stats || {};
-      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-', qsystemGasVersion: '(memuat…)' };
-    } else {
-      showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat statistik'));
+  // BARU (2026-08-03): auto-retry SEKALI di sisi browser kalau percobaan
+  // pertama gagal (timeout/error) -- sebelumnya user harus KLIK REFRESH
+  // MANUAL kalau ini terjadi. Sekarang dicoba ulang otomatis SEKALI dulu,
+  // diam-diam (tidak tampilkan error di percobaan pertama), baru kalau
+  // KEDUANYA gagal baru user diberi tahu.
+  let res = null, lastErr = null;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      res = await wabotCall('getStats', {});
+      if (res && res.success) break;
+      lastErr = res && res.error;
+    } catch(e) {
+      lastErr = e;
+      res = null;
     }
-  } catch(e) {
-    showToast('WA Bot: gagal menghubungi server');
+  }
+  if (res && res.success) {
+    state.wabotStats = res.stats || {};
+    state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-', qsystemGasVersion: '(memuat…)' };
+  } else {
+    showToast('WA Bot: ' + (lastErr || 'Gagal memuat statistik setelah 2 percobaan'));
   }
   state.wabotStatsLoading = false;
   render();
@@ -4820,17 +4832,15 @@ document.addEventListener('submit', function(e){
     if (newPin !== confirmPin) {
       showToast('PIN baru dan konfirmasi tidak cocok'); return;
     }
-    // Verify old PIN first
-    const currentPin = state.data.userPins && state.data.userPins[state.currentUser];
-    if (currentPin && currentPin !== oldPin) {
-      showToast('PIN lama salah'); return;
-    }
+    // BARU (2026-08-03, FIX KEAMANAN): verifikasi PIN lama SEKARANG dilakukan
+    // SERVER-SIDE (di dalam updatePin itu sendiri) -- sebelumnya dicek di sini
+    // dengan membandingkan ke state.data.userPins yang berisi PIN SEMUA USER
+    // dalam bentuk teks polos (bocor ke browser siapa pun yang login, dan
+    // gampang dilewati lewat DevTools). oldPin sekarang dikirim ke server
+    // untuk dicocokkan di sana, bukan dicek lokal di sini.
     closeModal();
     showToast('Menyimpan PIN…');
-    apiCall('updatePin', state.currentUser, newPin).then(result => {
-      // Update local cache
-      if (!state.data.userPins) state.data.userPins = {};
-      state.data.userPins[state.currentUser] = newPin;
+    apiCall('updatePin', state.currentUser, newPin, oldPin).then(result => {
       state.syncStatus = 'synced'; state.lastSyncedAt = Date.now();
       render();
       showToast(result.message || 'PIN berhasil diperbarui');
