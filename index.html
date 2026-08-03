@@ -730,7 +730,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-03-2330-notes-expandable';
+const QSYSTEM_HTML_VERSION = '2026-08-03-2345-fix-sirkular-getstats';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3206,7 +3206,7 @@ async function fetchWabotStats(){
     const res = await wabotCall('getStats', {});
     if (res && res.success) {
       state.wabotStats = res.stats || {};
-      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-', qsystemGasVersion: res.qsystemGasVersion || '-' };
+      state.wabotVersionInfo = { waBotVersion: res.waBotVersion || '-', mainGasVersion: res.mainGasVersion || '-', qsystemGasVersion: '(memuat…)' };
     } else {
       showToast('WA Bot: ' + (res && res.error ? res.error : 'Gagal memuat statistik'));
     }
@@ -3215,6 +3215,19 @@ async function fetchWabotStats(){
   }
   state.wabotStatsLoading = false;
   render();
+  // BARU (2026-08-03): versi QSystem diambil LANGSUNG ke QSystem sendiri --
+  // BUKAN lewat wabot_proxy/WA-Bot.gs (yang sebelumnya bikin putaran sirkuler
+  // QSystem->WA-Bot.gs->QSystem). Dipanggil terpisah, tidak memblokir
+  // tampilan stats utama sama sekali.
+  try {
+    const vRes = await apiCall('wabot_getQSystemVersion');
+    if (state.wabotVersionInfo) {
+      state.wabotVersionInfo.qsystemGasVersion = (vRes && vRes.version) ? vRes.version : 'GAGAL DICEK';
+      render();
+    }
+  } catch(e) {
+    if (state.wabotVersionInfo) { state.wabotVersionInfo.qsystemGasVersion = 'GAGAL DICEK'; render(); }
+  }
 }
 
 function wabotDashboardHTML(){
