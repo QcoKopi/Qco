@@ -731,7 +731,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-04-qaffiliator-dashboard';
+const QSYSTEM_HTML_VERSION = '2026-08-04-fix-init-blocking-login';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -5106,18 +5106,26 @@ document.addEventListener('submit', function(e){
    Init
    ============================================================ */
 async function init(){
-  // Test GAS connection first (debug only, doesn't block UI)
-  try {
-    await testGASConnection();
-    console.log('[QSystem] ✅ GAS connection OK');
-  } catch(e) {
-    console.error('[QSystem] ❌ GAS connection failed:', e.message);
-    console.error('[QSystem] Current GAS_URL:', CONFIG.GAS_URL);
-    console.error('[QSystem] Pastikan: (1) URL sudah di-update ke deployment terbaru, (2) Deployment mode = Execute as Me + Anyone, (3) Semua file .gs sudah di-save');
-  }
+  // BARU (2026-08-04, FIX PERFORMA LOGIN): SEBELUMNYA render() PERTAMA KALI
+  // baru dipanggil SETELAH DUA panggilan jaringan berurutan selesai --
+  // testGASConnection() (cuma tes koneksi utk catatan console, TIDAK
+  // menampilkan apa pun ke user) DAN apiCall('getData') (data sungguhan).
+  // Itu artinya layar pilih-user/PIN LITERAL TIDAK BISA MUNCUL sampai
+  // KEDUA request itu selesai -- padahal komentar lama di sini bilang
+  // "PIN required every time, pre-load data in BACKGROUND", tapi kodenya
+  // justru melakukan SEBALIKNYA (blocking, bukan background).
+  //
+  // testGASConnection() DIHAPUS dari sini seluruhnya -- fungsinya cuma
+  // panggilan getData KEDUA yang terpisah, semata untuk console.log
+  // diagnostik, sepenuhnya redundan dengan logging yang SUDAH otomatis ada
+  // di apiCall/gsJSONP untuk request getData yang SUNGGUHAN di bawah ini.
+  //
+  // render() sekarang dipanggil SEGERA -- daftar user (EMPLOYEES hardcoded)
+  // sudah tersedia tanpa perlu tunggu server sama sekali, jadi layar
+  // pilih-user muncul INSTAN. Data dinamis dari getData() menyusul betul-
+  // betul di belakang layar, render ulang begitu selesai.
+  render();
 
-  // Always show login screen — PIN required every time
-  // Pre-load data in background for faster validation
   try {
     state.data = await apiCall('getData');
     state.syncStatus = 'synced';
