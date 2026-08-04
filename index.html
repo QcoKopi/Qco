@@ -713,7 +713,7 @@ const APPS = [
   { id:'qsales', name:'QSales', desc:'CRM, leads, & pipeline penjualan', icon:'🎯', status:'live', color:'qsales' },
   { id:'crm', name:'CRM', desc:'Cluster & aktivitas existing client', icon:'👥', status:'live', color:'crm' },
   { id:'wabot', name:'WA Bot', desc:'Kelola persona, ambil-alih & eskalasi chatbot', icon:'🤖', status:'live', color:'wabot' },
-  { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'soon', color:'qaff' },
+  { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'live', color:'qaff' },
 ];
 
 
@@ -731,7 +731,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-03-2130-pengaturan-ke-sidebar-owner-only';
+const QSYSTEM_HTML_VERSION = '2026-08-04-qaffiliator-dashboard';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -741,6 +741,10 @@ let state = {
   qfinLoading: false,
   qfinError: null,
   qfinFetchAttempted: false,
+  qaffData: null,
+  qaffLoading: false,
+  qaffError: null,
+  qaffFetchAttempted: false,
   crmData: null,
   crmLoading: false,
   crmError: null,
@@ -2463,6 +2467,28 @@ async function fetchCRMData(){
   render();
 }
 
+async function fetchQAffData(){
+  if (state.qaffLoading || state.qaffFetchAttempted) return;
+  state.qaffFetchAttempted = true;
+  state.qaffLoading = true;
+  state.qaffError = null;
+  render();
+  try {
+    const result = await apiCall('qaff_getDashboard');
+    if (result && result.success) {
+      state.qaffData = result;
+      state.qaffLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.qaffLoading = false;
+    state.qaffError = e.message || 'Gagal memuat data QAffiliator';
+    showToast('QAffiliator: ' + state.qaffError);
+  }
+  render();
+}
+
 function qfinDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
@@ -3630,6 +3656,109 @@ function wabotSalesMgmtHTML(){
 }
 
 
+function qaffDashboardHTML(){
+  const emp = findEmp(state.currentUser);
+  const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
+  if (!canSeeTab) {
+    return `
+      <div class="greeting">QAffiliator 🤝</div>
+      <div class="greeting-sub">Akses ditolak</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;">
+          <b>⚠ Akses Ditolak:</b> QAffiliator hanya dapat diakses oleh Supervisor dan Director.
+        </div>
+        <button class="btn btn-primary" data-action="switch-app" data-app="dashboard">Kembali ke Dashboard</button>
+      </div>
+    `;
+  }
+
+  if (state.qaffLoading){
+    return `
+      <div class="greeting">QAffiliator 🤝</div>
+      <div class="empty-state"><span class="icon">🤝</span><p>Memuat data dari sheet...</p></div>
+    `;
+  }
+  if (state.qaffError){
+    return `
+      <div class="greeting">QAffiliator 🤝</div>
+      <div class="greeting-sub">Gagal memuat data</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;"><b>⚠ Error:</b> ${escapeHTML(state.qaffError)}</div>
+        <button class="btn btn-primary" data-action="qaff-refresh">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+  const d = state.qaffData;
+  if (!d){
+    return `<div class="empty-state"><span class="icon">🤝</span><p>Data belum dimuat.</p><button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="qaff-refresh">🔄 Muat Data</button></div>`;
+  }
+
+  const s = d.summary;
+  const trendUp = s.totalThisMonth >= s.totalLastMonth;
+  const trendPct = s.totalLastMonth > 0 ? Math.round(((s.totalThisMonth - s.totalLastMonth) / s.totalLastMonth) * 100) : null;
+
+  return `
+    <div class="greeting">QAffiliator 🤝</div>
+    <div class="greeting-sub">Ringkasan program affiliate — data live dari sheet Affiliator & Affiliator_Commissions</div>
+
+    <div class="card" style="background:linear-gradient(135deg, var(--accent) 0%, #B8763F 100%); color:#fff; margin-bottom:14px;">
+      <div style="font-size:12px; opacity:.85; margin-bottom:4px;">Komisi Belum Dibayar</div>
+      <div style="font-size:28px; font-weight:800; margin-bottom:10px;">${fmtRupiah(s.totalUnpaid)}</div>
+      <div style="display:flex; gap:16px; font-size:12px; opacity:.9; flex-wrap:wrap;">
+        <span>💰 Sudah dibayar: ${fmtRupiah(s.totalPaid)}</span>
+        <span>👥 ${s.activeAffiliators}/${s.totalAffiliators} affiliator aktif</span>
+      </div>
+    </div>
+
+    <div class="row gap-10" style="margin-bottom:14px;">
+      <div class="card" style="flex:1;">
+        <div class="faint" style="font-size:11px;">Komisi Bulan Ini</div>
+        <div style="font-size:18px; font-weight:700;">${fmtRupiah(s.totalThisMonth)}</div>
+        ${trendPct !== null ? `<div style="font-size:11px; color:${trendUp ? 'var(--success)' : 'var(--danger)'};">${trendUp ? '▲' : '▼'} ${Math.abs(trendPct)}% vs bulan lalu</div>` : ''}
+      </div>
+      <div class="card" style="flex:1;">
+        <div class="faint" style="font-size:11px;">Komisi Bulan Lalu</div>
+        <div style="font-size:18px; font-weight:700;">${fmtRupiah(s.totalLastMonth)}</div>
+      </div>
+    </div>
+
+    <a href="https://affiliate.qcoid.com/" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="margin-bottom:16px; text-decoration:none; display:flex; align-items:center; justify-content:center; gap:6px;">
+      🔗 Buka Situs Affiliate Asli (kelola approve, payout, kupon, dst)
+    </a>
+
+    <div class="section-title">Per Affiliator</div>
+    <div class="table-wrap" style="margin-bottom:16px;">
+      <table class="task-table">
+        <thead><tr><th>Nama</th><th>Kode Referral</th><th>Bank</th><th>Belum Dibayar</th><th>Sudah Dibayar</th></tr></thead>
+        <tbody>
+          ${d.affiliators.map(a => `
+            <tr>
+              <td style="font-weight:600;">${escapeHTML(a.name)}<div class="faint" style="font-size:10.5px;">${escapeHTML(a.status)}</div></td>
+              <td><code>${escapeHTML(a.referralCode)}</code></td>
+              <td style="font-size:11.5px;">${escapeHTML(a.bank)}</td>
+              <td style="color:${a.totalUnpaid > 0 ? 'var(--danger)' : 'var(--ink-faint)'}; font-weight:${a.totalUnpaid > 0 ? '700' : '400'};">${fmtRupiah(a.totalUnpaid)}</td>
+              <td class="faint">${fmtRupiah(a.totalPaid)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title">Komisi Terbaru</div>
+    <div class="card">
+      ${d.recentCommissions.length === 0 ? '<div class="faint" style="font-size:12px;">Belum ada data komisi.</div>' : d.recentCommissions.map(c => `
+        <div style="padding:8px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:12.5px;">${escapeHTML(c.affiliatorName)} <span class="badge" style="background:${c.paid ? '#E8F5E9' : '#FFF3E0'}; color:${c.paid ? 'var(--success)' : '#E65100'}; font-size:10px;">${c.paid ? 'Lunas' : 'Belum'}</span></div>
+            <div class="faint" style="font-size:11px;">${escapeHTML(c.type)} · ${fmtDate(String(c.date).split('T')[0])}</div>
+          </div>
+          <div style="font-weight:700; font-size:13px; white-space:nowrap;">${fmtRupiah(c.amount)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -4034,7 +4163,7 @@ function render(){
     else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
     else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
   } else if (state.appTab === 'qaff'){
-    body = mockupHTML('qaff');
+    body = qaffDashboardHTML();
   } else if (state.appTab === 'settings'){
     body = qtaskSettingsHTML();
   } else {
@@ -4129,6 +4258,9 @@ document.addEventListener('click', function(e){
     }
     if (state.appTab === 'crm' && !state.crmData && !state.crmLoading) {
       fetchCRMData();
+    }
+    if (state.appTab === 'qaff' && !state.qaffData && !state.qaffLoading) {
+      fetchQAffData();
     }
     // BARU: begitu pindah KE dashboard/qtask, langsung refresh sekali supaya
     // datanya segar seketika -- bukan nunggu sampai centang interval 30 detik
@@ -4384,6 +4516,12 @@ document.addEventListener('click', function(e){
     state.qfinData = null;
     state.qfinFetchAttempted = false;
     fetchQFinData();
+  }
+  else if (el.dataset.action === 'qaff-refresh'){
+    state.qaffError = null;
+    state.qaffData = null;
+    state.qaffFetchAttempted = false;
+    fetchQAffData();
   }
   else if (el.dataset.action === 'crm-refresh'){
     state.crmError = null;
@@ -5069,6 +5207,14 @@ function getAllowedApps(userId){
     const canSeeQFinTab = emp.role === 'owner' || emp.role === 'spv';
     if (!canSeeQFinTab) {
       allowed = allowed.filter(a => a !== 'qfin');
+    }
+  }
+  if (allowed.includes('qaff')) {
+    // Sama seperti QFinance -- data komisi & payout affiliate sensitif,
+    // Owner + semua Spv, bukan staff biasa.
+    const canSeeQAffTab = emp.role === 'owner' || emp.role === 'spv';
+    if (!canSeeQAffTab) {
+      allowed = allowed.filter(a => a !== 'qaff');
     }
   }
   if (allowed.includes('crm')) {
