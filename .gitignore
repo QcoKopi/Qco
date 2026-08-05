@@ -6,5 +6,5 @@
 window.QSYSTEM_CONFIG = {
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxETc9Xv6udc7U0N9yflz7DrosN3PH1STUhF-d1qrW0ST48DKjFU4w8Kafuadm09XU/exec',
   QSALES_PORTAL_URL: 'https://qcokopi.github.io/Sales/',
-  QFIN_PORTAL_URL: 'https://qcokopi.github.io/Finance/',
+  QFIN_PORTAL_URL: 'https://qcokopi.github.io/qfin-frontend/qfin.html',
 };
