@@ -731,7 +731,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-04-fix-init-blocking-login';
+const QSYSTEM_HTML_VERSION = '2026-08-04-qaff-leads-integration';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3696,10 +3696,11 @@ function qaffDashboardHTML(){
   const s = d.summary;
   const trendUp = s.totalThisMonth >= s.totalLastMonth;
   const trendPct = s.totalLastMonth > 0 ? Math.round(((s.totalThisMonth - s.totalLastMonth) / s.totalLastMonth) * 100) : null;
+  const leadsNeedingAttention = (d.recentLeads || []).filter(l => l.needsAttention);
 
   return `
     <div class="greeting">QAffiliator 🤝</div>
-    <div class="greeting-sub">Ringkasan program affiliate — data live dari sheet Affiliator & Affiliator_Commissions</div>
+    <div class="greeting-sub">Ringkasan program affiliate — data live dari sheet Affiliator, Affiliator_Commissions & Leads_Affiliator</div>
 
     <div class="card" style="background:linear-gradient(135deg, var(--accent) 0%, #B8763F 100%); color:#fff; margin-bottom:14px;">
       <div style="font-size:12px; opacity:.85; margin-bottom:4px;">Komisi Belum Dibayar</div>
@@ -3707,8 +3708,15 @@ function qaffDashboardHTML(){
       <div style="display:flex; gap:16px; font-size:12px; opacity:.9; flex-wrap:wrap;">
         <span>💰 Sudah dibayar: ${fmtRupiah(s.totalPaid)}</span>
         <span>👥 ${s.activeAffiliators}/${s.totalAffiliators} affiliator aktif</span>
+        ${s.totalLeads !== undefined ? `<span>🎯 ${s.totalPaidLeads}/${s.totalLeads} lead sudah bayar</span>` : ''}
       </div>
     </div>
+
+    ${leadsNeedingAttention.length > 0 ? `
+      <div class="card" style="background:#FFF3E0; border-color:#FFB74D; margin-bottom:14px;">
+        <div style="font-size:12.5px; color:#E65100;"><b>⚠️ ${leadsNeedingAttention.length} lead sudah bayar tapi belum ada catatan komisinya</b> -- cek bagian "Lead Terbaru" di bawah (ditandai merah), mungkin perlu dicek manual di situs asli.</div>
+      </div>
+    ` : ''}
 
     <div class="row gap-10" style="margin-bottom:14px;">
       <div class="card" style="flex:1;">
@@ -3729,13 +3737,14 @@ function qaffDashboardHTML(){
     <div class="section-title">Per Affiliator</div>
     <div class="table-wrap" style="margin-bottom:16px;">
       <table class="task-table">
-        <thead><tr><th>Nama</th><th>Kode Referral</th><th>Bank</th><th>Belum Dibayar</th><th>Sudah Dibayar</th></tr></thead>
+        <thead><tr><th>Nama</th><th>Kode Referral</th><th>Bank</th><th>Lead (Bayar/Total)</th><th>Belum Dibayar</th><th>Sudah Dibayar</th></tr></thead>
         <tbody>
           ${d.affiliators.map(a => `
             <tr>
               <td style="font-weight:600;">${escapeHTML(a.name)}<div class="faint" style="font-size:10.5px;">${escapeHTML(a.status)}</div></td>
               <td><code>${escapeHTML(a.referralCode)}</code></td>
               <td style="font-size:11.5px;">${escapeHTML(a.bank)}</td>
+              <td style="font-size:11.5px; text-align:center;">${a.paidLeads || 0}/${a.totalLeads || 0}</td>
               <td style="color:${a.totalUnpaid > 0 ? 'var(--danger)' : 'var(--ink-faint)'}; font-weight:${a.totalUnpaid > 0 ? '700' : '400'};">${fmtRupiah(a.totalUnpaid)}</td>
               <td class="faint">${fmtRupiah(a.totalPaid)}</td>
             </tr>
@@ -3745,7 +3754,7 @@ function qaffDashboardHTML(){
     </div>
 
     <div class="section-title">Komisi Terbaru</div>
-    <div class="card">
+    <div class="card" style="margin-bottom:16px;">
       ${d.recentCommissions.length === 0 ? '<div class="faint" style="font-size:12px;">Belum ada data komisi.</div>' : d.recentCommissions.map(c => `
         <div style="padding:8px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
           <div style="flex:1; min-width:0;">
@@ -3756,6 +3765,24 @@ function qaffDashboardHTML(){
         </div>
       `).join('')}
     </div>
+
+    ${d.recentLeads ? `
+      <div class="section-title">Lead Terbaru</div>
+      <div class="card">
+        ${d.recentLeads.length === 0 ? '<div class="faint" style="font-size:12px;">Belum ada data lead dari affiliator (atau sheet Leads_Affiliator belum di-setup).</div>' : d.recentLeads.map(l => `
+          <div style="padding:8px 0; border-bottom:1px solid var(--line); ${l.needsAttention ? 'background:#FFF5F5;' : ''} display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; font-size:12.5px;">${escapeHTML(l.affiliatorName)} → ${escapeHTML(l.customerName)}
+                <span class="badge" style="background:${l.paymentStatus==='paid'?'#E8F5E9':l.paymentStatus==='pending'?'#FFF3E0':'#FFEBEE'}; color:${l.paymentStatus==='paid'?'var(--success)':l.paymentStatus==='pending'?'#E65100':'var(--danger)'}; font-size:10px;">${escapeHTML(l.paymentStatus || l.status)}</span>
+                ${l.needsAttention ? '<span class="badge" style="background:#FFEBEE; color:var(--danger); font-size:10px;">⚠️ Belum ada komisi</span>' : ''}
+              </div>
+              <div class="faint" style="font-size:11px;">${fmtDate(String(l.date).split('T')[0])}</div>
+            </div>
+            <div style="font-weight:700; font-size:13px; white-space:nowrap;">${fmtRupiah(l.transactionValue)}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
   `;
 }
 
