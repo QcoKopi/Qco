@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QCO Kopi Affiliate Platform — Dokumentasi & Blueprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+--coffee-dark:#2B1D16;
+--coffee-med:#6D4C41;
+--coffee-line:#4A3428;
+--amber:#D97A26;
+--amber-light:#F0A855;
+--cream:#FBF7F2;
+--card:#FFFFFF;
+--border:#E8DCC8;
+--text-dark:#2B2118;
+--text-light:#7A6D5F;
+--success:#3F7A5E;
+--warning:#B8792A;
+--danger:#B3452C;
+--info:#3A6B8A;
+--radius:10px;
+--serif:'Source Serif 4',Georgia,serif;
+--sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+--mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--text-dark);background:var(--cream);line-height:1.65;font-size:15.5px}
+
+/* ============ LAYOUT ============ */
+.app{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sidebar{
+width:290px;flex-shrink:0;background:var(--coffee-dark);color:#fff;
+position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:100;
+padding:1.75rem 0 2.5rem;
+}
+.sidebar::-webkit-scrollbar{width:6px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--coffee-line);border-radius:3px}
+.sidebar-brand{padding:0 1.5rem 1.5rem;border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:1rem}
+.sidebar-brand .eyebrow{font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--amber-light);font-weight:600}
+.sidebar-brand h1{font-family:var(--serif);font-size:1.35rem;font-weight:700;margin-top:0.35rem;line-height:1.25}
+.sidebar-brand .sub{font-size:0.78rem;color:rgba(255,255,255,0.55);margin-top:0.5rem}
+.nav-group{margin-bottom:0.25rem}
+.nav-group-label{font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.38);padding:1.1rem 1.5rem 0.4rem;font-weight:600}
+.nav-link{display:block;padding:0.45rem 1.5rem;color:rgba(255,255,255,0.72);text-decoration:none;font-size:0.865rem;border-left:3px solid transparent;transition:all .15s}
+.nav-link:hover{color:#fff;background:rgba(255,255,255,0.04)}
+.nav-link.active{color:var(--amber-light);border-left-color:var(--amber);background:rgba(255,255,255,0.05);font-weight:600}
+.nav-sub{padding-left:2.35rem;font-size:0.8rem}
+
+/* MAIN CONTENT */
+.main{margin-left:290px;flex:1;min-width:0}
+.content{max-width:840px;margin:0 auto;padding:3.5rem 3rem 6rem}
+@media (max-width:900px){
+.sidebar{transform:translateX(-100%);transition:transform .25s}
+.sidebar.open{transform:translateX(0)}
+.main{margin-left:0}
+.content{padding:5rem 1.25rem 4rem}
+.menu-toggle{display:flex !important}
+}
+
+/* MOBILE TOGGLE */
+.menu-toggle{display:none;position:fixed;top:1rem;left:1rem;z-index:200;width:44px;height:44px;background:var(--coffee-dark);color:#fff;border:none;border-radius:8px;align-items:center;justify-content:center;font-size:1.1rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:99}
+.sidebar-overlay.active{display:block}
+
+/* ============ TYPOGRAPHY ============ */
+h1.page-title{font-family:var(--serif);font-size:2.4rem;font-weight:700;color:var(--coffee-dark);line-height:1.15;margin-bottom:0.6rem}
+.page-subtitle{font-size:1.05rem;color:var(--text-light);font-style:italic;margin-bottom:2.5rem}
+section.doc-section{margin-bottom:3.5rem;scroll-margin-top:2rem}
+h2{font-family:var(--serif);font-size:1.7rem;font-weight:700;color:var(--coffee-dark);margin:2.75rem 0 1rem;padding-bottom:0.6rem;border-bottom:2px solid var(--border);scroll-margin-top:2rem}
+h2:first-child{margin-top:0}
+h3{font-family:var(--serif);font-size:1.25rem;font-weight:600;color:var(--coffee-med);margin:1.75rem 0 0.75rem;scroll-margin-top:2rem}
+h4{font-size:1rem;font-weight:700;color:var(--text-dark);margin:1.25rem 0 0.5rem}
+p{margin-bottom:1rem;color:var(--text-dark)}
+a{color:var(--amber);text-decoration:none}
+a:hover{text-decoration:underline}
+strong{color:var(--coffee-dark);font-weight:600}
+ul,ol{margin:0 0 1rem 1.4rem}
+li{margin-bottom:0.4rem}
+code{font-family:var(--mono);font-size:0.85em;background:var(--border);color:var(--coffee-dark);padding:0.1em 0.4em;border-radius:4px}
+pre{font-family:var(--mono);font-size:0.82rem;background:var(--coffee-dark);color:#F0EAE0;padding:1.1rem 1.3rem;border-radius:var(--radius);overflow-x:auto;margin:1rem 0;line-height:1.6}
+pre code{background:none;color:inherit;padding:0}
+
+/* ============ COMPONENTS ============ */
+.eyebrow-tag{display:inline-block;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;color:var(--amber);background:rgba(217,122,38,0.1);padding:0.25rem 0.7rem;border-radius:20px;margin-bottom:1rem}
+
+.callout{border-left:4px solid var(--amber);background:#FBF3E7;border-radius:0 8px 8px 0;padding:1rem 1.25rem;margin:1.25rem 0;font-size:0.92rem}
+.callout-title{font-weight:700;color:var(--coffee-dark);margin-bottom:0.25rem;display:flex;align-items:center;gap:0.4rem}
+.callout.warn{border-left-color:var(--danger);background:#FBEEEA}
+.callout.warn .callout-title{color:var(--danger)}
+.callout.info{border-left-color:var(--info);background:#EAF1F5}
+.callout.info .callout-title{color:var(--info)}
+.callout.note p:last-child,.callout.warn p:last-child,.callout.info p:last-child{margin-bottom:0}
+
+table{width:100%;border-collapse:collapse;margin:1.25rem 0;font-size:0.88rem}
+th{background:var(--coffee-dark);color:#fff;text-align:left;padding:0.65rem 0.9rem;font-weight:600;font-size:0.82rem}
+td{padding:0.6rem 0.9rem;border-bottom:1px solid var(--border)}
+tr:nth-child(even) td{background:#FBF7F0}
+
+.badge{display:inline-block;padding:0.15rem 0.6rem;border-radius:20px;font-size:0.72rem;font-weight:700;color:#fff}
+.badge.b-success{background:var(--success)}
+.badge.b-warning{background:var(--warning)}
+.badge.b-danger{background:var(--danger)}
+.badge.b-info{background:var(--info)}
+.badge.b-amber{background:var(--amber)}
+
+/* STEP FLOW */
+.flow{display:flex;flex-wrap:wrap;gap:0;align-items:flex-start;margin:1.75rem 0;counter-reset:flow-step}
+.flow-step{display:flex;flex-direction:column;align-items:center;text-align:center;width:150px;position:relative}
+.flow-step .circle{width:52px;height:52px;border-radius:50%;background:var(--coffee-dark);color:var(--amber-light);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;font-size:1.2rem;margin-bottom:0.6rem;flex-shrink:0}
+.flow-step .label{font-size:0.8rem;color:var(--text-dark);font-weight:600;line-height:1.3}
+.flow-connector{flex:1;min-width:24px;height:2px;background:repeating-linear-gradient(90deg,var(--amber) 0,var(--amber) 6px,transparent 6px,transparent 11px);margin-top:26px;align-self:flex-start}
+
+/* STEP LIST (numbered instructions) */
+.steps{list-style:none;margin:1.25rem 0;counter-reset:step-counter}
+.steps li{counter-increment:step-counter;position:relative;padding-left:2.6rem;margin-bottom:0.9rem;min-height:1.8rem;display:flex;align-items:flex-start}
+.steps li::before{content:counter(step-counter);position:absolute;left:0;top:-0.1rem;width:1.9rem;height:1.9rem;background:var(--amber);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0}
+
+/* Q&A ACCORDION */
+.qa-item{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.7rem;overflow:hidden;background:var(--card)}
+.qa-item summary{padding:0.9rem 1.2rem;font-weight:600;color:var(--coffee-dark);cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.qa-item summary::-webkit-details-marker{display:none}
+.qa-item summary::after{content:'+';font-size:1.3rem;color:var(--amber);font-weight:400;flex-shrink:0;transition:transform .2s}
+.qa-item[open] summary::after{transform:rotate(45deg)}
+.qa-item summary:hover{background:#FBF7F0}
+.qa-body{padding:0 1.2rem 1.1rem;color:var(--text-dark);font-size:0.92rem;border-top:1px solid var(--border);padding-top:0.9rem}
+.qa-body p:last-child{margin-bottom:0}
+
+/* CARD GRID */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1.5rem 0}
+.mini-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem}
+.mini-card .icon{font-size:1.4rem;margin-bottom:0.5rem}
+.mini-card h4{margin-top:0}
+.mini-card p{font-size:0.85rem;color:var(--text-light);margin-bottom:0}
+
+/* TOC dots for on-this-page nav (optional right rail could be added, skipped for simplicity) */
+.divider-orn{display:flex;align-items:center;gap:0.75rem;margin:3rem 0;color:var(--amber)}
+.divider-orn::before,.divider-orn::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.kv-table td:first-child{font-weight:600;color:var(--coffee-med);width:220px}
+
+.search-box{position:sticky;top:0;background:var(--coffee-dark);padding:0.75rem 1.5rem 1rem;z-index:5}
+.search-box input{width:100%;padding:0.5rem 0.8rem;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;font-size:0.82rem;font-family:var(--sans)}
+.search-box input::placeholder{color:rgba(255,255,255,0.4)}
+.search-box input:focus{outline:none;border-color:var(--amber)}
+
+.print-btn{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--coffee-dark);color:#fff;border:none;padding:0.7rem 1.1rem;border-radius:30px;font-size:0.8rem;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,0.25);display:flex;align-items:center;gap:0.5rem;z-index:50}
+.print-btn:hover{background:var(--coffee-med)}
+@media print{.sidebar,.menu-toggle,.print-btn{display:none !important}.main{margin-left:0}}
+
+::selection{background:var(--amber-light);color:var(--coffee-dark)}
+</style>
+</head>
+<body>
+
+<button class="menu-toggle" id="menuToggle">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="app">
+<nav class="sidebar" id="sidebar">
+<div class="sidebar-brand">
+<div class="eyebrow">Dokumentasi &amp; Blueprint</div>
+<h1>QCO Kopi<br>Affiliate Platform</h1>
+<div class="sub">Handbook Administrator + Referensi Teknis · Agustus 2026</div>
+</div>
+<div class="search-box"><input type="text" id="navSearch" placeholder="Cari topik..."></div>
+
+<div class="nav-group" id="navGroups">
+<div class="nav-group-label">Mulai Di Sini</div>
+<a class="nav-link" href="#ringkasan" data-section="ringkasan">A. Ringkasan Eksekutif</a>
+
+<div class="nav-group-label">Blueprint Teknis</div>
+<a class="nav-link" href="#arsitektur" data-section="arsitektur">B. Arsitektur Sistem</a>
+<a class="nav-link nav-sub" href="#stack">B.1 Stack Teknologi</a>
+<a class="nav-link nav-sub" href="#integrasi">B.2 Integrasi Pihak Ketiga</a>
+<a class="nav-link nav-sub" href="#skema-data">B.3 Skema Data</a>
+<a class="nav-link nav-sub" href="#keamanan">B.4 Model Keamanan</a>
+<a class="nav-link nav-sub" href="#prinsip">B.5 Prinsip Desain &amp; Lessons Learned</a>
+
+<div class="nav-group-label">Alur Kerja Sistem</div>
+<a class="nav-link" href="#flow" data-section="flow">C. Alur (Flow) Sistem</a>
+<a class="nav-link nav-sub" href="#flow-checkout">C.1 Checkout Landing Page</a>
+<a class="nav-link nav-sub" href="#flow-wabot">C.2 Pemesanan via WhatsApp</a>
+<a class="nav-link nav-sub" href="#flow-payment">C.3 Bayar → Komisi → Kirim</a>
+<a class="nav-link nav-sub" href="#flow-cekstatus">C.4 Cek Status Pesanan</a>
+<a class="nav-link nav-sub" href="#flow-payout">C.5 Pencairan Komisi</a>
+<a class="nav-link nav-sub" href="#flow-bonus">C.6 Bonus Bulanan</a>
+<a class="nav-link nav-sub" href="#flow-eskalasi">C.7 Eskalasi ke Admin</a>
+
+<div class="nav-group-label">Handbook Administrator</div>
+<a class="nav-link" href="#handbook" data-section="handbook">D. Panduan Operasional</a>
+<a class="nav-link nav-sub" href="#setup-awal">D.1 Setup Awal</a>
+<a class="nav-link nav-sub" href="#operasional">D.2 Operasional Harian</a>
+<a class="nav-link nav-sub" href="#troubleshooting">D.3 Troubleshooting</a>
+
+<div class="nav-group-label">Referensi Developer</div>
+<a class="nav-link" href="#referensi-teknis" data-section="referensi-teknis">E. Referensi Teknis</a>
+<a class="nav-link nav-sub" href="#struktur-kode">E.1 Struktur Kode</a>
+<a class="nav-link nav-sub" href="#daftar-action">E.2 Daftar Action API</a>
+<a class="nav-link nav-sub" href="#extend">E.3 Cara Menambah Fitur</a>
+<a class="nav-link nav-sub" href="#peringatan">E.4 Peringatan Arsitektur</a>
+
+<div class="nav-group-label">Referensi Cepat</div>
+<a class="nav-link" href="#qa" data-section="qa">F. Tanya Jawab</a>
+<a class="nav-link" href="#changelog" data-section="changelog">G. Riwayat Pengembangan</a>
+</div>
+</nav>
+
+<div class="main">
+<div class="content" id="content">
+
+<!-- ============================================================ -->
+<!-- BAGIAN A: RINGKASAN EKSEKUTIF -->
+<!-- ============================================================ -->
+<section class="doc-section" id="ringkasan">
+<div class="eyebrow-tag">Mulai di sini</div>
+<h1 class="page-title">QCO Kopi Affiliate Platform</h1>
+<p class="page-subtitle">Dokumentasi lengkap sistem — sekaligus Handbook Administrator dan Blueprint Teknis untuk pengembangan lanjutan.</p>
+
+<p>QCO Kopi Affiliate Platform adalah sistem e-commerce terintegrasi yang menggabungkan toko online, program affiliate berbasis komisi, chatbot AI di WhatsApp, dan otomatisasi penuh untuk pembayaran, pengiriman, komisi, dan bonus performa. Seluruh perjalanan — dari promosi, checkout, pembayaran, pengiriman, sampai pencairan komisi — berjalan otomatis tanpa campur tangan manual admin di setiap langkahnya.</p>
+
+<h3>Empat Pilar Utama</h3>
+<div class="card-grid">
+<div class="mini-card"><div class="icon">🛒</div><h4>Toko Online</h4><p>Checkout, ongkir otomatis, pembayaran inline, cek status pesanan mandiri.</p></div>
+<div class="mini-card"><div class="icon">🤝</div><h4>Program Affiliate</h4><p>Tracking referral, dashboard, leaderboard, komisi &amp; bonus otomatis.</p></div>
+<div class="mini-card"><div class="icon">🤖</div><h4>Chatbot AI WhatsApp</h4><p>Memproses pesanan penuh dengan Claude AI, bukan sekadar auto-reply.</p></div>
+<div class="mini-card"><div class="icon">⚙️</div><h4>Otomatisasi End-to-End</h4><p>Pembayaran → pengiriman → komisi → bonus, semua saling terhubung.</p></div>
+</div>
+
+<h3>Untuk Siapa Dokumen Ini</h3>
+<table>
+<tr><td style="width:160px;font-weight:600;color:var(--coffee-med)">Admin / Operasional</td><td>Fokus ke <strong>Bagian D (Handbook Administrator)</strong> — langkah demi langkah menjalankan sistem sehari-hari.</td></tr>
+<tr><td style="font-weight:600;color:var(--coffee-med)">Developer / Teknis</td><td>Fokus ke <strong>Bagian B, C, dan E</strong> — arsitektur, alur data, dan referensi kode untuk pengembangan lanjutan.</td></tr>
+<tr><td style="font-weight:600;color:var(--coffee-med)">Siapa saja</td><td><strong>Bagian F (Tanya Jawab)</strong> mengumpulkan pertanyaan nyata yang paling sering muncul selama pengembangan sistem ini.</td></tr>
+</table>
+
+<div class="callout info">
+<div class="callout-title">💡 Cara pakai dokumen ini</div>
+<p>Gunakan sidebar di kiri untuk lompat langsung ke topik. Bagian Q&amp;A dan Troubleshooting bisa diklik untuk membuka/menutup jawabannya. Dokumen ini juga bisa dicetak/disimpan sebagai PDF lewat tombol "Cetak" di pojok kanan bawah.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN B: ARSITEKTUR SISTEM -->
+<!-- ============================================================ -->
+<section class="doc-section" id="arsitektur">
+<div class="eyebrow-tag">Blueprint Teknis</div>
+<h2 id="stack">B. Arsitektur Sistem</h2>
+<p>Sistem ini dibangun sepenuhnya di atas infrastruktur Google yang <em>serverless</em> (tanpa perlu sewa server sendiri), dipadukan dengan beberapa layanan pihak ketiga khusus untuk fungsi yang tidak disediakan Google secara native.</p>
+
+<h3>B.1 Stack Teknologi</h3>
+<table>
+<tr><th>Komponen</th><th>Teknologi</th><th>Fungsi</th></tr>
+<tr><td><strong>Backend Utama</strong></td><td><code>Code.gs</code></td><td>API pusat: data, pembayaran, komisi, bonus, webhook Xendit &amp; Biteship</td></tr>
+<tr><td><strong>Database</strong></td><td>Google Sheets</td><td>Leads, Orders, Users, Commissions, Products, Coupons, Settings, dll</td></tr>
+<tr><td><strong>Chatbot Engine</strong></td><td><code>WA-Bot.gs</code></td><td>Project Apps Script <strong>TERPISAH WAJIB</strong> dari Code.gs</td></tr>
+<tr><td><strong>Mesin AI Chatbot</strong></td><td>Claude Haiku 4.5 (Anthropic API)</td><td>Pemahaman bahasa &amp; pengambilan keputusan bot, dengan tool-calling</td></tr>
+<tr><td><strong>Frontend Toko</strong></td><td><code>landing.html</code></td><td>Checkout publik, cek status pesanan mandiri</td></tr>
+<tr><td><strong>Frontend Admin</strong></td><td><code>index.html</code></td><td>Dashboard admin &amp; affiliator</td></tr>
+<tr><td><strong>Dashboard Bot</strong></td><td><code>wa-admin.html</code></td><td>Kelola persona bot, ambil alih chat, kelola sales</td></tr>
+<tr><td><strong>Proxy Webhook</strong></td><td>Cloudflare Workers</td><td>Jembatan Xendit/Biteship ke Apps Script (yang selalu redirect)</td></tr>
+</table>
+
+<div class="callout warn">
+<div class="callout-title">⚠ Kenapa perlu Cloudflare Worker?</div>
+<p>Google Apps Script <code>/exec</code> URL <strong>selalu melakukan redirect (302)</strong> pada permintaan pertama. Xendit dan Biteship tidak mengikuti redirect ini saat mengirim webhook, sehingga permintaan gagal (<code>ENOTFOUND</code>). Cloudflare Worker berfungsi sebagai proxy yang mengikuti redirect secara internal, lalu mengembalikan status 200 ke pemanggil asli.</p>
+</div>
+
+<h3 id="integrasi">B.2 Integrasi Pihak Ketiga</h3>
+<table>
+<tr><th>Layanan</th><th>Fungsi</th><th>Status Terkini</th></tr>
+<tr><td><strong>Biteship</strong></td><td>Hitung ongkir real-time, buat order pengiriman otomatis, webhook status kurir</td><td><span class="badge b-warning">Test/Sandbox</span></td></tr>
+<tr><td><strong>Xendit</strong></td><td>Payment gateway (QRIS/VA/e-wallet) &amp; Disbursement (pencairan komisi)</td><td><span class="badge b-warning">Test/Development</span></td></tr>
+<tr><td><strong>Anthropic (Claude)</strong></td><td>Mesin AI chatbot WhatsApp &amp; fitur Contact Us</td><td><span class="badge b-success">Live/Production</span></td></tr>
+<tr><td><strong>Meta/WhatsApp Business</strong></td><td>Jalur pengiriman &amp; penerimaan pesan WhatsApp</td><td><span class="badge b-warning">Belum Verified (Tier 0)</span></td></tr>
+<tr><td><strong>Cloudflare Workers</strong></td><td>Proxy webhook Xendit &amp; Biteship</td><td><span class="badge b-success">Aktif</span></td></tr>
+<tr><td><strong>Google reCAPTCHA</strong></td><td>Anti-bot/spam di form checkout publik</td><td><span class="badge b-success">Aktif</span></td></tr>
+</table>
+
+<h4>Catatan penting soal masing-masing integrasi</h4>
+<ul>
+<li><strong>Biteship (mode test):</strong> status <code>picked</code> (paket diambil kurir) <strong>tidak pernah muncul otomatis</strong> selama masih pakai API key testing — ini keterbatasan resmi Biteship, bukan bug. Baru berjalan normal setelah pakai key production.</li>
+<li><strong>Xendit (mode test):</strong> transaksi tersimulasi, bukan uang sungguhan. Business verification perlu selesai dulu sebelum pakai key <code>xnd_production_...</code>.</li>
+<li><strong>Meta/WhatsApp (belum verified):</strong> batas <strong>250 percakapan business-initiated per 24 jam</strong> (Tier 0). Ini <em>hanya</em> berlaku untuk pesan yang DIMULAI bisnis (broadcast, notifikasi di luar 24 jam) — membalas pesan yang customer kirim duluan <strong>tidak terbatas</strong> ini.</li>
+<li><strong>Claude API (Anthropic):</strong> sistem <em>prepaid</em> murni, <strong>tidak ada kuota gratis harian</strong> seperti Meta. Kalau saldo di Console habis, API berhenti total sampai diisi ulang — disarankan aktifkan Auto-reload di <code>platform.claude.com → Settings → Billing</code>.</li>
+</ul>
+
+<h3 id="skema-data">B.3 Skema Data (Google Sheets)</h3>
+<p>Setiap "sheet" berfungsi seperti tabel database. Kolom dibuat otomatis oleh kode kalau belum ada — admin tidak perlu menyiapkan struktur manual.</p>
+<table>
+<tr><th>Sheet</th><th>Isi</th><th>Kolom Kunci</th></tr>
+<tr><td><code>Users</code></td><td>Data affiliator</td><td><code>id, referralcode, status, phone, bank</code></td></tr>
+<tr><td><code>Leads</code></td><td>Calon pembeli/transaksi</td><td><code>id, referralcode, status, paymentstatus, xenditinvoiceid, transactionvalue</code></td></tr>
+<tr><td><code>Orders</code></td><td>Item per produk dalam satu Lead</td><td><code>id, leadid, productname, status, resi, biteshiporderid</code></td></tr>
+<tr><td><code>Commissions</code></td><td>Komisi &amp; bonus affiliator</td><td><code>id, affiliatorid, type, amount, paid, xenditdisbursementid</code></td></tr>
+<tr><td><code>Products</code></td><td>Katalog produk</td><td><code>id, name, price, sizes (JSON), stock</code></td></tr>
+<tr><td><code>Coupons</code></td><td>Kupon diskon</td><td><code>code, type, value, usagelimit, active</code></td></tr>
+<tr><td><code>Settings</code></td><td>Key-value pengaturan (persentase komisi, target bonus, dll)</td><td><code>key, value</code></td></tr>
+<tr><td><code>Sessions</code></td><td>Sesi login dashboard (token)</td><td><code>token, userId, isAdmin, expiresAt</code></td></tr>
+<tr><td><code>WA_Sessions</code></td><td>Sesi percakapan WhatsApp (per nomor)</td><td><code>phone, session (JSON), updatedat</code></td></tr>
+<tr><td><code>Escalations</code></td><td>Log eskalasi bot ke admin (permanen)</td><td><code>id, phone, reason, status, resolvedby</code></td></tr>
+<tr><td><code>Customers</code></td><td>Data pembeli (untuk isi-otomatis, terpisah dari affiliator)</td><td><code>code, name, phone, alamat</code></td></tr>
+<tr><td><code>SalesUsers</code></td><td>Akun staff sales (password individual)</td><td><code>id, name, password, phone</code></td></tr>
+<tr><td><code>AuditLog</code></td><td>Jejak semua aksi sensitif admin</td><td><code>timestamp, actorName, action, details</code></td></tr>
+</table>
+
+<h3 id="keamanan">B.4 Model Keamanan</h3>
+<div class="steps">
+<ul style="list-style:none;margin-left:0">
+<li style="margin-bottom:0.7rem">🔐 <strong>Password:</strong> hash SHA-256 + salt — tidak pernah tersimpan polos, otomatis upgrade dari password lama saat login pertama kali</li>
+<li style="margin-bottom:0.7rem">🎫 <strong>Sesi login:</strong> berbasis token (sheet <code>Sessions</code>), divalidasi ULANG di server setiap request — tidak cukup cuma disembunyikan di tampilan browser</li>
+<li style="margin-bottom:0.7rem">🚦 <strong>Rate limiting:</strong> semua endpoint publik (submit lead, cek status pesanan, dll) dibatasi lajunya untuk cegah spam/brute-force</li>
+<li style="margin-bottom:0.7rem">✅ <strong>Verifikasi webhook:</strong> Xendit &amp; Biteship diverifikasi pakai secret token khusus di query string — terpisah dari API key utama</li>
+<li style="margin-bottom:0.7rem">🔒 <strong>LockService:</strong> mencegah race condition pada proses kritis (konfirmasi pembayaran &amp; komisi) — detail lengkap di B.5</li>
+<li style="margin-bottom:0.7rem">📋 <strong>Audit Trail:</strong> mencatat semua aksi sensitif admin, tidak bisa dihapus/diedit lewat aplikasi</li>
+<li style="margin-bottom:0">🔑 <strong>Kredensial:</strong> SELALU di Script Properties, tidak pernah hardcode di source code — lihat peringatan di E.4</li>
+</ul>
+</div>
+
+<h3 id="prinsip">B.5 Prinsip Desain &amp; Lessons Learned</h3>
+<p>Beberapa keputusan desain yang lahir dari masalah nyata yang pernah terjadi selama pengembangan — penting dipahami sebelum mengembangkan lebih lanjut.</p>
+
+<h4>Satu jalur logika bisnis</h4>
+<p>Order dari WhatsApp diproses <strong>identik</strong> dengan order dari web — potong stok, hitung komisi, dst — semua lewat action Code.gs yang sama persis. WA-Bot.gs tidak menyimpan data sendiri dan tidak menduplikasi logika bisnis apa pun.</p>
+
+<h4>Race condition pada konfirmasi pembayaran</h4>
+<div class="callout warn">
+<div class="callout-title">⚠ Kasus nyata: komisi dobel</div>
+<p>Payment gateway seperti Xendit lazim mengirim webhook yang sama <strong>dua kali</strong> (untuk keandalan). Tanpa penguncian, dua permintaan bisa lolos pengecekan "sudah dibayar?" secara bersamaan sebelum salah satunya sempat menulis status — menghasilkan komisi tercatat dua kali. Solusinya: <code>LockService.getScriptLock()</code> membungkus <code>markLeadPaidAndCalculateCommission()</code>, memaksa permintaan kedua menunggu sampai yang pertama benar-benar selesai.</p>
+</div>
+
+<h4>Idempotency di titik-titik kritis</h4>
+<p>Perhitungan bonus bulanan dan pembuatan order pengiriman Biteship dirancang <strong>aman dijalankan berkali-kali</strong> tanpa menghasilkan duplikasi — dicek lewat penanda unik (<code>reference_id</code>, atau deskripsi yang menyertakan <code>[yyyy-mm]</code>) sebelum benar-benar membuat entry baru.</p>
+
+<h4>Nilai yang bisa berubah, disimpan di Settings — bukan hardcode</h4>
+<p>Persentase komisi, target bonus bulanan, batas minimum payout, jadwal reminder — semua disimpan di sheet <code>Settings</code>, bisa diubah admin dari dashboard tanpa perlu edit kode maupun redeploy.</p>
+
+<h4>Placeholder dinamis untuk teks yang menyebut angka berubah</h4>
+<p>Alih-alih menulis ulang "5%" di banyak tempat (rawan lupa update sebagian), sistem pakai placeholder <code>{{komisi}}</code> yang disubstitusi otomatis di titik pemakaian — di teks Informasi affiliator, system prompt bot WhatsApp, dan Syarat &amp; Ketentuan pendaftaran.</p>
+
+<h4>Satu nomor WhatsApp = satu webhook aktif</h4>
+<div class="callout warn">
+<div class="callout-title">⚠ Batasan penting Meta</div>
+<p>WhatsApp Business Platform cuma mengizinkan <strong>satu URL webhook aktif per nomor</strong> di satu waktu. Kalau lebih dari satu project Apps Script dikonfigurasi ke nomor yang sama, siapa pun yang <strong>terakhir</strong> didaftarkan di dashboard Meta yang benar-benar menerima pesan — yang lain berhenti menerima tanpa pesan error apa pun. Lihat E.4 untuk detail lengkap.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN C: ALUR KERJA SISTEM -->
+<!-- ============================================================ -->
+<section class="doc-section" id="flow">
+<div class="eyebrow-tag">Alur Kerja</div>
+<h2>C. Alur (Flow) Sistem</h2>
+<p>Tujuh alur inti yang menggerakkan sistem ini, dari sisi pembeli, affiliator, maupun admin.</p>
+
+<h3 id="flow-checkout">C.1 Alur Checkout — Landing Page</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Pilih produk, isi keranjang</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Kode pos &amp; ongkir otomatis</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Submit → Lead + Invoice Xendit dibuat</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Modal bayar (iframe) di halaman sama</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">Polling status tiap 4 detik</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">6</div><div class="label">Kode pesanan + ajakan jadi affiliator</div></div>
+</div>
+<p>Ongkir dihitung otomatis lewat Biteship Rates API begitu pembeli memilih kode pos dari hasil pencarian. Pembayaran berjalan inline (iframe) tanpa pindah tab — begitu Xendit mengonfirmasi lunas (via webhook, dideteksi lewat polling), modal otomatis tertutup dan kode pesanan ditampilkan untuk disimpan.</p>
+
+<h3 id="flow-wabot">C.2 Alur Pemesanan via WhatsApp Bot</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Chat masuk (link referral tertangkap otomatis)</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Bot pakai tool get_products (tidak mengarang)</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Kumpulkan pesanan via add_to_cart</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Validasi alamat via check_postal_code</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">Ringkasan + konfirmasi eksplisit</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">6</div><div class="label">submit_order → Lead+Order via Code.gs</div></div>
+</div>
+<p>Bot menggunakan <em>agent loop</em> dengan tool-calling (maksimal 6 giliran per balasan) — bukan keyword matching kaku. Setiap tool memvalidasi data ke server secara real-time (harga, stok) sehingga bot tidak pernah "mengarang" informasi. System prompt &amp; persona bisa diedit admin dari <code>wa-admin.html</code> tanpa ubah kode.</p>
+
+<h3 id="flow-payment">C.3 Alur Konfirmasi Pembayaran → Komisi → Fulfillment</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Webhook Xendit "Paid" masuk</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">LockService cegah proses ganda</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Lead → Valid, Order → Diproses</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Komisi dihitung &amp; dicatat</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">1 paket Biteship untuk seluruh Lead</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">6</div><div class="label">Webhook "picked" → status Dikirim</div></div>
+</div>
+<p>Satu pembeli yang beli 3 produk sekaligus menghasilkan <strong>satu paket, satu resi</strong> — bukan tiga pengiriman terpisah. Admin bisa juga menandai manual "Diterima" karena tidak semua mode kurir mengirim update status final secara otomatis.</p>
+
+<h3 id="flow-cekstatus">C.4 Alur Cek Status Pesanan (Mandiri oleh Pembeli)</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Klik "Cek Status Pesanan"</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Isi Kode Pesanan + No. HP</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Verifikasi 8 digit terakhir HP</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Tampil status, resi, kurir</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">Ajakan jadi affiliator (jika belum)</div></div>
+</div>
+<p>Verifikasi <strong>2 faktor</strong> (kode + nomor HP) sengaja diterapkan — kode pesanan saja tidak cukup karena formatnya <code>lead_</code>+timestamp yang bisa ditebak. Momentum ajakan jadi affiliator ditempatkan tepat setelah pembeli merasakan kemudahan self-service ini.</p>
+
+<h3 id="flow-payout">C.5 Alur Pencairan Komisi Mingguan</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Trigger jam-an cek jadwal (default Jumat 9 pagi)</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Notifikasi WA ke admin kalau ada yang eligible</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Admin Refresh daftar &amp; verifikasi rekening</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Klik Kirim → Xendit Disbursement API</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">Komisi ditandai lunas, WA notifikasi</div></div>
+</div>
+<p>Kode bank &amp; nomor rekening ditebak otomatis dari data pendaftaran, tapi <strong>wajib diverifikasi manual</strong> oleh admin sebelum klik Kirim — ini uang sungguhan dan tidak bisa dibatalkan setelah terkirim.</p>
+
+<h3 id="flow-bonus">C.6 Alur Bonus Bulanan (Target &amp; Peringkat Penjualan)</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Tanggal terjadwal (default tgl 1), hitung bulan lalu</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Affiliator ≥ target → bonus % dari total</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">3 penjualan terbesar → bonus tambahan</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Masuk sheet Commissions (entry baru)</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">WA "Selamat!" segera, transfer ikut jadwal payout</div></div>
+</div>
+<p><strong>Reset bersih tiap bulan</strong> — tidak ada akumulasi dari bulan sebelumnya (dikonfirmasi eksplisit saat perancangan). Kedua jenis bonus masuk sebagai entry baru di sheet Commissions dengan <code>type</code> berbeda ("Bonus Target Bulanan" / "Bonus Peringkat Penjualan"), sehingga otomatis ikut alur payout &amp; notifikasi yang sudah ada — tidak perlu sistem pembayaran terpisah.</p>
+
+<h3 id="flow-eskalasi">C.7 Alur Eskalasi ke Admin/Sales</h3>
+<div class="flow">
+<div class="flow-step"><div class="circle">1</div><div class="label">Bot deteksi kebutuhan eskalasi (atau 3x tanpa progres)</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">2</div><div class="label">Sesi ditandai humanTakeover, bot berhenti balas</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">3</div><div class="label">Dicatat ke sheet Escalations + WA admin/sales</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">4</div><div class="label">Admin balas manual dari dashboard</div></div>
+<div class="flow-connector"></div>
+<div class="flow-step"><div class="circle">5</div><div class="label">Kembali ke bot (manual/diam 10 mnt/30 mnt maks)</div></div>
+</div>
+<p>Selain eskalasi eksplisit (komplain, sengketa), ada juga <strong>jaring pengaman mekanis</strong>: kalau 3 balasan berturut-turut tidak menghasilkan progres nyata, bot otomatis diinstruksikan menawarkan sambungan ke admin — tidak hanya mengandalkan Claude "sadar sendiri".</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN D: HANDBOOK ADMINISTRATOR -->
+<!-- ============================================================ -->
+<section class="doc-section" id="handbook">
+<div class="eyebrow-tag">Handbook Administrator</div>
+<h2 id="setup-awal">D. Panduan Operasional</h2>
+<p>Langkah demi langkah menjalankan sistem sehari-hari — dari setup awal (sekali jalan) sampai operasional rutin per menu.</p>
+
+<h3>D.1 Setup Awal (Sekali Jalan)</h3>
+<div class="callout note">
+<div class="callout-title">📌 Kapan bagian ini dipakai</div>
+<p>Hanya perlu dilakukan sekali di awal, atau setiap kali ada perubahan besar (ganti API key, redeploy dengan URL baru). Setelah selesai, cukup ikuti D.2 untuk operasional harian.</p>
+</div>
+
+<h4>a. Deploy Code.gs &amp; WA-Bot.gs</h4>
+<ol class="steps">
+<li>Buka project Apps Script, klik <strong>Deploy → Manage Deployments</strong></li>
+<li>Klik ikon pensil pada deployment aktif → pilih <strong>"New version"</strong> → Deploy</li>
+<li>Ulangi persis sama untuk project <code>WA-Bot.gs</code> yang <strong>terpisah</strong></li>
+</ol>
+
+<h4>b. Aktifkan Keamanan &amp; Password Admin</h4>
+<ol class="steps">
+<li>Di editor Code.gs, jalankan fungsi <code>setupSecurity()</code> sekali dari dropdown fungsi</li>
+<li>Buka ⚙️ Project Settings → Script Properties, tambahkan <code>TEMP_NEW_ADMIN_PASSWORD</code> dengan password pilihan (min. 6 karakter)</li>
+<li>Kembali ke Editor, jalankan fungsi <code>updateAdminPassword()</code></li>
+<li>Password langsung aktif — tidak perlu redeploy</li>
+</ol>
+
+<h4>c. Sambungkan WA-Bot ke Sistem Utama</h4>
+<ol class="steps">
+<li>Di WA-Bot.gs, jalankan <code>setupWABotSecurity()</code></li>
+<li>Jalankan <code>updateAppSecretDanMainUrl()</code></li>
+<li>Di Code.gs, jalankan <code>updateWABotSecretDiSistemUtama()</code></li>
+</ol>
+
+<h4>d. Konfigurasi API Pihak Ketiga</h4>
+<p>Isi manual di Script Properties: <code>XENDIT_SECRET_KEY</code>, <code>BITESHIP_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, alamat pengirim (<code>SHIPPING_ORIGIN_*</code>).</p>
+
+<h4>e. Pasang Proxy Cloudflare Worker &amp; Daftarkan Webhook</h4>
+<ol class="steps">
+<li>Buat 2 Worker terpisah (Xendit &amp; Biteship) di workers.cloudflare.com</li>
+<li>Jalankan <code>checkXenditSetup()</code> / <code>checkBiteshipWebhookSetup()</code> untuk dapat URL webhook lengkap</li>
+<li>Daftarkan URL Worker (bukan URL Apps Script langsung) di dashboard masing-masing layanan</li>
+</ol>
+
+<h4>f. Aktifkan Trigger Otomatis</h4>
+<ul>
+<li><code>setupReminderTrigger()</code> di WA-Bot.gs — cek eskalasi tiap 5 menit</li>
+<li><code>setupPayoutReminderTrigger()</code> di Code.gs — reminder payout tiap jam</li>
+<li><code>setupMonthlyBonusTrigger()</code> di Code.gs — hitung bonus bulanan tiap hari jam 8 pagi</li>
+</ul>
+
+<h3 id="operasional">D.2 Operasional Harian per Menu</h3>
+
+<h4>Manage Products</h4>
+<p>Kelola harga, stok per varian ukuran, foto, deskripsi. <strong>Berat produk wajib diisi benar</strong> — dipakai langsung untuk hitung ongkir otomatis.</p>
+
+<h4>Affiliators</h4>
+<p>Approve/reject pendaftar baru, cek dokumen KTP &amp; buku tabungan via tombol "Lihat Dokumen". Affiliator berstatus <em>Pending</em> tidak dihitung di leaderboard maupun payout.</p>
+
+<h4>Leads</h4>
+<table class="kv-table">
+<tr><td>Pending</td><td>Baru masuk, belum ada kepastian (otomatis)</td></tr>
+<tr><td>Valid</td><td>Sudah bayar lewat Xendit (otomatis via webhook)</td></tr>
+<tr><td>Converted</td><td>Sudah jadi penjualan lewat cara lain (manual admin)</td></tr>
+<tr><td>Rejected</td><td>Tidak jadi/dibatalkan</td></tr>
+</table>
+<p><em>Valid</em> dan <em>Converted</em> dihitung sama sebagai "transaksi berhasil" untuk komisi maupun bonus.</p>
+
+<h4>Orders</h4>
+<p>Filter status, input resi manual (tombol truk), tandai <strong>"Diterima"</strong> (muncul otomatis kalau status sekarang "Dikirim") — berguna karena tidak semua kurir mengirim update status final otomatis.</p>
+
+<h4>Komisi → Kelola Komisi dan Bonus</h4>
+<ul>
+<li><strong>Persentase komisi referral</strong> — sepenuhnya bisa diedit, berlaku ke semua tempat yang menyebutnya (termasuk bot WhatsApp)</li>
+<li><strong>Target &amp; persen bonus bulanan</strong>, <strong>bonus peringkat 1/2/3</strong>, <strong>tanggal hitung otomatis</strong></li>
+<li>Tombol "Hitung Bonus Bulan Ini" — trigger manual kapan saja, bisa pilih bulan spesifik</li>
+</ul>
+
+<h4>Komisi → Payout Komisi (Xendit)</h4>
+<ol class="steps">
+<li>Klik Refresh untuk muat daftar affiliator eligible</li>
+<li>Cek/perbaiki kode bank &amp; nomor rekening (wajib verifikasi manual)</li>
+<li>Klik Kirim — <strong>uang sungguhan, tidak bisa dibatalkan</strong></li>
+</ol>
+
+<h4>Lalu Lintas Xendit</h4>
+<p>Tabel gabungan uang masuk (pembayaran) dan keluar (komisi) yang lewat Xendit, dengan filter jenis/status/pencarian nama — tanpa perlu buka dashboard Xendit terpisah.</p>
+
+<h4>Kelola Panduan</h4>
+<p>Edit teks Informasi (Dashboard affiliator), Panduan, Promo Aktif, dan Info Rekening. Mendukung placeholder <code>{{nama}}</code> dan <code>{{komisi}}</code> yang otomatis tersubstitusi.</p>
+
+<h4>Audit Trail</h4>
+<p>Log semua aksi sensitif admin — tidak bisa dihapus/diedit, berguna untuk menelusuri perubahan data yang tidak terduga.</p>
+
+<h4>wa-admin.html — Persona Bot, Ambil Alih, Kelola Sales</h4>
+<p>Edit system prompt bot, uji coba langsung dari dashboard, ambil alih percakapan yang dieskalasi, kelola akun staff sales (password individual per orang).</p>
+
+<h3 id="troubleshooting">D.3 Troubleshooting Umum</h3>
+
+<details class="qa-item">
+<summary>Ongkir tidak muncul saat checkout</summary>
+<div class="qa-body"><p>Pastikan pembeli benar-benar <strong>memilih</strong> kode pos dari dropdown hasil pencarian (bukan cuma mengetik). Cek juga apakah berat produk sudah diisi benar di Manage Products.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Pembayaran sudah masuk tapi status Lead belum berubah</summary>
+<div class="qa-body"><p>Jalankan <code>testXenditWebhookSimulation()</code> dari editor untuk memastikan logika sistem benar. Kalau simulasi berhasil tapi transaksi sungguhan tetap tidak berubah, cek status webhook "Invoices paid" di dashboard Xendit — pastikan aktif, bukan cuma tersimpan.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Status kurir tidak pernah berubah jadi "Dikirim"</summary>
+<div class="qa-body"><p>Kalau masih pakai API key test/sandbox Biteship, status <code>picked</code> memang <strong>tidak akan pernah muncul otomatis</strong> — keterbatasan resmi Biteship, bukan bug. Gunakan tombol "Tandai Diterima" sebagai alternatif manual, atau tunggu sampai pakai key production.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Komisi affiliator tercatat dobel</summary>
+<div class="qa-body"><p>Ini masalah <em>race condition</em> yang sudah diperbaiki lewat <code>LockService</code> (lihat B.5). Kalau masih terjadi di versi terbaru, pastikan Code.gs sudah di-redeploy dengan versi yang benar-benar terbaru — cek lewat <code>checkDeploymentVersions()</code>.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Data (Leads/Orders/Komisi/Affiliator) tiba-tiba kosong semua, kecuali Produk</summary>
+<div class="qa-body"><p>Ini <strong>hampir selalu berarti sesi login sudah kedaluwarsa</strong> (berlaku 24 jam). Produk tetap tampil karena itu data publik yang tidak butuh sesi. Solusinya: logout, lalu login ulang.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Data kadang muncul, kadang tidak, walau sudah login</summary>
+<div class="qa-body"><p>Kemungkinan Apps Script sedang lambat/sibuk saat beberapa data ditarik bersamaan. Sistem sudah punya retry otomatis (3x percobaan) — kalau tetap gagal setelah itu, akan muncul pesan jelas "Gagal memuat data: [nama data]. Coba klik Refresh lagi." Ini pertanda genuinely perlu di-refresh manual, bukan bug diam-diam.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Lupa password admin</summary>
+<div class="qa-body"><p>Ulangi langkah D.1.b — fungsi <code>updateAdminPassword()</code> selalu bisa dipakai kapan saja tanpa perlu tahu password lama.</p></div>
+</details>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN E: REFERENSI TEKNIS -->
+<!-- ============================================================ -->
+<section class="doc-section" id="referensi-teknis">
+<div class="eyebrow-tag">Untuk Developer</div>
+<h2 id="struktur-kode">E. Referensi Teknis</h2>
+<p>Untuk siapa pun yang perlu memahami/mengembangkan lebih lanjut sistem ini.</p>
+
+<h3>E.1 Struktur Kode</h3>
+<table>
+<tr><th>File</th><th>Peran</th></tr>
+<tr><td><code>Code.gs</code></td><td>Backend utama — seluruh logika bisnis, endpoint <code>doGet</code>/<code>doPost</code>, webhook Xendit &amp; Biteship</td></tr>
+<tr><td><code>WA-Bot.gs</code></td><td>Chatbot WhatsApp — agent loop Claude, tool-calling, tidak menyimpan data sendiri</td></tr>
+<tr><td><code>index.html</code></td><td>Dashboard admin &amp; affiliator (satu file, role dibedakan lewat class CSS <code>admin-only</code>/<code>affiliator-only</code>)</td></tr>
+<tr><td><code>landing.html</code></td><td>Toko online publik — checkout, cek status pesanan</td></tr>
+<tr><td><code>wa-admin.html</code></td><td>Dashboard khusus bot — persona, ambil alih, kelola sales</td></tr>
+</table>
+
+<div class="callout note">
+<div class="callout-title">📐 Pola dasar backend</div>
+<p>Semua request (dari <code>index.html</code>, <code>landing.html</code>, maupun <code>WA-Bot.gs</code>) masuk lewat <code>doGet</code>/<code>doPost</code> di Code.gs, diteruskan ke <code>executeAction(params)</code> yang membaca <code>params.action</code> lalu dispatch ke fungsi <code>handleXxx()</code> terkait. Action yang butuh sesi terdaftar di <code>AUTH_ACTIONS</code>; yang butuh role admin di <code>ADMIN_ACTIONS</code>; sisanya publik.</p>
+</div>
+
+<h3 id="daftar-action">E.2 Daftar Action API Penting</h3>
+<table>
+<tr><th>Action</th><th>Akses</th><th>Fungsi</th></tr>
+<tr><td><code>login</code></td><td>Publik</td><td>Autentikasi, buat token sesi</td></tr>
+<tr><td><code>addLead</code> / <code>addOrder</code></td><td>Publik (rate-limited)</td><td>Checkout dari landing.html maupun WA-Bot.gs</td></tr>
+<tr><td><code>createXenditInvoicePublic</code></td><td>Publik</td><td>Buat invoice pembayaran saat checkout</td></tr>
+<tr><td><code>getLeadPaymentStatus</code></td><td>Publik</td><td>Polling status bayar dari modal iframe</td></tr>
+<tr><td><code>checkOrderStatusPublic</code></td><td>Publik (2 faktor)</td><td>Cek status pesanan mandiri oleh pembeli</td></tr>
+<tr><td><code>getCommissionPercentPublic</code></td><td>Publik</td><td>Ambil persentase komisi terkini (dipakai WA-Bot.gs)</td></tr>
+<tr><td><code>getLeads</code> / <code>getOrders</code> / <code>getCommissions</code></td><td>Login</td><td>Data terfilter sesuai role (non-admin cuma lihat miliknya)</td></tr>
+<tr><td><code>getUsers</code> / <code>saveProduct</code> / dst</td><td>Admin</td><td>Operasional CRUD data</td></tr>
+<tr><td><code>getBonusSettings</code> / <code>saveBonusSettings</code></td><td>Admin</td><td>Pengaturan komisi &amp; bonus</td></tr>
+<tr><td><code>runMonthlyBonusCalculation</code></td><td>Admin</td><td>Trigger manual hitung bonus</td></tr>
+<tr><td><code>getXenditInvoiceStatus</code> / <code>getXenditDisbursementStatus</code></td><td>Admin</td><td>Cek status transaksi langsung ke API Xendit</td></tr>
+<tr><td><code>getWASession</code> / <code>saveWASession</code></td><td>WA_BOT_SECRET</td><td>Sesi percakapan WhatsApp (dipanggil dari project terpisah)</td></tr>
+</table>
+
+<h3 id="extend">E.3 Cara Menambah Fitur Baru</h3>
+<ol class="steps">
+<li><strong>Backend dulu:</strong> tambahkan fungsi <code>handleXxx(spreadsheet, params)</code> di Code.gs, daftarkan di <code>ADMIN_ACTIONS</code>/<code>AUTH_ACTIONS</code> kalau perlu proteksi, tambahkan <code>case</code> di <code>executeAction()</code></li>
+<li><strong>Nilai yang bisa berubah → Settings:</strong> jangan hardcode angka/teks yang mungkin berubah — simpan lewat <code>setSettingValue()</code>/<code>getSettingValue()</code>, ikuti pola <code>getBonusSettings()</code> sebagai contoh</li>
+<li><strong>Idempotency:</strong> kalau fitur baru bisa terpanggil berkali-kali (webhook, trigger), pastikan ada penanda unik sebelum membuat entry baru — lihat pola di <code>calculateMonthlyBonuses()</code></li>
+<li><strong>Race condition:</strong> kalau fitur menyentuh uang/status kritis yang bisa terpanggil bersamaan, bungkus dengan <code>LockService.getScriptLock()</code></li>
+<li><strong>Frontend:</strong> tambahkan UI di index.html/landing.html, panggil lewat <code>callGASPost()</code>/<code>fetchFromGAS()</code> (yang di index.html sudah ada retry otomatis — pakai <code>fetchFromGASWithRetry()</code> untuk konsistensi)</li>
+<li><strong>Validasi selalu di server:</strong> jangan percaya validasi frontend saja — cek ulang di backend (lihat pola <code>isValidLength()</code>, <code>isValidPositiveNumber()</code>, dst)</li>
+</ol>
+
+<h3 id="peringatan">E.4 Peringatan Arsitektur</h3>
+
+<div class="callout warn">
+<div class="callout-title">⚠ WA-Bot.gs WAJIB project terpisah</div>
+<p>Kalau digabung dengan Code.gs di project yang sama, fungsi <code>doGet</code>/<code>doPost</code> keduanya akan tabrakan — salah satu diam-diam berhenti berfungsi. Ini pernah terjadi sebelumnya.</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">⚠ Satu nomor WhatsApp = satu webhook aktif</div>
+<p>Kalau ada lebih dari satu project Apps Script (mis. untuk bisnis/unit berbeda) dikonfigurasi ke nomor WA yang sama, siapa pun yang <strong>terakhir</strong> didaftarkan sebagai webhook di dashboard Meta yang benar-benar menerima pesan — yang lain berhenti menerima tanpa error apa pun. Kalau perlu satu nomor melayani beberapa "kepribadian" bot (seperti integrasi CRM terpisah), pisahkan logikanya lewat <strong>deteksi di dalam kode yang sama</strong> (satu deployment, banyak jalur logika) — bukan banyak deployment berebut satu nomor.</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">⚠ Jangan pernah hardcode kredensial di source code</div>
+<p><code>ANTHROPIC_API_KEY</code>, <code>WA_ACCESS_TOKEN</code>, <code>WA_APP_SECRET</code>, dan sejenisnya <strong>selalu</strong> lewat Script Properties, tidak pernah ditulis langsung di kode — terutama karena kode bisa saja suatu saat ditempel/dibagikan ke tempat lain (termasuk ke asisten AI untuk debugging), dan kredensial yang sempat ter-expose harus dianggap bocor dan digenerate ulang.</p>
+</div>
+
+<div class="callout info">
+<div class="callout-title">💡 Kalau ada integrasi pihak ketiga LAIN (seperti CRM/QSystem)</div>
+<p>Pola yang dipakai: project terpisah, otentikasi lewat secret bersama (<code>WA_BOT_SECRET</code>), dan jalur logika yang <strong>sengaja dipisah total</strong> di dalam WA-Bot.gs (deteksi nomor di awal <code>processIncomingMessage()</code>, lalu routing ke agent loop yang sesuai). Prinsipnya: kemampuan tiap agent dibatasi SEKETAT mungkin sesuai tugasnya — agent CRM misalnya cuma boleh satu tool (<code>escalate_to_crm_staff</code>), tidak diberi akses order/checkout sama sekali walau secara teknis bisa.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN F: TANYA JAWAB -->
+<!-- ============================================================ -->
+<section class="doc-section" id="qa">
+<div class="eyebrow-tag">Referensi Cepat</div>
+<h2>F. Tanya Jawab</h2>
+<p>Kumpulan pertanyaan nyata yang paling sering muncul selama pengembangan sistem ini.</p>
+
+<details class="qa-item">
+<summary>Apakah orang lain bisa masuk ke dashboard tanpa password?</summary>
+<div class="qa-body"><p>Tidak. Kalau terasa "masuk tanpa password", itu karena sesi login tersimpan di browser yang <strong>sama</strong> yang pernah dipakai login sebelumnya (fitur "tetap login", supaya tidak perlu ketik ulang tiap buka halaman). Token tetap divalidasi ke server setiap ada aksi. Cara pastikan: coba buka di jendela Incognito/browser lain yang belum pernah login — kalau di situ tetap diminta password, sistem aman.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Apa beda status Lead "Valid" dan "Converted"?</summary>
+<div class="qa-body"><p>Keduanya dihitung sama sebagai "transaksi berhasil" untuk komisi &amp; bonus — bedanya cuma jalur. <strong>Valid</strong> = otomatis oleh sistem begitu pembayaran Xendit terkonfirmasi. <strong>Converted</strong> = ditandai manual oleh admin, untuk penjualan yang closing-nya di luar jalur otomatis (mis. transfer manual, chat WhatsApp).</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Apakah bot WhatsApp bisa broadcast pesan massal?</summary>
+<div class="qa-body"><p>Belum dibangun. Yang ada sekarang cuma kirim satu-satu ke nomor tertentu. Kalau mau dibangun, perlu diperhatikan: WhatsApp mewajibkan <em>Message Template</em> yang disetujui Meta untuk pesan yang dikirim di luar jendela 24 jam sejak customer chat terakhir, dan ada batas ±2 pesan marketing/hari/user (gabungan semua bisnis).</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Berapa kuota pesan WhatsApp kalau bisnis belum verified?</summary>
+<div class="qa-body"><p><strong>250 percakapan business-initiated per 24 jam</strong> (Tier 0). Ini <em>hanya</em> berlaku untuk pesan yang dimulai bisnis (broadcast, notifikasi di luar 24 jam) — membalas pesan yang customer kirim duluan <strong>tidak terbatas</strong> ini. Setelah verified, langsung naik ke 1.000, lalu bisa lanjut lebih tinggi tergantung kualitas &amp; pemakaian.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Bagaimana cara kerja billing Claude API — ada kuota gratis harian?</summary>
+<div class="qa-body"><p><strong>Tidak ada</strong> kuota gratis harian seperti Meta. Claude API (lewat <code>platform.claude.com</code>, bukan Claude.ai) murni <em>prepaid</em> — kalau saldo Console habis, API berhenti total sampai diisi ulang manual. Satu-satunya "gratis" cuma kredit awal sekali saat pertama daftar. Disarankan aktifkan <strong>Auto-reload</strong> di Settings → Billing supaya bot tidak tiba-tiba bisu.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Kenapa modal pembayaran Xendit sempat membuka tab baru sendiri?</summary>
+<div class="qa-body"><p>Penyebabnya <code>success_redirect_url</code> yang diarahkan ke URL Apps Script sendiri — URL itu tidak bisa dimuat di dalam iframe (dibatasi kebijakan keamanan Google), jadi browser "kabur" membuka tab baru sebagai jalan keluarnya. Sudah diperbaiki dengan menghapus field ini sepenuhnya — status pembayaran sudah dideteksi lewat polling, bukan lewat redirect ini.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Apa yang membedakan agent CRM dan agent Affiliate di WA-Bot.gs?</summary>
+<div class="qa-body"><p>Keduanya berbagi nomor WA &amp; mekanisme sesi, tapi logika bisnisnya sengaja dipisah total. CRM melayani client wholesale/B2B <em>existing</em> (deteksi di awal <code>processIncomingMessage()</code>), cuma punya <strong>1 tool</strong> (<code>escalate_to_crm_staff</code>) dan <strong>tidak bisa</strong> checkout/order sama sekali — kalau mau order, diarahkan ke sales manual. Affiliate melayani pembeli retail baru, punya <strong>8 tool</strong> lengkap dari lihat produk sampai submit pesanan. Pembatasan tool CRM itu disengaja — bukan kekurangan fitur, tapi pagar supaya bot tidak pernah salah memproses transaksi wholesale sendiri.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Amankah satu nomor WhatsApp dipakai lebih dari satu project/bisnis?</summary>
+<div class="qa-body"><p>Berisiko <strong>kalau</strong> masing-masing dijalankan sebagai deployment Apps Script yang <em>berbeda dan berebut</em> jadi webhook nomor yang sama — WhatsApp cuma izinkan satu webhook aktif per nomor, jadi salah satu akan berhenti menerima pesan tanpa error apa pun. Solusi yang aman: satu deployment saja yang jadi webhook, dengan logika di DALAM kode yang mendeteksi &amp; memilah jenis customer/bisnis (seperti pola CRM vs Affiliate di atas).</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Bagaimana cara ganti password admin?</summary>
+<div class="qa-body"><p>Isi Script Property <code>TEMP_NEW_ADMIN_PASSWORD</code> dengan password baru (nama property-nya tetap, isinya bebas), lalu jalankan fungsi <code>updateAdminPassword()</code> dari editor. Langsung aktif tanpa redeploy, dan property sementara itu otomatis terhapus sendiri setelah dipakai.</p></div>
+</details>
+
+<details class="qa-item">
+<summary>Kenapa komisi kadang tidak muncul walau sudah login?</summary>
+<div class="qa-body"><p>Kemungkinan besar Apps Script sedang lambat/sibuk memproses beberapa permintaan data sekaligus. Sistem sudah dilengkapi retry otomatis (3x percobaan) untuk kegagalan sesaat seperti ini — kalau tetap gagal setelahnya, akan muncul pesan jelas yang meminta refresh manual, bukan diam-diam kosong tanpa keterangan.</p></div>
+</details>
+</section>
+
+<!-- ============================================================ -->
+<!-- BAGIAN G: RIWAYAT PENGEMBANGAN -->
+<!-- ============================================================ -->
+<section class="doc-section" id="changelog">
+<div class="eyebrow-tag">Referensi Cepat</div>
+<h2>G. Riwayat Pengembangan (Changelog)</h2>
+<p>Ringkasan kronologis tonggak-tonggak besar pengembangan sistem ini.</p>
+
+<ol class="steps">
+<li>Setup awal: struktur data, autentikasi, keamanan dasar (hash password, sesi, rate limit)</li>
+<li>Integrasi pembayaran Xendit (invoice, webhook) &amp; ongkir Biteship (rates, order otomatis)</li>
+<li>Chatbot WhatsApp berbasis AI (Claude) dengan tool-calling penuh — dari auto-reply jadi agen pemesanan lengkap</li>
+<li>Restrukturisasi dashboard: pemisahan Dashboard/Leads/Komisi, leaderboard, kupon, sistem customer code</li>
+<li>Otomatisasi fulfillment: konsolidasi pengiriman per-lead, payout komisi via Xendit Disbursement</li>
+<li>Sistem Bonus Target &amp; Peringkat Penjualan bulanan (otomatis, dengan pengaturan admin)</li>
+<li>Perbaikan bug kritis: race condition komisi dobel (LockService), input jumlah keranjang tidak bisa diketik di mobile</li>
+<li>Fitur Cek Status Pesanan publik untuk pembeli (verifikasi 2 faktor)</li>
+<li>Persentase komisi dijadikan sepenuhnya dapat diedit admin, menggantikan nilai hardcode</li>
+<li>Perbaikan modal pembayaran Xendit yang sempat membuka tab baru tak terduga</li>
+<li>Eskalasi otomatis bot WhatsApp setelah 3x balasan tanpa progres nyata</li>
+<li>Perbaikan keandalan pemuatan data (retry otomatis + peringatan jelas saat gagal)</li>
+<li>Fitur "Lihat Detail Transaksi Xendit" langsung dari dashboard (invoice &amp; disbursement)</li>
+<li>Bot WhatsApp bisa jawab jadwal payout &amp; tanggal komisi terakhir dibayar</li>
+<li>Penggabungan fitur affiliate dengan integrasi CRM QSystem terpisah (satu bot, dua "kepribadian")</li>
+<li>Halaman "Lalu Lintas Xendit" — tabel gabungan transaksi masuk &amp; keluar dengan filter</li>
+</ol>
+
+<div class="divider-orn">☕</div>
+<p style="text-align:center;color:var(--text-light);font-style:italic;font-size:0.9rem">Dokumentasi ini dibuat untuk mendampingi pengoperasian dan pengembangan lanjutan QCO Kopi Affiliate Platform.</p>
+
+</section>
+
+
+
+
+
+
+
+
+
+
+
+</div>
+</div>
+</div>
+
+<button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+
+<script>
+// Sidebar toggle (mobile)
+const sidebar = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menuToggle');
+const overlay = document.getElementById('sidebarOverlay');
+menuToggle.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+document.querySelectorAll('.nav-link').forEach(a => a.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); }));
+
+// Active section highlight on scroll
+const sections = document.querySelectorAll('section.doc-section');
+const navLinks = document.querySelectorAll('.nav-link[data-section]');
+const observer = new IntersectionObserver((entries) => {
+entries.forEach(entry => {
+if (entry.isIntersecting) {
+navLinks.forEach(l => l.classList.remove('active'));
+const active = document.querySelector('.nav-link[data-section="' + entry.target.id + '"]');
+if (active) active.classList.add('active');
+}
+});
+}, { rootMargin: '-15% 0px -75% 0px' });
+sections.forEach(s => observer.observe(s));
+
+// Simple sidebar search - filter nav links by text
+document.getElementById('navSearch').addEventListener('input', function(e) {
+const q = e.target.value.toLowerCase().trim();
+document.querySelectorAll('.nav-link').forEach(link => {
+const match = link.textContent.toLowerCase().includes(q);
+link.style.display = (q === '' || match) ? 'block' : 'none';
+});
+document.querySelectorAll('.nav-group-label').forEach(label => {
+label.style.display = q === '' ? 'block' : 'none';
+});
+});
+</script>
+</body>
+</html>
