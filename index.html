@@ -732,7 +732,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-05-payroll-fee-marketing-dari-gl';
+const QSYSTEM_HTML_VERSION = '2026-08-06-payroll-qtask-harian-fee-rekonsiliasi';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -752,6 +752,10 @@ let state = {
   payrollLoading: false,
   payrollError: null,
   payrollExpandedIds: [],
+  feeReconData: null,
+  feeReconLoading: false,
+  feeReconError: null,
+  feeReconExpandedIds: [],
   crmData: null,
   crmLoading: false,
   crmError: null,
@@ -1881,6 +1885,53 @@ function qtaskSettingsHTML(){
         <div style="text-align:right; margin-top:10px; font-weight:700; font-size:14px;">Grand Total: ${fmtRupiah(state.payrollData.grandTotal)}</div>
       ` : ''}
     </div>
+
+    <div class="section-title">📊 Rekonsiliasi Fee Marketing (Sepanjang Waktu)</div>
+    <div class="card">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Fee 3% tidak dibayar per bulan (jadwalnya tidak tentu) -- jadi ringkasan ini menghitung SEMUA WAKTU: total fee yang seharusnya didapat vs yang sudah dibayar vs sisanya.</div>
+      <button class="btn btn-primary btn-sm" data-action="load-fee-recon" style="margin-bottom:12px;">Muat Rekonsiliasi</button>
+
+      ${state.feeReconLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` : ''}
+      ${state.feeReconError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.feeReconError)}</div>` : ''}
+
+      ${state.feeReconData ? `
+        <div class="table-wrap">
+          <table class="task-table" style="min-width:0;">
+            <thead><tr><th>Nama</th><th>Total Fee</th><th>Sudah Dibayar</th><th>Sisa</th></tr></thead>
+            <tbody>
+              ${state.feeReconData.staff.map(s => {
+                const isExpanded = (state.feeReconExpandedIds || []).includes(s.id);
+                return `
+                <tr style="cursor:pointer;" data-action="toggle-fee-recon-detail" data-id="${s.id}">
+                  <td style="font-weight:600;">${escapeHTML(s.name)}</td>
+                  <td>${fmtRupiah(s.totalFeeEarned)}</td>
+                  <td>${fmtRupiah(s.totalPaid)}</td>
+                  <td style="font-weight:700; color:${s.remaining > 0 ? 'var(--danger)' : 'var(--success)'};">${fmtRupiah(s.remaining)}</td>
+                </tr>
+                ${isExpanded ? `
+                <tr><td colspan="4" style="background:var(--bg-soft); font-size:11px; padding:10px;">
+                  ${s.payments.length > 0 ? `<b>Riwayat pembayaran (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}` : '<span class="faint">Belum ada pembayaran tercatat.</span>'}
+                </td></tr>
+                ` : ''}
+              `}).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="text-align:right; margin-top:10px; font-size:12px;">
+          <div>Total Fee: <b>${fmtRupiah(state.feeReconData.grandTotalEarned)}</b></div>
+          <div>Sudah Dibayar: <b>${fmtRupiah(state.feeReconData.grandTotalPaid)}</b></div>
+        </div>
+
+        ${state.feeReconData.unmatchedPayments.length > 0 ? `
+          <div style="margin-top:14px; padding:10px; background:#FFF3E0; border-radius:8px;">
+            <div style="font-weight:700; font-size:12px; color:#E65100; margin-bottom:6px;">⚠️ ${state.feeReconData.unmatchedPayments.length} pembayaran (total ${fmtRupiah(state.feeReconData.grandTotalUnmatched)}) tidak bisa dicocokkan ke staff manapun -- kemungkinan typo nama di GL. Cek manual:</div>
+            <div style="font-size:11px;">
+              ${state.feeReconData.unmatchedPayments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} — <i>"${escapeHTML(p.keterangan)}"</i>`).join('<br>')}
+            </div>
+          </div>
+        ` : ''}
+      ` : ''}
+    </div>
     ` : ''}
 
     ${emp.role==='owner' ? `
@@ -2567,6 +2618,26 @@ async function fetchPayrollData(){
     state.payrollLoading = false;
     state.payrollError = e.message || 'Gagal memuat data gaji';
     showToast('Gaji & Bonus: ' + state.payrollError);
+  }
+  render();
+}
+
+async function fetchFeeReconciliation(){
+  state.feeReconLoading = true;
+  state.feeReconError = null;
+  render();
+  try {
+    const result = await apiCall('getFeeReconciliation', { requestingUserId: state.currentUser });
+    if (result && result.success) {
+      state.feeReconData = result;
+      state.feeReconLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.feeReconLoading = false;
+    state.feeReconError = e.message || 'Gagal memuat rekonsiliasi fee';
+    showToast('Rekonsiliasi Fee: ' + state.feeReconError);
   }
   render();
 }
@@ -4666,6 +4737,16 @@ document.addEventListener('click', function(e){
     const idx = state.payrollExpandedIds.indexOf(id);
     if (idx >= 0) state.payrollExpandedIds.splice(idx, 1);
     else state.payrollExpandedIds.push(id);
+    render();
+  }
+  else if (el.dataset.action === 'load-fee-recon'){
+    fetchFeeReconciliation();
+  }
+  else if (el.dataset.action === 'toggle-fee-recon-detail'){
+    const id = el.dataset.id;
+    const idx = state.feeReconExpandedIds.indexOf(id);
+    if (idx >= 0) state.feeReconExpandedIds.splice(idx, 1);
+    else state.feeReconExpandedIds.push(id);
     render();
   }
   else if (el.dataset.action === 'crm-refresh'){
