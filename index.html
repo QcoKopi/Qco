@@ -640,14 +640,14 @@ const EMPLOYEES = [
   { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
   { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv',  jabatan:'Marketing & Sales', qcoSystem:'All' },
   { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
-  { id:'umay',  name:'Fahmi Maulana',  dept:'po', role:'spv',  jabatan:'Ops & Product Development', qcoSystem:'All' },
+  { id:'fahmi',  name:'Fahmi Maulana',  dept:'po', role:'spv',  jabatan:'Ops & Product Development', qcoSystem:'All' },
   { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director', qcoSystem:'All' },
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
   rizky: ['reza','rasya','nanda','rizky'],
-  umay: ['razak','umay'],
-  owner: ['reza','rasya','nanda','rizky','razak','umay'],
+  fahmi: ['razak','fahmi'],
+  owner: ['reza','rasya','nanda','rizky','razak','fahmi'],
 };
 const USER_KEY = 'qsystem-current-user';
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
@@ -691,7 +691,7 @@ const JOBDESK = {
     'Deep Cleaning area Roasting setiap Senin',
     'Input data produksi ke QFinance'
   ],
-  umay: [
+  fahmi: [
     'Rekap kerjaan tim Produksi (QFinance/QTask)',
     'Monitoring dana masuk & keluar',
     'Cek inventory & outstanding order',
@@ -732,7 +732,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-06-payroll-qtask-harian-fee-rekonsiliasi';
+const QSYSTEM_HTML_VERSION = '2026-08-06-fix-id-umay-ke-fahmi';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -5462,7 +5462,7 @@ function getAllowedApps(userId){
   if (allowed.includes('crm')) {
     // Named-ID, BUKAN role-based: cuma 3 orang ini persis yang boleh buka
     // CRM, walau nanti ada spv baru ditambahkan lewat Manajemen Staff.
-    const CRM_ALLOWED_IDS = ['owner', 'rizky', 'umay'];
+    const CRM_ALLOWED_IDS = ['owner', 'rizky', 'fahmi'];
     if (!CRM_ALLOWED_IDS.includes(userId)) {
       allowed = allowed.filter(a => a !== 'crm');
     }
@@ -5470,7 +5470,7 @@ function getAllowedApps(userId){
   if (allowed.includes('wabot')) {
     // Sama seperti CRM: named-ID, karena bisa edit persona bot, ambil-alih
     // percakapan customer, dan reset password staff sales affiliate.
-    const WABOT_ALLOWED_IDS = ['owner', 'rizky', 'umay'];
+    const WABOT_ALLOWED_IDS = ['owner', 'rizky', 'fahmi'];
     if (!WABOT_ALLOWED_IDS.includes(userId)) {
       allowed = allowed.filter(a => a !== 'wabot');
     }
