@@ -732,7 +732,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-08-roasting-di-rekonsiliasi';
+const QSYSTEM_HTML_VERSION = '2026-08-08-kolom-fee-terpisah';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1900,20 +1900,20 @@ function qtaskSettingsHTML(){
       ${state.feeReconData ? `
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Total Fee</th><th>Sudah Dibayar</th><th>Sisa</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Fee Marketing<div class="faint" style="font-weight:400; font-size:9.5px;">dari Penjualan_INV</div></th><th>Fee Roast<div class="faint" style="font-weight:400; font-size:9.5px;">dari Assembly</div></th><th>Sudah Dibayar</th><th>Sisa</th></tr></thead>
             <tbody>
               ${state.feeReconData.staff.map(s => {
                 const isExpanded = (state.feeReconExpandedIds || []).includes(s.id);
                 return `
                 <tr style="cursor:pointer;" data-action="toggle-fee-recon-detail" data-id="${s.id}">
                   <td style="font-weight:600;">${escapeHTML(s.name)}</td>
-                  <td>${fmtRupiah(s.totalFeeEarned)}${s.roastRate > 0 ? `<div class="faint" style="font-size:10px;">Marketing: ${fmtRupiah(s.feeMarketingEarned)} + Roasting: ${fmtRupiah(s.roastingEarned)}</div>` : ''}</td>
+                  <td>${fmtRupiah(s.feeMarketingEarned)}${s.feeMarketingPct ? `<div class="faint" style="font-size:10px;">${s.feeMarketingPct}% x ${fmtRupiah(s.totalSalesAllTime)}</div>` : ''}</td>
+                  <td>${s.roastRate > 0 ? fmtRupiah(s.roastingEarned) : '-'}${s.roastRate > 0 ? `<div class="faint" style="font-size:10px;">${s.roastBatchCount} batch x ${fmtRupiah(s.roastRate)}</div>` : ''}</td>
                   <td>${fmtRupiah(s.totalPaid)}</td>
                   <td style="font-weight:700; color:${s.remaining > 0 ? 'var(--danger)' : 'var(--success)'};">${fmtRupiah(s.remaining)}</td>
                 </tr>
                 ${isExpanded ? `
-                <tr><td colspan="4" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                  ${s.roastRate > 0 ? `<div style="margin-bottom:6px;"><b>Bonus Roasting:</b> ${s.roastBatchCount} batch unik (RB + GB) x ${fmtRupiah(s.roastRate)} = ${fmtRupiah(s.roastingEarned)}</div>` : ''}
+                <tr><td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
                   ${s.payments.length > 0 ? `<b>Riwayat pembayaran (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}` : '<span class="faint">Belum ada pembayaran tercatat.</span>'}
                 </td></tr>
                 ` : ''}
@@ -1922,7 +1922,8 @@ function qtaskSettingsHTML(){
           </table>
         </div>
         <div style="text-align:right; margin-top:10px; font-size:12px;">
-          <div>Total Fee: <b>${fmtRupiah(state.feeReconData.grandTotalEarned)}</b></div>
+          <div>Total Fee Marketing: <b>${fmtRupiah(state.feeReconData.grandTotalFeeMarketing)}</b></div>
+          <div>Total Fee Roast: <b>${fmtRupiah(state.feeReconData.grandTotalRoasting)}</b></div>
           <div>Sudah Dibayar: <b>${fmtRupiah(state.feeReconData.grandTotalPaid)}</b></div>
         </div>
 
