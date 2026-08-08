@@ -732,7 +732,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-06-fix-id-umay-ke-fahmi';
+const QSYSTEM_HTML_VERSION = '2026-08-06-bonus-roasting';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1837,7 +1837,7 @@ function qtaskSettingsHTML(){
     ${emp.role==='owner' ? `
     <div class="section-title">💰 Gaji & Bonus Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Gaji Tetap dari sheet Employees + Bonus Harian (hari kunjungan tercatat di QSales) + Fee Marketing (% dari penjualan pribadi mereka).</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Gaji Tetap dari sheet Employees + Bonus Harian (hari kunjungan tercatat di QTask) + Fee Marketing (% dari penjualan pribadi mereka) + Bonus Roasting (batch ber-GB unik x rate, khusus staff produksi).</div>
       <div class="row gap-8" style="margin-bottom:12px;">
         <select data-action="set-payroll-month" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
           ${MONTH_NAMES_ID.map((m,i)=>`<option value="${i+1}" ${state.payrollMonth===i+1?'selected':''}>${m}</option>`).join('')}
@@ -1855,9 +1855,10 @@ function qtaskSettingsHTML(){
         <div style="font-weight:700; font-size:13px; margin-bottom:8px;">${escapeHTML(state.payrollData.monthName)}</div>
         ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Fee Marketing tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
         ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Fee Marketing tidak bisa dihitung per orang.</div>` : ''}
+        ${!state.payrollData.assemblyReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "Assembly" tidak ditemukan -- Bonus Roasting tidak bisa dihitung (akan tampil 0).</div>` : ''}
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Bonus Harian</th><th>Fee Marketing</th><th>Total</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Bonus Harian</th><th>Fee Marketing</th><th>Bonus Roasting</th><th>Total</th></tr></thead>
             <tbody>
               ${state.payrollData.employees.map(pe => {
                 const isExpanded = (state.payrollExpandedIds || []).includes(pe.id);
@@ -1867,14 +1868,16 @@ function qtaskSettingsHTML(){
                   <td>${fmtRupiah(pe.gajiTetap)}</td>
                   <td>${fmtRupiah(pe.bonusHarian)}${pe.harianRate ? `<div class="faint" style="font-size:10px;">${pe.visitDaysCount} hari x ${fmtRupiah(pe.harianRate)}</div>` : ''}</td>
                   <td>${fmtRupiah(pe.feeMarketing)}${pe.feeMarketingPct ? `<div class="faint" style="font-size:10px;">${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)}</div>` : ''}</td>
+                  <td>${fmtRupiah(pe.bonusRoasting)}${pe.feeRoastRate ? `<div class="faint" style="font-size:10px;">${pe.roastBatchCount} batch x ${fmtRupiah(pe.feeRoastRate)}</div>` : ''}</td>
                   <td style="font-weight:700;">${fmtRupiah(pe.total)}</td>
                 </tr>
                 ${isExpanded ? `
                 <tr>
-                  <td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
+                  <td colspan="6" style="background:var(--bg-soft); font-size:11px; padding:10px;">
                     ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;"><b>Hari kunjungan (${pe.visitDaysCount}):</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
-                    ${pe.salesBreakdown.length > 0 ? `<div><b>Penjualan dari GL (${pe.salesBreakdown.length}):</b><br>${pe.salesBreakdown.map(s=>`${escapeHTML(s.pihak || s.keterangan || '-')} (${escapeHTML(s.date)}) — ${fmtRupiah(s.jumlah)}`).join('<br>')}</div>` : ''}
-                    ${pe.visitDates.length === 0 && pe.salesBreakdown.length === 0 ? '<span class="faint">Tidak ada aktivitas tercatat bulan ini.</span>' : ''}
+                    ${pe.salesBreakdown.length > 0 ? `<div style="margin-bottom:6px;"><b>Penjualan dari GL (${pe.salesBreakdown.length}):</b><br>${pe.salesBreakdown.map(s=>`${escapeHTML(s.pihak || s.keterangan || '-')} (${escapeHTML(s.date)}) — ${fmtRupiah(s.jumlah)}`).join('<br>')}</div>` : ''}
+                    ${pe.feeRoastRate > 0 ? `<div><b>Bonus Roasting:</b> ${pe.roastBatchCount} batch unik ber-GB bulan ini x ${fmtRupiah(pe.feeRoastRate)}</div>` : ''}
+                    ${pe.visitDates.length === 0 && pe.salesBreakdown.length === 0 && !pe.feeRoastRate ? '<span class="faint">Tidak ada aktivitas tercatat bulan ini.</span>' : ''}
                   </td>
                 </tr>
                 ` : ''}
