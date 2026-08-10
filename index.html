@@ -732,7 +732,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-08-kolom-fee-terpisah';
+const QSYSTEM_HTML_VERSION = '2026-08-08-kelola-rate-payroll';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -756,6 +756,10 @@ let state = {
   feeReconLoading: false,
   feeReconError: null,
   feeReconExpandedIds: [],
+  payrollRatesData: null,
+  payrollRatesLoading: false,
+  payrollRatesError: null,
+  payrollRatesSaving: false,
   crmData: null,
   crmLoading: false,
   crmError: null,
@@ -1837,7 +1841,7 @@ function qtaskSettingsHTML(){
     ${emp.role==='owner' ? `
     <div class="section-title">💰 Gaji & Bonus Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Gaji Tetap dari sheet Employees + Bonus Harian (hari kunjungan tercatat di QTask) + Fee Marketing (% dari penjualan pribadi mereka) + Bonus Roasting (batch ber-GB unik x rate, khusus staff produksi).</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya).</div>
       <div class="row gap-8" style="margin-bottom:12px;">
         <select data-action="set-payroll-month" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
           ${MONTH_NAMES_ID.map((m,i)=>`<option value="${i+1}" ${state.payrollMonth===i+1?'selected':''}>${m}</option>`).join('')}
@@ -1853,31 +1857,31 @@ function qtaskSettingsHTML(){
 
       ${state.payrollData ? `
         <div style="font-weight:700; font-size:13px; margin-bottom:8px;">${escapeHTML(state.payrollData.monthName)}</div>
-        ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Fee Marketing tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
-        ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Fee Marketing tidak bisa dihitung per orang.</div>` : ''}
-        ${!state.payrollData.assemblyReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "Assembly" tidak ditemukan -- Bonus Roasting tidak bisa dihitung (akan tampil 0).</div>` : ''}
+        <div class="faint" style="font-size:11px; margin-bottom:8px;">Komisi Penjualan bersifat KUMULATIF (Fee Marketing + Fee Roasting yang belum dibayar dari bulan-bulan sebelumnya ikut terbawa) -- Gaji dibayar penuh tiap bulan, tidak menunggak.</div>
+        ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Komisi Penjualan tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
+        ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Komisi Penjualan tidak bisa dihitung per orang.</div>` : ''}
+        ${!state.payrollData.assemblyReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "Assembly" tidak ditemukan -- bagian Fee Roasting tidak bisa dihitung (akan tampil 0).</div>` : ''}
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Bonus Harian</th><th>Fee Marketing</th><th>Bonus Roasting</th><th>Total</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Gaji</th><th>Komisi Penjualan<div class="faint" style="font-weight:400; font-size:9.5px;">kumulatif</div></th><th>Total</th></tr></thead>
             <tbody>
               ${state.payrollData.employees.map(pe => {
                 const isExpanded = (state.payrollExpandedIds || []).includes(pe.id);
                 return `
                 <tr style="cursor:pointer;" data-action="toggle-payroll-detail" data-id="${pe.id}">
                   <td style="font-weight:600;">${escapeHTML(pe.name)}<div class="faint" style="font-size:10px;">${escapeHTML(pe.jabatan)}</div></td>
-                  <td>${fmtRupiah(pe.gajiTetap)}</td>
-                  <td>${fmtRupiah(pe.bonusHarian)}${pe.harianRate ? `<div class="faint" style="font-size:10px;">${pe.visitDaysCount} hari x ${fmtRupiah(pe.harianRate)}</div>` : ''}</td>
-                  <td>${fmtRupiah(pe.feeMarketing)}${pe.feeMarketingPct ? `<div class="faint" style="font-size:10px;">${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)}</div>` : ''}</td>
-                  <td>${fmtRupiah(pe.bonusRoasting)}${pe.feeRoastRate ? `<div class="faint" style="font-size:10px;">${pe.roastBatchCount} batch x ${fmtRupiah(pe.feeRoastRate)}</div>` : ''}</td>
+                  <td>${fmtRupiah(pe.gaji)}<div class="faint" style="font-size:10px;">Tetap ${fmtRupiah(pe.gajiTetap)}${pe.harianRate ? ` + Harian ${pe.visitDaysCount}h x ${fmtRupiah(pe.harianRate)}` : ''}</div></td>
+                  <td style="color:${pe.komisiPenjualan > 0 ? 'var(--danger)' : (pe.komisiPenjualan < 0 ? 'var(--success)' : 'inherit')};">${fmtRupiah(pe.komisiPenjualan)}${(pe.feeMarketingPct || pe.feeRoastRate) ? `<div class="faint" style="font-size:10px;">Marketing ${fmtRupiah(pe.feeMarketing)}${pe.feeRoastRate ? ` + Roasting ${fmtRupiah(pe.bonusRoasting)}` : ''} − Dibayar ${fmtRupiah(pe.totalPaidCum)}</div>` : ''}</td>
                   <td style="font-weight:700;">${fmtRupiah(pe.total)}</td>
                 </tr>
                 ${isExpanded ? `
                 <tr>
-                  <td colspan="6" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                    ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;"><b>Hari kunjungan (${pe.visitDaysCount}):</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
-                    ${pe.salesBreakdown.length > 0 ? `<div style="margin-bottom:6px;"><b>Penjualan dari GL (${pe.salesBreakdown.length}):</b><br>${pe.salesBreakdown.map(s=>`${escapeHTML(s.pihak || s.keterangan || '-')} (${escapeHTML(s.date)}) — ${fmtRupiah(s.jumlah)}`).join('<br>')}</div>` : ''}
-                    ${pe.feeRoastRate > 0 ? `<div><b>Bonus Roasting:</b> ${pe.roastBatchCount} batch unik ber-GB bulan ini x ${fmtRupiah(pe.feeRoastRate)}</div>` : ''}
-                    ${pe.visitDates.length === 0 && pe.salesBreakdown.length === 0 && !pe.feeRoastRate ? '<span class="faint">Tidak ada aktivitas tercatat bulan ini.</span>' : ''}
+                  <td colspan="4" style="background:var(--bg-soft); font-size:11px; padding:10px;">
+                    ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;"><b>Hari kunjungan bulan ini (${pe.visitDaysCount}):</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
+                    ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;"><b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (total penjualan sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}</div>` : ''}
+                    ${pe.feeRoastRate > 0 ? `<div style="margin-bottom:6px;"><b>Fee Roasting kumulatif:</b> ${pe.roastKg.toFixed(2)} kg hasil roasting (dari ${pe.roastBatchCount} batch unik RB+GB) x ${fmtRupiah(pe.feeRoastRate)}/kg = ${fmtRupiah(pe.bonusRoasting)}</div>` : ''}
+                    ${pe.paymentHistory && pe.paymentHistory.length > 0 ? `<div><b>Riwayat pembayaran Komisi (${pe.paymentHistory.length}):</b><br>${pe.paymentHistory.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}</div>` : ''}
+                    ${pe.visitDates.length === 0 && !pe.feeMarketingPct && !pe.feeRoastRate ? '<span class="faint">Tidak ada aktivitas tercatat.</span>' : ''}
                   </td>
                 </tr>
                 ` : ''}
@@ -1908,7 +1912,7 @@ function qtaskSettingsHTML(){
                 <tr style="cursor:pointer;" data-action="toggle-fee-recon-detail" data-id="${s.id}">
                   <td style="font-weight:600;">${escapeHTML(s.name)}</td>
                   <td>${fmtRupiah(s.feeMarketingEarned)}${s.feeMarketingPct ? `<div class="faint" style="font-size:10px;">${s.feeMarketingPct}% x ${fmtRupiah(s.totalSalesAllTime)}</div>` : ''}</td>
-                  <td>${s.roastRate > 0 ? fmtRupiah(s.roastingEarned) : '-'}${s.roastRate > 0 ? `<div class="faint" style="font-size:10px;">${s.roastBatchCount} batch x ${fmtRupiah(s.roastRate)}</div>` : ''}</td>
+                  <td>${s.roastRate > 0 ? fmtRupiah(s.roastingEarned) : '-'}${s.roastRate > 0 ? `<div class="faint" style="font-size:10px;">${s.roastKg.toFixed(2)} kg x ${fmtRupiah(s.roastRate)}/kg</div>` : ''}</td>
                   <td>${fmtRupiah(s.totalPaid)}</td>
                   <td style="font-weight:700; color:${s.remaining > 0 ? 'var(--danger)' : 'var(--success)'};">${fmtRupiah(s.remaining)}</td>
                 </tr>
@@ -1935,6 +1939,35 @@ function qtaskSettingsHTML(){
             </div>
           </div>
         ` : ''}
+      ` : ''}
+    </div>
+
+    <div class="section-title">⚙️ Kelola Rate Gaji & Komisi</div>
+    <div class="card">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Ubah Gaji Tetap, rate Harian, persen Fee Marketing, dan rate Fee Roast (Rp/kg) langsung dari sini -- tersimpan ke sheet Employees, tidak perlu edit spreadsheet manual.</div>
+      <button class="btn btn-primary btn-sm" data-action="load-payroll-rates" style="margin-bottom:12px;">Muat Rate</button>
+
+      ${state.payrollRatesLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` : ''}
+      ${state.payrollRatesError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.payrollRatesError)}</div>` : ''}
+
+      ${state.payrollRatesData ? `
+        <div class="table-wrap">
+          <table class="task-table" style="min-width:0;">
+            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Harian</th><th>Fee Marketing %</th><th>Fee Roast Rp/kg</th></tr></thead>
+            <tbody>
+              ${state.payrollRatesData.staff.map(s => `
+                <tr data-payroll-rate-row="${s.id}">
+                  <td style="font-weight:600; font-size:11.5px;">${escapeHTML(s.name)}<div class="faint" style="font-size:9.5px;">${escapeHTML(s.jabatan)}</div></td>
+                  <td><input type="number" data-field="gaji" value="${s.gaji}" style="width:90px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
+                  <td><input type="number" data-field="harian" value="${s.harian}" style="width:70px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
+                  <td><input type="number" data-field="feeMarketingPct" value="${s.feeMarketingPct}" step="0.1" style="width:55px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
+                  <td><input type="number" data-field="feeRoastRate" value="${s.feeRoastRate}" style="width:70px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn btn-primary btn-block" data-action="save-payroll-rates" style="margin-top:12px;" ${state.payrollRatesSaving ? 'disabled' : ''}>${state.payrollRatesSaving ? 'Menyimpan...' : '💾 Simpan Semua Perubahan'}</button>
       ` : ''}
     </div>
     ` : ''}
@@ -2643,6 +2676,62 @@ async function fetchFeeReconciliation(){
     state.feeReconLoading = false;
     state.feeReconError = e.message || 'Gagal memuat rekonsiliasi fee';
     showToast('Rekonsiliasi Fee: ' + state.feeReconError);
+  }
+  render();
+}
+
+async function fetchPayrollRates(){
+  state.payrollRatesLoading = true;
+  state.payrollRatesError = null;
+  render();
+  try {
+    const result = await apiCall('getPayrollRatesForEdit', { requestingUserId: state.currentUser });
+    if (result && result.success) {
+      state.payrollRatesData = result;
+      state.payrollRatesLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.payrollRatesLoading = false;
+    state.payrollRatesError = e.message || 'Gagal memuat rate gaji';
+    showToast('Kelola Rate: ' + state.payrollRatesError);
+  }
+  render();
+}
+
+async function savePayrollRates(){
+  const rows = document.querySelectorAll('[data-payroll-rate-row]');
+  const updates = [];
+  rows.forEach(row => {
+    const id = row.getAttribute('data-payroll-rate-row');
+    const gaji = row.querySelector('[data-field="gaji"]').value;
+    const harian = row.querySelector('[data-field="harian"]').value;
+    const feeMarketingPct = row.querySelector('[data-field="feeMarketingPct"]').value;
+    const feeRoastRate = row.querySelector('[data-field="feeRoastRate"]').value;
+    updates.push({
+      id: id,
+      gaji: Number(gaji) || 0,
+      harian: Number(harian) || 0,
+      feeMarketingPct: Number(feeMarketingPct) || 0,
+      feeRoastRate: Number(feeRoastRate) || 0
+    });
+  });
+
+  state.payrollRatesSaving = true;
+  render();
+  try {
+    const result = await apiCall('updateEmployeePayrollRates', { requestingUserId: state.currentUser, updates: updates });
+    if (result && result.success) {
+      showToast(result.message || 'Rate berhasil disimpan');
+      state.payrollRatesSaving = false;
+      await fetchPayrollRates(); // muat ulang supaya tampilan sinkron dengan sheet
+    } else {
+      throw new Error((result && result.error) || 'Gagal menyimpan');
+    }
+  } catch(e) {
+    state.payrollRatesSaving = false;
+    showToast('Gagal menyimpan: ' + (e.message || 'Coba lagi'));
   }
   render();
 }
@@ -4746,6 +4835,12 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'load-fee-recon'){
     fetchFeeReconciliation();
+  }
+  else if (el.dataset.action === 'load-payroll-rates'){
+    fetchPayrollRates();
+  }
+  else if (el.dataset.action === 'save-payroll-rates'){
+    savePayrollRates();
   }
   else if (el.dataset.action === 'toggle-fee-recon-detail'){
     const id = el.dataset.id;
