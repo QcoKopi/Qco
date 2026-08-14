@@ -551,12 +551,14 @@ function gsJSONP(fnName, ...args){
     script.src = url;
     script.async = true;
 
-    // Timeout handler — dinaikkan dari 15 ke 30 detik: action yang baca
-    // beberapa sheet sekaligus (mis. qfin_getDashboard) butuh napas
-    // lebih, dan sejak lock dibatasi cuma untuk action yang menulis
-    // (lihat 05_WebApp.gs v7), action baca seharusnya jarang lagi
-    // mepet batas waktu — tapi tetap dikasih ruang lebih untuk jaga-jaga.
-    const JSONP_TIMEOUT_MS = 30000;
+    // Timeout handler — dinaikkan dari 30 ke 45 detik (2026-08-13): terbukti
+    // dari console log nyata bahwa response BISA datang SETELAH 30 detik
+    // (terlihat dari ReferenceError pada callback yang sudah dihapus duluan
+    // oleh cleanup() timeout -- artinya server SEBENARNYA berhasil, cuma
+    // telat). Ini kemungkinan besar akibat kongesti/kuota platform Apps
+    // Script, bukan bug kode -- menaikkan timeout memberi ruang lebih untuk
+    // request yang lambat-tapi-sebenarnya-berhasil.
+    const JSONP_TIMEOUT_MS = 45000;
     const timeoutId = setTimeout(() => {
       cleanup();
       console.error('[QSystem] JSONP TIMEOUT:', fnName, '— tidak ada respons dalam', JSONP_TIMEOUT_MS/1000, 'detik. URL:', url);
@@ -585,9 +587,18 @@ function gsJSONP(fnName, ...args){
       reject(new Error('JSONP failed — GAS tidak merespons JS valid. Penyebab: (1) URL GAS salah/sudah expired, (2) GAS belum deploy ulang setelah revisi, (3) Ada error di server GAS (cek Execution Log), (4) Script GAS return HTML error page bukan JavaScript'));
     };
 
+    // BARU (2026-08-13): SEBELUMNYA cleanup() pakai "delete window[cbName]" --
+    // kalau responsnya BENAR-BENAR datang TERLAMBAT (setelah timeout sudah
+    // reject duluan), script tag yang telat itu tetap coba manggil
+    // window[cbName](...), tapi karena sudah di-delete, browser lempar
+    // "Uncaught ReferenceError: ... is not defined" -- membingungkan dan
+    // kelihatan seperti bug baru padahal cuma efek samping dari timeout yang
+    // sudah lebih dulu menyerah. Sekarang diganti jadi FUNGSI KOSONG (no-op)
+    // supaya respons telat itu diam-diam diabaikan, bukan melempar error.
     function cleanup() {
       clearTimeout(timeoutId);
-      delete window[cbName];
+      window[cbName] = function(){ /* respons datang setelah timeout, diabaikan */ };
+      setTimeout(() => { delete window[cbName]; }, 60000); // beres-beres beneran setelah 1 menit
       if (script.parentNode) script.parentNode.removeChild(script);
     }
 
@@ -732,7 +743,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-08-kelola-rate-payroll';
+const QSYSTEM_HTML_VERSION = '2026-08-13-absensi-task-reminder';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -817,6 +828,7 @@ let state = {
   mnLoading: false,
   mnModalOpen: false,
   mnEditingId: null,
+  mnMyResponses: {},
   mnExpandedIds: [], // id notes yang lagi di-expand (baca selengkapnya)
 };
 
@@ -1023,6 +1035,17 @@ async function fetchManagementNotes(){
     const action = isOwner ? 'getAllManagementNotes' : 'getManagementNotes';
     const result = await apiCall(action, state.currentUser);
     if (result && result.notes) state.mnNotes = result.notes;
+
+    // KOREKSI (2026-08-13): dulu cuma role 'staff', sekarang 'staff' ATAU
+    // 'spv' (kecuali Admin Qco) -- HARUS SAMA dengan isInMnScope di
+    // mnBannerHTML(), supaya supervisor juga dapat status balasan mereka
+    // sendiri (bukan cuma dapat tombolnya doang).
+    const inMnScope = emp && (emp.role === 'staff' || emp.role === 'spv') &&
+      String(emp.id||'').toLowerCase() !== 'qco' && String(emp.name||'').toLowerCase().trim() !== 'admin qco';
+    if (inMnScope) {
+      const respResult = await apiCall('getMyNoteResponses', { staffId: state.currentUser });
+      if (respResult && respResult.responses) state.mnMyResponses = respResult.responses;
+    }
   } catch(e) { console.error('MN fetch error:', e); }
   state.mnLoading = false;
   if(!state.modal.open && !state.mnModalOpen) render();
@@ -1466,12 +1489,23 @@ function bottomNavHTML(){
 function mnBannerHTML(){
   const notes = state.mnNotes || [];
   if (!notes.length) return '';
+  const emp = findEmp(state.currentUser);
+  // KOREKSI (2026-08-13): SEBELUMNYA cuma role==='staff'. Sekarang role
+  // 'staff' ATAU 'spv' (supervisor) sama-sama dapat tombol balas -- KECUALI
+  // Owner, dan kecuali satu orang spesifik "Admin Qco" (id 'Qco') meski
+  // role-nya 'spv'. HARUS SELALU SAMA dengan mnIsInScope_() di
+  // 14_ManagementNotesReply.gs -- kalau salah satu diubah, satunya lagi
+  // wajib diubah juga, supaya tidak ada orang yang dapat reminder WA tapi
+  // tidak punya cara balas di UI (atau sebaliknya).
+  const isInMnScope = emp && (emp.role === 'staff' || emp.role === 'spv') &&
+    String(emp.id||'').toLowerCase() !== 'qco' && String(emp.name||'').toLowerCase().trim() !== 'admin qco';
   const MN_PREVIEW_LEN = 100;
   return notes.map(n => {
     const isExpanded = (state.mnExpandedIds || []).includes(n.id);
     const fullContent = String(n.content || '');
     const needsTruncate = fullContent.length > MN_PREVIEW_LEN;
     const shownContent = (isExpanded || !needsTruncate) ? fullContent : fullContent.substring(0, MN_PREVIEW_LEN) + '…';
+    const myResponse = (state.mnMyResponses || {})[n.id];
     return `
     <div class="card" style="background:linear-gradient(135deg, #FFF8E7 0%, #FFF0C7 100%); border-color:#E6C68E; margin-bottom:14px;">
       <div style="display:flex; align-items:flex-start; gap:10px;">
@@ -1488,6 +1522,18 @@ function mnBannerHTML(){
           <div style="font-size:11px; color:var(--ink-faint); margin-top:8px;">
             ${fmtDate(String(n.timestamp).split(' ')[0])} &#183; ${n.targetType === 'all' ? '&#127760; Semua Staff' : '&#128101; Staff Tertentu'}
           </div>
+          ${isInMnScope ? (
+            myResponse ? `
+              <div style="margin-top:10px; font-size:12.5px; font-weight:600; color:${myResponse==='difahami' ? '#2E7D32' : '#C62828'};">
+                ${myResponse==='difahami' ? '✅ Anda menandai: Difahami' : '❌ Anda menandai: Tidak Difahami'}
+              </div>
+            ` : `
+              <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="btn btn-primary btn-sm" data-action="mn-respond" data-id="${escapeHTML(n.id)}" data-status="difahami">✅ Difahami</button>
+                <button class="btn btn-ghost btn-sm" data-action="mn-respond" data-id="${escapeHTML(n.id)}" data-status="tidak_difahami">❌ Tidak Difahami</button>
+              </div>
+            `
+          ) : ''}
         </div>
       </div>
     </div>
@@ -4502,6 +4548,7 @@ async function selectUser(id){
   state.appTab = 'dashboard';
   state.qtaskTab = 'home';
   state.mnNotes = []; // clear notes lama saat ganti user
+  state.mnMyResponses = {};
   state.mnModalOpen = false;
   state.mnEditingId = null;
   await initData();
@@ -4529,6 +4576,12 @@ document.addEventListener('click', function(e){
     showToast('Memverifikasi…');
     apiCall('validatePin', empId, pin).then(result => {
       if (result && result.valid) {
+        // BARU (2026-08-13): catat absensi -- FIRE-AND-FORGET, SENGAJA tidak
+        // di-await dan tidak boleh pernah mengganggu/menunda proses login
+        // sama sekali (login sudah dioptimasi habis-habisan malam ini,
+        // TIDAK BOLEH ada penambahan yang memperlambatnya). Kalau gagal,
+        // diam saja -- tidak ditampilkan ke user, tidak menghalangi apa pun.
+        apiCall('recordAttendance', { staffId: empId }).catch(()=>{});
         selectUser(empId);
       } else {
         showToast('PIN salah');
@@ -4735,6 +4788,7 @@ document.addEventListener('click', function(e){
     state.currentUser = null;
     state.appTab = 'dashboard';
     state.mnNotes = [];
+    state.mnMyResponses = {};
     state.mnModalOpen = false;
     state.mnEditingId = null;
     render();
@@ -4943,6 +4997,21 @@ document.addEventListener('click', function(e){
     if (idx === -1) state.mnExpandedIds.push(id);
     else state.mnExpandedIds.splice(idx, 1);
     render();
+  }
+  else if (el.dataset.action === 'mn-respond'){
+    const id = el.dataset.id;
+    const status = el.dataset.status;
+    // Optimistic update -- langsung tampilkan hasilnya, baru kirim ke server
+    state.mnMyResponses = state.mnMyResponses || {};
+    state.mnMyResponses[id] = status;
+    render();
+    apiCall('respondToManagementNote', { noteId: id, staffId: state.currentUser, status: status }).then(()=>{
+      showToast(status === 'difahami' ? 'Tersimpan: Difahami' : 'Tersimpan: Tidak Difahami');
+    }).catch(err=>{
+      delete state.mnMyResponses[id]; // gagal -- batalkan optimistic update, kembalikan tombol
+      showToast('Gagal menyimpan balasan: ' + (err.message||err));
+      render();
+    });
   }
   else if (el.dataset.action === 'mn-toggle'){
     const id = el.dataset.id;
