@@ -444,6 +444,16 @@ function fmtRupiah(n){
   const s = abs.toLocaleString('id-ID');
   return (Number(n) < 0 ? '-Rp ' : 'Rp ') + s;
 }
+// BARU (2026-08-14): ubah 'yyyy-MM' jadi label bulan Indonesia singkat,
+// dipakai QSales Klien Baru -- pakai MONTH_NAMES_ID yang sudah ada
+// (dipakai juga oleh dropdown bulan Payroll), tidak duplikasi array nama bulan.
+function qsalesMonthLabelID_(yyyyMM){
+  const parts = String(yyyyMM || '').split('-');
+  if (parts.length !== 2) return yyyyMM;
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const name = MONTH_NAMES_ID[monthIdx];
+  return name ? (name + ' ' + parts[0]) : yyyyMM;
+}
 
 /* ============================================================
    API Layer — JSONP Mode (CORS-free via <script> tag)
@@ -743,7 +753,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-13-qsales-closing-dari-gl';
+const QSYSTEM_HTML_VERSION = '2026-08-14-klien-baru-per-bulan';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2283,6 +2293,27 @@ function qsalesDashboardHTML(){
       <div class="qstat"><div class="qnum" style="color:var(--success);">${d.closing || 0}</div><div class="qlbl">Jadi Klien</div></div>
       <div class="qstat"><div class="qnum" style="color:var(--danger);">${d.stop || 0}</div><div class="qlbl">Stop</div></div>
     </div>
+
+    ${d.klienBaru ? `
+    <div class="section-title">🆕 Klien Baru (Verifikasi GL)</div>
+    <div class="card">
+      <div class="row between" style="align-items:flex-end; margin-bottom:10px;">
+        <div>
+          <div style="font-size:28px; font-weight:800; color:var(--success);">${d.klienBaru.totalSinceStart}</div>
+          <div class="faint" style="font-size:11.5px;">Total sejak ${qsalesMonthLabelID_(d.klienBaru.startMonth)}</div>
+        </div>
+      </div>
+      <div class="faint" style="font-size:11px; margin-bottom:6px;">Dihitung dari SELURUH data GL (bukan cuma 50 baris ENTRY terakhir), berdasar tanggal invoice pertama tiap customer.</div>
+      <div style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;">
+        ${Object.keys(d.klienBaru.byMonth).filter(m => m >= d.klienBaru.startMonth).sort().map(m => `
+          <div style="flex:none; min-width:64px; text-align:center; background:var(--surface-alt); border-radius:8px; padding:8px 6px;">
+            <div style="font-weight:700; font-size:15px;">${d.klienBaru.byMonth[m]}</div>
+            <div class="faint" style="font-size:10px;">${qsalesMonthLabelID_(m)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
 
     <div class="section-title">Follow-up Pipeline</div>
     <div class="quick-stats">
