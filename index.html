@@ -743,7 +743,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-13-absensi-task-reminder';
+const QSYSTEM_HTML_VERSION = '2026-08-13-polling-60s-kuota';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1089,10 +1089,21 @@ async function refreshData(){
 // yang berjalan bersamaan. Data ini (state.data, Management Notes) HANYA
 // ditampilkan di tab 'dashboard'/'qtask' -- jadi polling-nya sekarang cuma
 // jalan kalau user BENAR-BENAR sedang di salah satu tab itu.
+// BARU (2026-08-13, OPTIMASI KUOTA): interval dinaikkan dari 30 ke 60 detik.
+// Ini SATU-SATUNYA sumber request TERBESAR di seluruh sistem -- tiap sesi
+// staff yang lagi buka tab dashboard/qtask memicu 2-3 request (getData +
+// getManagementNotes + kadang getMyNoteResponses) SETIAP siklus, SEPANJANG
+// jam kerja, DIKALIKAN jumlah staff yang buka bersamaan. Menaikkan ke 60
+// detik LANGSUNG memangkas volume ini SETENGAHNYA, dengan dampak UX minimal
+// (data dashboard tidak butuh kesegaran di bawah 1 menit). Kalau masih perlu
+// hemat lebih jauh, bisa dinaikkan lagi (mis. 90000/120000) -- refreshData()
+// juga tetap terpicu instan tiap kali tab jadi visible lagi / balik online
+// (lihat listener di bawah), jadi kenaikan interval TIDAK bikin data terasa
+// basi saat user baru buka/kembali ke tab.
 setInterval(()=>{
   if (!state.currentUser) return;
   if (state.appTab === 'dashboard' || state.appTab === 'qtask') refreshData();
-}, 30000);
+}, 60000);
 window.addEventListener('online', ()=>{ if (state.currentUser) refreshData(); });
 document.addEventListener('visibilitychange', ()=>{
   if (document.visibilityState === 'visible' && state.currentUser) refreshData();
@@ -5545,7 +5556,16 @@ init();
 function getEmployees(){
   // Merge hardcoded + dynamic, preserve qcoSystem from either source
   const dynamic = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : [];
-  if (!dynamic.length) return EMPLOYEES;
+  // BARU (2026-08-13, FIX BUG DROPDOWN LOGIN): SEBELUMNYA fungsi ini
+  // mengembalikan urutan yang BERBEDA tergantung sumber datanya -- fallback
+  // EMPLOYEES (urutan tetap sesuai array di kode) SEBELUM getData() selesai,
+  // lalu urutan BARIS SHEET (bisa beda total) SETELAH getData() selesai dan
+  // render ulang. User melaporkan dropdown login TERLIHAT BERUBAH URUTAN
+  // (mis. "Owner" pindah dari bawah ke tengah) tepat di seputar momen ini.
+  // Sekarang KEDUA jalur diurutkan SAMA PERSIS (alfabetis nama) supaya
+  // dropdown TIDAK PERNAH terlihat berubah urutan sama sekali, dari fallback
+  // maupun sesudah data live masuk.
+  if (!dynamic.length) return [...EMPLOYEES].sort((a, b) => a.name.localeCompare(b.name));
   const merged = [];
   const seen = new Set();
   // Dynamic first (from GAS), preserve qcoSystem
@@ -5565,6 +5585,7 @@ function getEmployees(){
   EMPLOYEES.forEach(e => {
     if (!seen.has(e.id)) merged.push(e);
   });
+  merged.sort((a, b) => a.name.localeCompare(b.name));
   return merged;
 }
 function findEmpDynamic(id){ 
