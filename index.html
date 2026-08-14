@@ -743,7 +743,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-13-polling-60s-kuota';
+const QSYSTEM_HTML_VERSION = '2026-08-13-qsales-closing-dari-gl';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2303,6 +2303,21 @@ function qsalesDashboardHTML(){
     </div>
     ` : ''}
 
+    ${isSpvOrOwner && (d.unmatchedCustomers || []).length > 0 ? `
+    <div class="section-title">🔍 Customer GL Tanpa Jejak Lead</div>
+    <div class="card" style="background:var(--surface-alt);">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Customer ini punya invoice nyata di GL, tapi nama-nya tidak bisa dihubungkan (lewat nomor telepon atau nama) ke lead manapun di ENTRY -- kemungkinan konsumen lama (sebelum QSales dipakai) atau butuh verifikasi manual.</div>
+      <div style="font-size:12px; max-height:220px; overflow-y:auto;">
+        ${d.unmatchedCustomers.filter(c => c.revenue > 0).sort((a,b) => b.revenue - a.revenue).map(c => `
+          <div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--line);">
+            <div>${escapeHTML(c.name)}${c.note ? `<div class="faint" style="font-size:10px; color:var(--warning);">${escapeHTML(c.note)}</div>` : ''}</div>
+            <div style="font-weight:600; white-space:nowrap; margin-left:8px;">${fmtRupiah(c.revenue)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
     <div class="section-title">Aksi Cepat</div>
     <div class="app-grid" style="grid-template-columns:repeat(2,1fr);">
       <div class="app-card" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">
@@ -2347,6 +2362,11 @@ function qsalesShopListHTML(shops){
           <span class="badge" style="background:${statusColor}20; color:${statusColor};">${statusLabel}</span>
         </div>
         <div class="task-owner">${escapeHTML(s.sales)} · ${escapeHTML(s.area || 'Area tidak diketahui')}</div>
+        ${s.status === 'closing' && s.glRevenue > 0 ? `
+          <div style="font-size:12px; font-weight:700; color:var(--success); margin-top:4px;">
+            💰 ${fmtRupiah(s.glRevenue)} <span class="faint" style="font-weight:400;">(terverifikasi GL${s.glCustomerName && s.glCustomerName !== s.name ? ' · sbg "' + escapeHTML(s.glCustomerName) + '"' : ''})</span>
+          </div>
+        ` : ''}
         <div class="task-badges">
           <span class="badge ${vBadge}">${visitLabel}</span>
           ${s.bahan ? `<span class="badge badge-active">${escapeHTML(s.bahan)}</span>` : ''}
