@@ -759,7 +759,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-17-content-plan-tab';
+const QSYSTEM_HTML_VERSION = '2026-08-17-ig-media-type-analysis';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -4263,6 +4263,69 @@ function contentPlanHTML(){
       <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Views</div><div style="font-size:16px; font-weight:700;">${(t.views||0).toLocaleString('id-ID')}</div></div>
     </div>
     <div class="faint" style="font-size:11px; margin-bottom:14px;">Total engagement (likes+komentar+simpan+share): ${engagementTotal.toLocaleString('id-ID')} · Follow baru dari post: ${(t.followsFromPost||0).toLocaleString('id-ID')}</div>
+
+    ${d.followerGrowth !== null ? `
+      <div class="card" style="margin-bottom:14px; background:${d.followerGrowth >= 0 ? 'var(--success-soft, #E8F5E9)' : 'var(--danger-soft)'};">
+        <div class="faint" style="font-size:11px;">Pertumbuhan Follower (dari data paling awal ke paling baru)</div>
+        <div style="font-size:20px; font-weight:800; color:${d.followerGrowth >= 0 ? 'var(--success)' : 'var(--danger)'};">${d.followerGrowth >= 0 ? '▲ +' : '▼ '}${d.followerGrowth.toLocaleString('id-ID')}</div>
+      </div>
+    ` : ''}
+
+    ${d.followersByMediaType && d.followersByMediaType.length > 0 ? `
+      <div class="section-title">👤 Follower Baru per Tipe Konten</div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="faint" style="font-size:11px; margin-bottom:8px;">Tipe konten mana yang paling banyak mendatangkan follower baru.</div>
+        ${(() => { const maxF = Math.max(...d.followersByMediaType.map(m => m.followsFromPost), 1); return d.followersByMediaType.map(m => `
+          <div style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;"><b>${escapeHTML(m.mediaType)}</b><span>${m.followsFromPost.toLocaleString('id-ID')} follower</span></div>
+            <div style="background:var(--line); border-radius:4px; height:8px; overflow:hidden;"><div style="width:${Math.max((m.followsFromPost/maxF)*100, 2)}%; background:var(--accent); height:100%;"></div></div>
+          </div>
+        `).join(''); })()}
+      </div>
+    ` : ''}
+
+    ${d.engagementByMediaType && d.engagementByMediaType.length > 0 ? `
+      <div class="section-title">📈 Rata-Rata Engagement per Tipe Konten</div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="table-wrap">
+          <table class="task-table" style="min-width:0; font-size:11px;">
+            <thead><tr><th>Tipe</th><th>Post</th><th>Avg Likes</th><th>Avg Reach</th><th>Save Rate</th><th>Share Rate</th></tr></thead>
+            <tbody>
+              ${d.engagementByMediaType.map(e => `
+                <tr>
+                  <td style="font-weight:600;">${escapeHTML(e.mediaType)}</td>
+                  <td>${e.posts}</td>
+                  <td>${e.avgLikes.toLocaleString('id-ID')}</td>
+                  <td>${e.avgReach.toLocaleString('id-ID')}</td>
+                  <td>${e.saveRatePct !== null ? e.saveRatePct + '%' : '—'}</td>
+                  <td>${e.shareRatePct !== null ? e.shareRatePct + '%' : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="faint" style="font-size:10px; margin-top:6px;">Save Rate & Share Rate = disimpan/dibagikan dibagi reach -- indikasi seberapa "layak disimpan/dibagikan" konten tipe itu, bukan cuma seberapa sering diposting.</div>
+      </div>
+    ` : ''}
+
+    ${d.matrix && d.matrix.months.length > 0 ? `
+      <div class="section-title">🗓️ Matriks Posting per Bulan</div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="faint" style="font-size:11px; margin-bottom:8px;">Berapa kali posting per bulan, dan tipe kontennya apa saja.</div>
+        <div class="table-wrap">
+          <table class="task-table" style="min-width:0; font-size:11px;">
+            <thead><tr><th>Bulan</th>${d.matrix.mediaTypes.map(mt => `<th>${escapeHTML(mt)}</th>`).join('')}<th>Total</th></tr></thead>
+            <tbody>
+              ${d.matrix.months.map(m => {
+                const monthData = d.matrix.data[m] || {};
+                const monthTotal = d.monthlyBreakdown.find(x => x.month === m);
+                return `<tr><td style="font-weight:600;">${escapeHTML(qsalesMonthLabelID_(m))}</td>${d.matrix.mediaTypes.map(mt => `<td>${monthData[mt] || 0}</td>`).join('')}<td style="font-weight:700;">${monthTotal ? monthTotal.totalPosts : 0}</td></tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
 
     ${d.igTopByReach && d.igTopByReach.length > 0 ? `
       <div class="section-title">🏆 Top 5 Post (Reach Tertinggi)</div>
