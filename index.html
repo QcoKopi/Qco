@@ -736,7 +736,13 @@ const APPS = [
   { id:'crm', name:'CRM', desc:'Cluster & aktivitas existing client', icon:'👥', status:'live', color:'crm' },
   { id:'wabot', name:'WA Bot', desc:'Kelola persona, ambil-alih & eskalasi chatbot', icon:'🤖', status:'live', color:'wabot' },
   { id:'qaff', name:'QAffiliator', desc:'Program afiliasi & komisi', icon:'🤝', status:'live', color:'qaff' },
+  { id:'content', name:'Content Plan', desc:'Analisis Instagram, TikTok, FB & FB Marketplace', icon:'📅', status:'live', color:'content' },
 ];
+
+// BARU (2026-08-17): daftar id untuk akses tab Content Plan -- SATU tempat,
+// dipakai BERSAMA oleh getAllowedApps() (kontrol nav sidebar) dan
+// contentPlanHTML() (pengaman render, jaga-jaga kalau tab diakses langsung).
+const CONTENT_PLAN_ALLOWED_IDS = ['owner', 'Qco', 'rizky', 'nanda'];
 
 
 
@@ -753,7 +759,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-14-klien-baru-nama-barang';
+const QSYSTEM_HTML_VERSION = '2026-08-17-content-plan-tab';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -767,6 +773,10 @@ let state = {
   qaffLoading: false,
   qaffError: null,
   qaffFetchAttempted: false,
+  contentPlanData: null,
+  contentPlanLoading: false,
+  contentPlanError: null,
+  contentPlanFetchAttempted: false,
   payrollMonth: new Date().getMonth() + 1,
   payrollYear: new Date().getFullYear(),
   payrollData: null,
@@ -1475,6 +1485,7 @@ function sidebarHTML(){
         ${navItem('qfin','💰','QFinance')}
         ${navItem('qsales','🎯','QSales')}
         ${navItem('qaff','🤝','QAffiliator')}
+        ${navItem('content','📅','Content Plan')}
         ${navItem('settings','⚙️','Pengaturan')}
       </nav>
       <div class="sidebar-fab">
@@ -2767,6 +2778,28 @@ async function fetchQAffData(){
     state.qaffLoading = false;
     state.qaffError = e.message || 'Gagal memuat data QAffiliator';
     showToast('QAffiliator: ' + state.qaffError);
+  }
+  render();
+}
+
+async function fetchContentPlanData(){
+  if (state.contentPlanLoading || state.contentPlanFetchAttempted) return;
+  state.contentPlanFetchAttempted = true;
+  state.contentPlanLoading = true;
+  state.contentPlanError = null;
+  render();
+  try {
+    const result = await apiCall('getContentPlanData', { requestingUserId: state.currentUser });
+    if (result && result.success) {
+      state.contentPlanData = result;
+      state.contentPlanLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.contentPlanLoading = false;
+    state.contentPlanError = e.message || 'Gagal memuat data Content Plan';
+    showToast('Content Plan: ' + state.contentPlanError);
   }
   render();
 }
@@ -4164,6 +4197,120 @@ function qaffDashboardHTML(){
   `;
 }
 
+function contentPlanHTML(){
+  const emp = findEmp(state.currentUser);
+  const canSeeTab = emp && CONTENT_PLAN_ALLOWED_IDS.includes(emp.id);
+  if (!canSeeTab) {
+    return `
+      <div class="greeting">Content Plan 📅</div>
+      <div class="greeting-sub">Akses ditolak</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;">
+          <b>⚠ Akses Ditolak:</b> Content Plan hanya dapat diakses oleh Owner, Admin Qco, Rizky, dan Nanda.
+        </div>
+        <button class="btn btn-primary" data-action="switch-app" data-app="dashboard">Kembali ke Dashboard</button>
+      </div>
+    `;
+  }
+
+  if (state.contentPlanLoading){
+    return `
+      <div class="greeting">Content Plan 📅</div>
+      <div class="empty-state"><span class="icon">📅</span><p>Memuat data dari sheet...</p></div>
+    `;
+  }
+  if (state.contentPlanError){
+    return `
+      <div class="greeting">Content Plan 📅</div>
+      <div class="greeting-sub">Gagal memuat data</div>
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:13px; color:var(--danger); margin-bottom:10px;"><b>⚠ Error:</b> ${escapeHTML(state.contentPlanError)}</div>
+        <button class="btn btn-primary" data-action="content-plan-refresh">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+  const d = state.contentPlanData;
+  if (!d){
+    return `<div class="empty-state"><span class="icon">📅</span><p>Data belum dimuat.</p><button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="content-plan-refresh">🔄 Muat Data</button></div>`;
+  }
+
+  const t = d.igTotals || {};
+  const engagementTotal = (t.likes||0) + (t.comments||0) + (t.saved||0) + (t.shares||0);
+
+  return `
+    <div class="greeting">Content Plan 📅</div>
+    <div class="greeting-sub">Analisis Instagram, TikTok, FB & FB Marketplace — data live dari sheet IG_Insight & KPI_Insight</div>
+
+    <a href="https://qcokopi.github.io/Content_log/content_log.html" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="margin-bottom:16px; text-decoration:none; text-align:center;">🛠️ Buka Content Plan Tool</a>
+
+    ${!d.igReady ? `<div class="card" style="background:#FFF3E0; margin-bottom:14px;"><div style="font-size:12.5px; color:#E65100;">⚠ Sheet "IG_Insight" tidak ditemukan -- analisis Instagram tidak bisa ditampilkan.</div></div>` : ''}
+    ${!d.kpiReady ? `<div class="card" style="background:#FFF3E0; margin-bottom:14px;"><div style="font-size:12.5px; color:#E65100;">⚠ Sheet "KPI_Insight" tidak ditemukan -- analisis TikTok/FB/FB Marketplace tidak bisa ditampilkan.</div></div>` : ''}
+
+    ${d.igReady ? `
+    <div class="section-title">📸 Instagram Insight</div>
+    <div class="card" style="background:linear-gradient(135deg, var(--accent) 0%, #B8763F 100%); color:#fff; margin-bottom:14px;">
+      <div style="font-size:12px; opacity:.85; margin-bottom:4px;">Total Follower (terkini)</div>
+      <div style="font-size:28px; font-weight:800; margin-bottom:6px;">${d.latestFollowerCount !== null ? d.latestFollowerCount.toLocaleString('id-ID') : '—'}</div>
+      <div style="font-size:11px; opacity:.85;">${d.latestSyncedAt ? 'Sinkron terakhir: ' + escapeHTML(d.latestSyncedAt) : ''} · ${t.posts || 0} post dilacak</div>
+    </div>
+
+    <div class="row gap-10" style="margin-bottom:14px; flex-wrap:wrap;">
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Total Likes</div><div style="font-size:16px; font-weight:700;">${(t.likes||0).toLocaleString('id-ID')}</div></div>
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Komentar</div><div style="font-size:16px; font-weight:700;">${(t.comments||0).toLocaleString('id-ID')}</div></div>
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Disimpan</div><div style="font-size:16px; font-weight:700;">${(t.saved||0).toLocaleString('id-ID')}</div></div>
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Dibagikan</div><div style="font-size:16px; font-weight:700;">${(t.shares||0).toLocaleString('id-ID')}</div></div>
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Reach</div><div style="font-size:16px; font-weight:700;">${(t.reach||0).toLocaleString('id-ID')}</div></div>
+      <div class="card" style="flex:1; min-width:100px;"><div class="faint" style="font-size:11px;">Views</div><div style="font-size:16px; font-weight:700;">${(t.views||0).toLocaleString('id-ID')}</div></div>
+    </div>
+    <div class="faint" style="font-size:11px; margin-bottom:14px;">Total engagement (likes+komentar+simpan+share): ${engagementTotal.toLocaleString('id-ID')} · Follow baru dari post: ${(t.followsFromPost||0).toLocaleString('id-ID')}</div>
+
+    ${d.igTopByReach && d.igTopByReach.length > 0 ? `
+      <div class="section-title">🏆 Top 5 Post (Reach Tertinggi)</div>
+      <div class="card" style="margin-bottom:16px;">
+        ${d.igTopByReach.map((p, i) => `
+          <div style="padding:8px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; font-size:12.5px;">#${i+1} ${escapeHTML(p.captionSnippet || '(tanpa caption)')}</div>
+              <div class="faint" style="font-size:11px;">${escapeHTML(p.postDate)} · ❤️ ${p.likes.toLocaleString('id-ID')} · 💬 ${p.comments.toLocaleString('id-ID')}</div>
+            </div>
+            <div style="font-weight:700; font-size:13px; white-space:nowrap;">👁️ ${p.reach.toLocaleString('id-ID')}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
+    <div class="section-title">Post Terbaru (${d.igPostsTotalCount || 0} total)</div>
+    <div class="card" style="margin-bottom:16px; max-height:360px; overflow-y:auto;">
+      ${(d.igPosts || []).length === 0 ? '<div class="faint" style="font-size:12px;">Belum ada data post.</div>' : d.igPosts.map(p => `
+        <div style="padding:8px 0; border-bottom:1px solid var(--line);">
+          <div style="font-weight:600; font-size:12.5px;">${escapeHTML(p.captionSnippet || '(tanpa caption)')} <span class="faint" style="font-weight:400;">${escapeHTML(p.scope)}</span></div>
+          <div class="faint" style="font-size:11px;">${escapeHTML(p.postDate)} · ❤️ ${p.likes.toLocaleString('id-ID')} · 💬 ${p.comments.toLocaleString('id-ID')} · 🔖 ${p.saved.toLocaleString('id-ID')} · ↗️ ${p.shares.toLocaleString('id-ID')} · 👁️ ${p.reach.toLocaleString('id-ID')} reach · ${p.views.toLocaleString('id-ID')} views</div>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+
+    ${d.kpiReady ? `
+    <div class="section-title">📊 KPI Insight (TikTok, FB & FB Marketplace)</div>
+    ${(d.kpiDestList || []).length === 0 ? `<div class="card"><div class="faint" style="font-size:12px;">Belum ada data KPI.</div></div>` : d.kpiDestList.map(destId => `
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700; font-size:13px; margin-bottom:8px;">${escapeHTML(destId)}</div>
+        ${(d.kpiByDest[destId] || []).map(m => `
+          <div style="padding:6px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; font-size:12px;">${escapeHTML(m.metric)}</div>
+              ${m.notes ? `<div class="faint" style="font-size:10.5px;">${escapeHTML(m.notes)}</div>` : ''}
+              <div class="faint" style="font-size:10px;">${escapeHTML(m.timestamp)}${m.contentRef ? ' · ' + escapeHTML(m.contentRef) : ''}</div>
+            </div>
+            <div style="font-weight:700; font-size:13px; white-space:nowrap;">${escapeHTML(String(m.value))}</div>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}
+    ` : ''}
+  `;
+}
+
 function mockupHTML(appId){
   const app = APPS.find(a=>a.id===appId);
   const features = {
@@ -4595,6 +4742,8 @@ function render(){
     else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
   } else if (state.appTab === 'qaff'){
     body = qaffDashboardHTML();
+  } else if (state.appTab === 'content'){
+    body = contentPlanHTML();
   } else if (state.appTab === 'settings'){
     body = qtaskSettingsHTML();
   } else {
@@ -4699,6 +4848,9 @@ document.addEventListener('click', function(e){
     }
     if (state.appTab === 'qaff' && !state.qaffData && !state.qaffLoading) {
       fetchQAffData();
+    }
+    if (state.appTab === 'content' && !state.contentPlanData && !state.contentPlanLoading) {
+      fetchContentPlanData();
     }
     // BARU: begitu pindah KE dashboard/qtask, langsung refresh sekali supaya
     // datanya segar seketika -- bukan nunggu sampai centang interval 30 detik
@@ -4961,6 +5113,12 @@ document.addEventListener('click', function(e){
     state.qaffData = null;
     state.qaffFetchAttempted = false;
     fetchQAffData();
+  }
+  else if (el.dataset.action === 'content-plan-refresh'){
+    state.contentPlanError = null;
+    state.contentPlanData = null;
+    state.contentPlanFetchAttempted = false;
+    fetchContentPlanData();
   }
   else if (el.dataset.action === 'load-payroll'){
     fetchPayrollData();
@@ -5747,6 +5905,16 @@ function getAllowedApps(userId){
   // kolom QcoSystem staff biasa -- murni berdasarkan role.
   if (emp.role === 'owner' && !allowed.includes('settings')) {
     allowed.push('settings');
+  }
+  // BARU (2026-08-17): "Content Plan" -- analisis Instagram/TikTok/FB/FB
+  // Marketplace insight, KHUSUS 4 orang ini persis (named-ID, BUKAN
+  // role-based, SAMA seperti pola CRM/WA Bot di atas): Owner, Admin Qco,
+  // Rizky, Nanda. "Admin" di sini ditafsirkan sebagai Admin Qco (id 'Qco')
+  // -- satu-satunya "Admin" yang pernah disebut sepanjang sesi ini,
+  // BUKAN sebuah role (role 'admin' tidak ada di sistem ini) -- kalau
+  // salah, cukup ubah CONTENT_PLAN_ALLOWED_IDS di atas (dekat definisi APPS).
+  if (CONTENT_PLAN_ALLOWED_IDS.includes(userId) && !allowed.includes('content')) {
+    allowed.push('content');
   }
   return allowed;
 }
