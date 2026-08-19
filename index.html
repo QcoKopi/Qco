@@ -332,6 +332,7 @@
   .settings-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line);}
   .settings-row:last-child{border-bottom:none;}
   select.inline-select{padding:7px 10px; border-radius:8px; border:1px solid var(--line); font-family:inherit; font-size:13px; background:var(--surface);}
+  input.inline-input{padding:7px 10px; border-radius:8px; border:1px solid var(--line); font-family:inherit; font-size:13px; background:var(--surface);}
 
   /* ---------- DASHBOARD STAFF ---------- */
   .profile-card{
@@ -759,12 +760,13 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-qfin-3tab-piutang-per-sales';
+const QSYSTEM_HTML_VERSION = '2026-08-19-stock-search-diagnostik';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
   qfinStockFilterProduk: 'all', // all | nama_produk
   qfinStockOnlySisa: false, // true = cuma tampilkan baris dengan sisa > 0
+  qfinStockSearch: '', // teks pencarian bebas: nama_produk, id_produk, batch_no
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
@@ -3164,12 +3166,18 @@ function qfinDashboardHTML(){
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
 
-  // Filter Stock: dropdown per produk + toggle "hanya ada sisa" (client-side filter, NOT calculation)
+  // Filter Stock: dropdown per produk + toggle "hanya ada sisa" + pencarian
+  // bebas (client-side filter, NOT calculation)
   const stockAll = d.stockKopiRows || [];
   const stockProdukOptions = [...new Set(stockAll.map(r => r.nama_produk).filter(Boolean))].sort();
+  const stockSearchQuery = String(state.qfinStockSearch || '').trim().toLowerCase();
   const stockRows = stockAll.filter(r => {
     if (state.qfinStockFilterProduk !== 'all' && r.nama_produk !== state.qfinStockFilterProduk) return false;
     if (state.qfinStockOnlySisa && !(Number(r.sisa) > 0)) return false;
+    if (stockSearchQuery) {
+      const haystack = [r.nama_produk, r.id_produk, r.batch_no].map(v => String(v || '').toLowerCase()).join(' ');
+      if (!haystack.includes(stockSearchQuery)) return false;
+    }
     return true;
   });
 
@@ -3317,8 +3325,27 @@ function qfinDashboardHTML(){
     </div>
   `;
 
+  const stockDiag = d.stockDiag || { sheetFound: false, kategoriColumnFound: false, totalRowsInSheet: 0, categoriesFound: [] };
+
   const stockTabBody = `
     <div class="section-title">☕ Stock Kopi</div>
+    ${stockAll.length === 0 && stockDiag.sheetFound && stockDiag.totalRowsInSheet > 0 ? `
+    <div class="card" style="background:#FFF3E0; margin-bottom:12px;">
+      <div style="font-size:12.5px; color:#E65100;">
+        <b>⚠ Sheet "Stock" ditemukan dengan ${stockDiag.totalRowsInSheet} baris, tapi tidak satu pun kategorinya mengandung kata "kopi".</b>
+        ${stockDiag.kategoriColumnFound ? `
+          <div style="margin-top:6px;">Kategori yang benar-benar ada di sheet: ${stockDiag.categoriesFound.map(k => `<span style="display:inline-block; background:#fff; border:1px solid #E65100; border-radius:99px; padding:1px 8px; margin:2px 4px 0 0; font-size:11px;">${escapeHTML(k)}</span>`).join('')}</div>
+        ` : `
+          <div style="margin-top:6px;">Kolom "kategori" itu sendiri tidak ditemukan di header sheet -- cek penamaan kolomnya.</div>
+        `}
+      </div>
+    </div>
+    ` : ''}
+    ${!stockDiag.sheetFound ? `
+    <div class="card" style="background:var(--danger-soft); margin-bottom:12px;">
+      <div style="font-size:12.5px; color:var(--danger);"><b>⚠ Sheet "Stock" tidak ditemukan sama sekali di spreadsheet.</b></div>
+    </div>
+    ` : ''}
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-stock">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -3329,6 +3356,7 @@ function qfinDashboardHTML(){
       </div>
       ${expandStock ? `
       <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);" onclick="event.stopPropagation()">
+        <input type="text" class="inline-input" data-action="set-qfin-stock-search" placeholder="🔍 Cari produk, ID, atau batch..." value="${escapeHTML(state.qfinStockSearch || '')}" style="flex:1; min-width:180px; max-width:260px;">
         <select class="inline-select" data-action="set-qfin-stock-produk" style="max-width:220px;">
           <option value="all" ${state.qfinStockFilterProduk==='all'?'selected':''}>Semua Produk (${stockProdukOptions.length})</option>
           ${stockProdukOptions.map(p => `<option value="${escapeHTML(p)}" ${state.qfinStockFilterProduk===p?'selected':''}>${escapeHTML(p)}</option>`).join('')}
@@ -5459,6 +5487,10 @@ document.addEventListener('input', function(e){
   if (e.target.dataset && e.target.dataset.action === 'wabot-sync-prompt-draft'){
     const field = e.target.dataset.field;
     if (field) state[field] = e.target.value;
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'set-qfin-stock-search'){
+    state.qfinStockSearch = e.target.value;
+    render();
   }
 });
 
