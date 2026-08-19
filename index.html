@@ -759,7 +759,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-18-fix-attendance-retry';
+const QSYSTEM_HTML_VERSION = '2026-08-19-audit-fixes';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -5390,15 +5390,15 @@ document.addEventListener('change', function(e){
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-meeting-weekday'){
     const v = Number(e.target.value);
-    apiCall('updateMeetingSetting','weekday',v).then(data=>{ state.data=data; render(); });
+    apiCall('updateMeetingSetting','weekday',v).then(data=>{ state.data=data; render(); }).catch(err=>{ showToast('Gagal simpan: ' + (err.message || 'coba lagi')); });
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-meeting-hour'){
     const v = Number(e.target.value);
-    apiCall('updateMeetingSetting','hour',v).then(data=>{ state.data=data; render(); });
+    apiCall('updateMeetingSetting','hour',v).then(data=>{ state.data=data; render(); }).catch(err=>{ showToast('Gagal simpan: ' + (err.message || 'coba lagi')); });
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-update-hour'){
     const v = Number(e.target.value);
-    apiCall('updateMeetingSetting','updateHour',v).then(data=>{ state.data=data; render(); });
+    apiCall('updateMeetingSetting','updateHour',v).then(data=>{ state.data=data; render(); }).catch(err=>{ showToast('Gagal simpan: ' + (err.message || 'coba lagi')); });
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-filter-dept'){
     state.filter.dept = e.target.value; render();
