@@ -759,7 +759,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-audit-fixes';
+const QSYSTEM_HTML_VERSION = '2026-08-19-qfin-3tab-piutang-per-sales';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -832,6 +832,7 @@ let state = {
   qsalesLoading: false,
   qsalesError: null,
   qsalesTab: 'dashboard', // dashboard | leads | kpi | kunjungan
+  qfinTab: 'kasbank', // kasbank | hutangpiutang | stock
   qsalesFilterSales: 'all', // 'all' | nama sales (untuk owner/spv filter)
   // QSales KPI sub-state
   qsalesKPIData: null,
@@ -2916,6 +2917,18 @@ async function savePayrollRates(){
   render();
 }
 
+function qfinSubNavHTML(){
+  const tabBtn = (tab, label) => `
+    <button class="btn btn-sm ${state.qfinTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qfin-tab" data-tab="${tab}">${label}</button>
+  `;
+  return `
+    <div class="row gap-6 wrap" style="margin-bottom:14px;">
+      ${tabBtn('kasbank','💰 Kas Bank & Target')}
+      ${tabBtn('hutangpiutang','📋 Hutang Piutang')}
+      ${tabBtn('stock','☕ Stock')}
+    </div>
+  `;
+}
 function qfinDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const canSeeTab = emp && (emp.role === 'spv' || emp.role === 'owner');
@@ -3167,34 +3180,9 @@ function qfinDashboardHTML(){
   const latestKas = latestMonthEntry(kasRow);
   const latestBank = latestMonthEntry(bankRow);
 
-  return `
-    <div class="greeting">QFinance 💰</div>
-    <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
+  const piutangPerSales = d.piutangPerSales || { available: false, salesList: [], grandTotal: 0 };
 
-    ${canOpenPortal ? `
-    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
-      <div class="app-card" onclick="window.open(CONFIG.QFIN_PORTAL_URL, '_blank')">
-        <div class="app-icon qfin">💰</div>
-        <div class="app-info">
-          <div class="app-name">Buka Portal QFinance</div>
-          <div class="app-desc">GL lengkap, Neraca, Rugi Laba, HPP, Inventory, Kas &amp; Bank, AR/AP</div>
-          <span class="app-status live">🟢 Live</span>
-        </div>
-      </div>
-    </div>
-    ` : `
-    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
-      <div class="app-card" style="opacity:.6; cursor:default;">
-        <div class="app-icon qfin">🔒</div>
-        <div class="app-info">
-          <div class="app-name">Portal QFinance</div>
-          <div class="app-desc">Akses portal dibatasi. Hubungi Supervisor Ops &amp; Product Development atau Director.</div>
-          <span class="app-status" style="background:var(--danger-soft); color:var(--danger);">🔒 Terkunci</span>
-        </div>
-      </div>
-    </div>
-    `}
-
+  const kasBankTabBody = `
     <div class="section-title">💰 Kas & Bank Saat Ini</div>
     <div class="card card-hero" style="margin-bottom:12px;">
       <div class="hero-row" style="align-items:stretch; flex-wrap:wrap; gap:20px;">
@@ -3237,7 +3225,9 @@ function qfinDashboardHTML(){
       ${renderTargetTable(plMonthKeys, d.penjualanBulanan || {}, d.targetBulanan.target)}
     </div>
     ` : ''}
+  `;
 
+  const hutangPiutangTabBody = `
     <div class="section-title">📋 Hutang Usaha</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-hutang">
@@ -3274,6 +3264,60 @@ function qfinDashboardHTML(){
       ]) : ''}
     </div>
 
+    <div class="section-title">🧑‍💼 Piutang Per Sales</div>
+    <div class="card" style="margin-bottom:12px;">
+      ${!piutangPerSales.available ? `
+        <div class="faint" style="font-size:12px;">Sheet Hutang_Piutang tidak ditemukan.</div>
+      ` : piutangPerSales.salesList.length === 0 ? `
+        <div class="faint" style="font-size:12px;">Blok "PIUTANG PER SALES" belum ditemukan di sheet -- pastikan kolom A berisi persis teks itu untuk seluruh baris bloknya.</div>
+      ` : `
+        <div class="row between" style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
+          <div style="font-weight:600; font-size:13px;">Total Piutang (semua sales)</div>
+          <div style="font-weight:800; font-size:15px; color:var(--danger);">${fmtRupiah(piutangPerSales.grandTotal)}</div>
+        </div>
+        ${piutangPerSales.salesList.map(s => {
+          const key = 'qfin-piutang-sales-' + s.salesName;
+          const isOpen = !!state.expanded[key];
+          return `
+          <div style="border-bottom:1px solid var(--line); padding:8px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="${escapeHTML(key)}">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="chev" style="color:var(--ink-faint); font-size:11px;">${isOpen ? '⌃' : '⌄'}</span>
+                <div style="font-weight:600; font-size:12.5px;">${escapeHTML(s.salesName)}</div>
+                <span class="faint" style="font-size:10.5px;">(${s.customers.length} customer)</span>
+              </div>
+              <div style="font-weight:700; font-size:13px;">${fmtRupiah(s.total)}</div>
+            </div>
+            ${isOpen ? `
+              <div style="margin-top:8px; margin-left:19px;">
+                ${s.customers.map(c => `
+                  <div style="padding:6px 0; border-top:1px dashed var(--line);">
+                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                      <div>${escapeHTML(c.customerName)}</div>
+                      <div style="font-weight:600;">${fmtRupiah(c.total)}</div>
+                    </div>
+                    ${c.invoices.length ? `
+                      <div style="margin-top:4px; margin-left:12px;">
+                        ${c.invoices.map(inv => `
+                          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--ink-faint); padding:2px 0;">
+                            <div>${escapeHTML(inv.ref)}</div>
+                            <div>${fmtRupiah(inv.total)}</div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `; }).join('')}
+      `}
+      <div class="muted" style="font-size:10.5px; margin-top:10px;">Blok mengambang "PIUTANG PER SALES" di sheet Hutang_Piutang -- dibaca lewat penanda kolom, bukan posisi baris tetap, jadi tetap akurat walau baris bergeser.</div>
+    </div>
+  `;
+
+  const stockTabBody = `
     <div class="section-title">☕ Stock Kopi</div>
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-stock">
@@ -3306,6 +3350,43 @@ function qfinDashboardHTML(){
         {label:'Sisa', key:'sisa'}
       ]) : ''}
     </div>
+  `;
+
+  const tabBody = state.qfinTab === 'hutangpiutang' ? hutangPiutangTabBody
+    : state.qfinTab === 'stock' ? stockTabBody
+    : kasBankTabBody;
+
+  return `
+    <div class="greeting">QFinance 💰</div>
+    <div class="greeting-sub">Posisi Keuangan · ${tanggalStr} <span class="faint">(live dari sheet)</span></div>
+
+    ${canOpenPortal ? `
+    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
+      <div class="app-card" onclick="window.open(CONFIG.QFIN_PORTAL_URL, '_blank')">
+        <div class="app-icon qfin">💰</div>
+        <div class="app-info">
+          <div class="app-name">Buka Portal QFinance</div>
+          <div class="app-desc">GL lengkap, Neraca, Rugi Laba, HPP, Inventory, Kas &amp; Bank, AR/AP</div>
+          <span class="app-status live">🟢 Live</span>
+        </div>
+      </div>
+    </div>
+    ` : `
+    <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
+      <div class="app-card" style="opacity:.6; cursor:default;">
+        <div class="app-icon qfin">🔒</div>
+        <div class="app-info">
+          <div class="app-name">Portal QFinance</div>
+          <div class="app-desc">Akses portal dibatasi. Hubungi Supervisor Ops &amp; Product Development atau Director.</div>
+          <span class="app-status" style="background:var(--danger-soft); color:var(--danger);">🔒 Terkunci</span>
+        </div>
+      </div>
+    </div>
+    `}
+
+    ${qfinSubNavHTML()}
+
+    ${tabBody}
 
     <p class="hint" style="text-align:center; margin-top:8px;">
       Data live dari sheet Neraca, Hutang_Piutang, Stock · Terakhir dimuat ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleTimeString('id-ID') : '-'}
@@ -5155,6 +5236,14 @@ document.addEventListener('click', function(e){
     if (state.qsalesTab === 'kpi' && !state.qsalesKPIData && !state.qsalesKPILoading) {
       fetchQSalesKPI();
     }
+    render();
+  }
+  else if (el.dataset.action === 'switch-qfin-tab'){
+    // BARU (2026-08-19): ganti sub-tab QFinance -- TIDAK perlu fetch ulang,
+    // ketiga tab (Kas Bank & Target / Hutang Piutang / Stock) semuanya
+    // sudah ada dalam SATU response qfin_getDashboard() yang sama, cuma
+    // beda bagian mana yang ditampilkan.
+    state.qfinTab = el.dataset.tab;
     render();
   }
   else if (el.dataset.action === 'reset-qsales-filter'){
