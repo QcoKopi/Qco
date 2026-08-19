@@ -759,7 +759,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-17-ig-media-type-analysis';
+const QSYSTEM_HTML_VERSION = '2026-08-18-fix-attendance-retry';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1089,7 +1089,23 @@ async function refreshData(){
       if (attempt === 2) state.syncStatus = 'offline';
     }
   }
-  if (state.currentUser) fetchManagementNotes();
+  if (state.currentUser) {
+    fetchManagementNotes();
+    // BARU (2026-08-18, FIX BUG NYATA): recordAttendance() SEBELUMNYA cuma
+    // dipanggil SEKALI, tepat setelah login, fire-and-forget TANPA retry
+    // (.catch(()=>{})). TERBUKTI dari laporan nyata: staff (Nanda) yang
+    // GENUINELY sudah login dan aktif memakai QSystem TETAP dapat reminder
+    // "belum login" -- artinya panggilan tunggal itu gagal diam-diam
+    // (kemungkinan besar sama seperti transport hiccup yang sudah berkali-
+    // kali ditemukan sepanjang malam ini utk getData/dsb), dan tidak ada
+    // kesempatan kedua untuk berhasil. Sekarang DIPANGGIL ULANG di SETIAP
+    // refreshData() (tiap 60 detik selama di tab dashboard/qtask, PLUS
+    // instan tiap pindah ke tab itu) -- aman dipanggil berkali-kali karena
+    // recordAttendance() di server SUDAH idempoten (tidak menulis apa-apa
+    // kalau firstLoginAt hari ini sudah tercatat), jadi ini murni jaring
+    // pengaman, bukan menambah beban tulis ke sheet.
+    apiCall('recordAttendance', { staffId: state.currentUser }).catch(()=>{});
+  }
   if (!state.modal.open && !state.mnModalOpen) render();
   else {
     const pill = document.querySelector('.sync-pill');
