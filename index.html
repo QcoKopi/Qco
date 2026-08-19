@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-stock-search-diagnostik';
+const QSYSTEM_HTML_VERSION = '2026-08-19-stock-skema-baru';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3173,9 +3173,9 @@ function qfinDashboardHTML(){
   const stockSearchQuery = String(state.qfinStockSearch || '').trim().toLowerCase();
   const stockRows = stockAll.filter(r => {
     if (state.qfinStockFilterProduk !== 'all' && r.nama_produk !== state.qfinStockFilterProduk) return false;
-    if (state.qfinStockOnlySisa && !(Number(r.sisa) > 0)) return false;
+    if (state.qfinStockOnlySisa && !(Number(r.sisa_kg) > 0)) return false;
     if (stockSearchQuery) {
-      const haystack = [r.nama_produk, r.id_produk, r.batch_no].map(v => String(v || '').toLowerCase()).join(' ');
+      const haystack = [r.nama_produk, r.sku, r.batch_no].map(v => String(v || '').toLowerCase()).join(' ');
       if (!haystack.includes(stockSearchQuery)) return false;
     }
     return true;
@@ -3325,38 +3325,34 @@ function qfinDashboardHTML(){
     </div>
   `;
 
-  const stockDiag = d.stockDiag || { sheetFound: false, kategoriColumnFound: false, totalRowsInSheet: 0, categoriesFound: [] };
+  const stockDiag = d.stockDiag || { sheetFound: false, totalRowsInSheet: 0, expectedColumnsMissing: [], headerColumnsFound: [] };
 
   const stockTabBody = `
-    <div class="section-title">☕ Stock Kopi</div>
-    ${stockAll.length === 0 && stockDiag.sheetFound && stockDiag.totalRowsInSheet > 0 ? `
-    <div class="card" style="background:#FFF3E0; margin-bottom:12px;">
-      <div style="font-size:12.5px; color:#E65100;">
-        <b>⚠ Sheet "Stock" ditemukan dengan ${stockDiag.totalRowsInSheet} baris, tapi tidak satu pun kategorinya mengandung kata "kopi".</b>
-        ${stockDiag.kategoriColumnFound ? `
-          <div style="margin-top:6px;">Kategori yang benar-benar ada di sheet: ${stockDiag.categoriesFound.map(k => `<span style="display:inline-block; background:#fff; border:1px solid #E65100; border-radius:99px; padding:1px 8px; margin:2px 4px 0 0; font-size:11px;">${escapeHTML(k)}</span>`).join('')}</div>
-        ` : `
-          <div style="margin-top:6px;">Kolom "kategori" itu sendiri tidak ditemukan di header sheet -- cek penamaan kolomnya.</div>
-        `}
-      </div>
-    </div>
-    ` : ''}
+    <div class="section-title">☕ Stock Produk</div>
     ${!stockDiag.sheetFound ? `
     <div class="card" style="background:var(--danger-soft); margin-bottom:12px;">
       <div style="font-size:12.5px; color:var(--danger);"><b>⚠ Sheet "Stock" tidak ditemukan sama sekali di spreadsheet.</b></div>
+    </div>
+    ` : stockDiag.expectedColumnsMissing.length > 0 ? `
+    <div class="card" style="background:#FFF3E0; margin-bottom:12px;">
+      <div style="font-size:12.5px; color:#E65100;">
+        <b>⚠ Sheet "Stock" ditemukan (${stockDiag.totalRowsInSheet} baris), tapi kolom berikut yang diharapkan TIDAK ADA di header:</b>
+        <div style="margin-top:6px;">${stockDiag.expectedColumnsMissing.map(c => `<span style="display:inline-block; background:#fff; border:1px solid #E65100; border-radius:99px; padding:1px 8px; margin:2px 4px 0 0; font-size:11px;">${escapeHTML(c)}</span>`).join('')}</div>
+        <div style="margin-top:6px;">Kolom yang benar-benar ada: ${stockDiag.headerColumnsFound.map(c => escapeHTML(c)).join(', ')}</div>
+      </div>
     </div>
     ` : ''}
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-stock">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">☕</span>
-          <div style="font-weight:600; font-size:14px;">Stock Kopi (sheet Stock) · ${stockRows.length}/${stockAll.length} baris</div>
+          <div style="font-weight:600; font-size:14px;">Stock Produk (sheet Stock) · ${stockRows.length}/${stockAll.length} baris</div>
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStock ? '⌃' : '⌄'}</span>
       </div>
       ${expandStock ? `
       <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);" onclick="event.stopPropagation()">
-        <input type="text" class="inline-input" data-action="set-qfin-stock-search" placeholder="🔍 Cari produk, ID, atau batch..." value="${escapeHTML(state.qfinStockSearch || '')}" style="flex:1; min-width:180px; max-width:260px;">
+        <input type="text" class="inline-input" data-action="set-qfin-stock-search" placeholder="🔍 Cari produk, SKU, atau batch..." value="${escapeHTML(state.qfinStockSearch || '')}" style="flex:1; min-width:180px; max-width:260px;">
         <select class="inline-select" data-action="set-qfin-stock-produk" style="max-width:220px;">
           <option value="all" ${state.qfinStockFilterProduk==='all'?'selected':''}>Semua Produk (${stockProdukOptions.length})</option>
           ${stockProdukOptions.map(p => `<option value="${escapeHTML(p)}" ${state.qfinStockFilterProduk===p?'selected':''}>${escapeHTML(p)}</option>`).join('')}
@@ -3369,13 +3365,12 @@ function qfinDashboardHTML(){
       ` : ''}
       ${expandStock ? renderRows(stockRows, [
         {label:'Produk', key:'nama_produk'},
-        {label:'ID', key:'id_produk'},
+        {label:'SKU', key:'sku'},
         {label:'Batch', key:'batch_no'},
         {label:'Tanggal', key:'tanggal'},
-        {label:'Diproduksi', key:'diproduksi'},
-        {label:'Terjual', key:'terjual'},
-        {label:'Assembly', key:'dipakai_assembly_lain'},
-        {label:'Sisa', key:'sisa'}
+        {label:'Produksi Awal (kg)', key:'produksi_awal_kg'},
+        {label:'Sisa (kg)', key:'sisa_kg'},
+        {label:'Status', key:'status', fn: v => `<span style="font-size:10.5px; padding:2px 8px; border-radius:99px; background:${v==='Tersedia'?'var(--success-soft, #E8F5E9)':'var(--line)'}; color:${v==='Tersedia'?'var(--success)':'var(--ink-faint)'}; font-weight:600;">${escapeHTML(v)}</span>`}
       ]) : ''}
     </div>
   `;
