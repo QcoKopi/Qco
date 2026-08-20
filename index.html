@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-rekap-piutang-pdf';
+const QSYSTEM_HTML_VERSION = '2026-08-19-rekap-piutang-fix';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -5338,7 +5338,11 @@ document.addEventListener('click', function(e){
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('Rekap Piutang ' + customerName + ' berhasil diunduh');
+        if (result.unmatchedInvoiceRefs && result.unmatchedInvoiceRefs.length > 0) {
+          showToast('⚠ Rekap ' + customerName + ' terunduh, TAPI rincian barang untuk invoice ' + result.unmatchedInvoiceRefs.join(', ') + ' tidak ditemukan di Penjualan_App (totalnya tetap benar).');
+        } else {
+          showToast('Rekap Piutang ' + customerName + ' berhasil diunduh');
+        }
       } else {
         showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
       }
