@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-rekap-piutang-fix';
+const QSYSTEM_HTML_VERSION = '2026-08-20-fix-invoice-ref-total';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3315,7 +3315,7 @@ function qfinDashboardHTML(){
                         ${c.invoices.map(inv => `
                           <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--ink-faint); padding:2px 0;">
                             <div>${escapeHTML(inv.ref)}</div>
-                            <div>${fmtRupiah(inv.total)}</div>
+                            <div>${inv.total > 0 ? fmtRupiah(inv.total) : '-'}</div>
                           </div>
                         `).join('')}
                       </div>
