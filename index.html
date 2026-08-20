@@ -760,13 +760,14 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-19-stock-skema-baru';
+const QSYSTEM_HTML_VERSION = '2026-08-19-rekap-piutang-pdf';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
   qfinStockFilterProduk: 'all', // all | nama_produk
   qfinStockOnlySisa: false, // true = cuma tampilkan baris dengan sisa > 0
   qfinStockSearch: '', // teks pencarian bebas: nama_produk, id_produk, batch_no
+  rekapPiutangLoading: null, // nama customer yang sedang di-generate PDF-nya, null kalau tidak ada
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
@@ -3300,9 +3301,14 @@ function qfinDashboardHTML(){
               <div style="margin-top:8px; margin-left:19px;">
                 ${s.customers.map(c => `
                   <div style="padding:6px 0; border-top:1px dashed var(--line);">
-                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                       <div>${escapeHTML(c.customerName)}</div>
-                      <div style="font-weight:600;">${fmtRupiah(c.total)}</div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="font-weight:600;">${fmtRupiah(c.total)}</div>
+                        <button class="btn btn-ghost btn-sm" data-action="download-rekap-piutang" data-customer="${escapeHTML(c.customerName)}" style="padding:3px 8px; font-size:10.5px;" ${state.rekapPiutangLoading === c.customerName ? 'disabled' : ''}>
+                          ${state.rekapPiutangLoading === c.customerName ? '⏳' : '📄 PDF'}
+                        </button>
+                      </div>
                     </div>
                     ${c.invoices.length ? `
                       <div style="margin-top:4px; margin-left:12px;">
@@ -5310,6 +5316,38 @@ document.addEventListener('click', function(e){
     state.contentPlanData = null;
     state.contentPlanFetchAttempted = false;
     fetchContentPlanData();
+  }
+  else if (el.dataset.action === 'download-rekap-piutang'){
+    const customerName = el.dataset.customer;
+    if (!customerName || state.rekapPiutangLoading) return;
+    state.rekapPiutangLoading = customerName;
+    render();
+    apiCall('generateRekapPiutangPDF', { customerName }).then(result => {
+      state.rekapPiutangLoading = null;
+      if (result && result.success && result.pdfBase64) {
+        // Decode base64 -> Blob -> trigger download lewat elemen <a> sementara.
+        const byteChars = atob(result.pdfBase64);
+        const byteNumbers = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.fileName || ('Rekap Piutang - ' + customerName + '.pdf');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Rekap Piutang ' + customerName + ' berhasil diunduh');
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+      }
+      render();
+    }).catch(err => {
+      state.rekapPiutangLoading = null;
+      showToast('Gagal membuat PDF: ' + (err.message || 'coba lagi'));
+      render();
+    });
   }
   else if (el.dataset.action === 'load-payroll'){
     fetchPayrollData();
