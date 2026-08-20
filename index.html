@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-20-fix-invoice-ref-total';
+const QSYSTEM_HTML_VERSION = '2026-08-20-hide-piutang-zero';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3189,7 +3189,26 @@ function qfinDashboardHTML(){
   const latestKas = latestMonthEntry(kasRow);
   const latestBank = latestMonthEntry(bankRow);
 
-  const piutangPerSales = d.piutangPerSales || { available: false, salesList: [], grandTotal: 0 };
+  const piutangPerSalesRaw = d.piutangPerSales || { available: false, salesList: [], grandTotal: 0 };
+  // BARU (2026-08-20): sales/customer dengan piutang Rp 0 tidak perlu
+  // ditampilkan. Filter diterapkan di level CUSTOMER (c.total -- sudah
+  // terbukti akurat dari kasus Serenona Coffeatery sebelumnya), lalu sales
+  // hanya dianggap "masih ada piutang" kalau SETELAH filter itu masih
+  // tersisa minimal 1 customer -- BUKAN mengandalkan s.total secara
+  // langsung, supaya aman walau ternyata angka level-sales juga pernah
+  // tidak sinkron dengan children-nya (sama seperti kasus level-invoice).
+  // Level INVOICE SENGAJA TIDAK ikut difilter di sini -- total 0 di level
+  // itu SUDAH TERBUKTI seringkali data yang salah (Serenona: kedua invoice
+  // tercatat Rp 0 padahal total customer-nya benar Rp 2.100.000), jadi
+  // menyembunyikan invoice ber-total 0 berisiko menyembunyikan tagihan
+  // yang sebenarnya masih harus dibayar.
+  const piutangPerSales = {
+    available: piutangPerSalesRaw.available,
+    grandTotal: piutangPerSalesRaw.grandTotal,
+    salesList: (piutangPerSalesRaw.salesList || [])
+      .map(s => ({ ...s, customers: (s.customers || []).filter(c => Number(c.total) > 0) }))
+      .filter(s => s.customers.length > 0)
+  };
 
   const kasBankTabBody = `
     <div class="section-title">💰 Kas & Bank Saat Ini</div>
@@ -3277,8 +3296,10 @@ function qfinDashboardHTML(){
     <div class="card" style="margin-bottom:12px;">
       ${!piutangPerSales.available ? `
         <div class="faint" style="font-size:12px;">Sheet Hutang_Piutang tidak ditemukan.</div>
-      ` : piutangPerSales.salesList.length === 0 ? `
+      ` : piutangPerSalesRaw.salesList.length === 0 ? `
         <div class="faint" style="font-size:12px;">Blok "PIUTANG PER SALES" belum ditemukan di sheet -- pastikan kolom A berisi persis teks itu untuk seluruh baris bloknya.</div>
+      ` : piutangPerSales.salesList.length === 0 ? `
+        <div class="faint" style="font-size:12px;">✅ Semua piutang sudah lunas -- tidak ada sales/customer dengan saldo outstanding saat ini.</div>
       ` : `
         <div class="row between" style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
           <div style="font-weight:600; font-size:13px;">Total Piutang (semua sales)</div>
