@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-20-absensi-harian';
+const QSYSTEM_HTML_VERSION = '2026-08-21-qsales-persales-ownergate';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2338,6 +2338,7 @@ function qsalesDashboardHTML(){
   const emp = findEmp(state.currentUser);
   const isStaff = emp && emp.role === 'staff';
   const isSpvOrOwner = emp && (emp.role === 'spv' || emp.role === 'owner');
+  const isOwner = emp && emp.role === 'owner';
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
 
   // Build sales filter dropdown for owner/spv
@@ -2415,7 +2416,7 @@ function qsalesDashboardHTML(){
     </div>
     ` : ''}
 
-    ${d.sampleAnalysis ? `
+    ${isOwner && d.sampleAnalysis ? `
     <div class="section-title">🧪 Analisis Sample</div>
     <div class="card" style="margin-bottom:16px;">
       <div class="faint" style="font-size:11px; margin-bottom:10px;">Pemberian sample ke lead (kolom "Sampling" di ENTRY) dihubungkan dengan status lead saat ini dan verifikasi "Jadi Klien" via GL -- angka yang sama dengan status closing di daftar shop.</div>
@@ -2508,7 +2509,7 @@ function qsalesDashboardHTML(){
     </div>
     ` : ''}
 
-    ${isSpvOrOwner && (d.unmatchedCustomers || []).length > 0 ? `
+    ${isOwner && (d.unmatchedCustomers || []).length > 0 ? `
     <div class="section-title">🔍 Customer GL Tanpa Jejak Lead</div>
     <div class="card" style="background:var(--surface-alt);">
       <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Customer ini punya invoice nyata di GL, tapi nama-nya tidak bisa dihubungkan (lewat nomor telepon atau nama) ke lead manapun di ENTRY -- kemungkinan konsumen lama (sebelum QSales dipakai) atau butuh verifikasi manual.</div>
