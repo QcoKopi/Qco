@@ -645,6 +645,36 @@ function testGASConnection(){
   });
 }
 
+/* ============================================================
+   BARU (2026-08-22): buka portal QSales/QFin HARUS lewat sini --
+   token sekali-pakai umur pendek diterbitkan dulu, portal (Sales
+   Portal / QFin) memvalidasi token itu SEBELUM render apa pun.
+   Mencegah akses langsung ke htmlnya masing-masing (bookmark/link
+   lama) tanpa lewat QSystem.
+
+   PENTING soal popup blocker: window.open() HARUS dipanggil LANGSUNG
+   secara sinkron di dalam klik pengguna -- kalau dipanggil di dalam
+   .then()/async callback SETELAH menunggu token, browser modern akan
+   memblokirnya (dianggap bukan lagi "user gesture langsung"). Makanya
+   tab KOSONG dibuka DULU secara sinkron, baru location-nya diarahkan
+   belakangan setelah token siap.
+   ============================================================ */
+function openPortalWithToken(portal, baseUrl){
+  const newTab = window.open('', '_blank');
+  const emp = findEmp(state.currentUser);
+  apiCall('issuePortalToken', { portal: portal, staffId: emp ? emp.name : state.currentUser }).then(result => {
+    if (result && result.success && result.token) {
+      newTab.location.href = baseUrl + (baseUrl.indexOf('?') === -1 ? '?' : '&') + 't=' + encodeURIComponent(result.token);
+    } else {
+      newTab.close();
+      showToast('Gagal membuka portal: ' + ((result && result.error) || 'coba lagi'));
+    }
+  }).catch(err => {
+    newTab.close();
+    showToast('Gagal membuka portal: ' + (err.message || 'coba lagi'));
+  });
+}
+
 function apiCall(fnName, ...args){
   if (isGASNative()) {
     return gsNative(fnName, ...args);
@@ -760,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-21-kpi-jadwal-hari-kerja';
+const QSYSTEM_HTML_VERSION = '2026-08-22-portal-token-guard';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2527,7 +2557,7 @@ function qsalesDashboardHTML(){
 
     <div class="section-title">Aksi Cepat</div>
     <div class="app-grid" style="grid-template-columns:repeat(2,1fr);">
-      <div class="app-card" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">
+      <div class="app-card" onclick="openPortalWithToken('qsales', CONFIG.QSALES_PORTAL_URL)">
         <div class="app-icon qsales">🎯</div>
         <div class="app-info">
           <div class="app-name">Buka Portal QSales</div>
@@ -2615,7 +2645,7 @@ function qsalesKunjunganHTML(){
     <div class="card" style="text-align:center; padding:40px 20px;">
       <span class="icon" style="font-size:32px; margin-bottom:12px; display:block;">📅</span>
       <p style="color:var(--ink-soft); font-size:13px; margin-bottom:16px;">Jadwal kunjungan lengkap tersedia di Portal QSales.</p>
-      <button class="btn btn-primary" onclick="window.open(CONFIG.QSALES_PORTAL_URL, '_blank')">Buka Portal QSales</button>
+      <button class="btn btn-primary" onclick="openPortalWithToken('qsales', CONFIG.QSALES_PORTAL_URL)">Buka Portal QSales</button>
     </div>
   `;
 }
@@ -3608,7 +3638,7 @@ function qfinDashboardHTML(){
 
     ${canOpenPortal ? `
     <div class="app-grid" style="grid-template-columns:1fr; margin-bottom:16px;">
-      <div class="app-card" onclick="window.open(CONFIG.QFIN_PORTAL_URL, '_blank')">
+      <div class="app-card" onclick="openPortalWithToken('qfin', CONFIG.QFIN_PORTAL_URL)">
         <div class="app-icon qfin">💰</div>
         <div class="app-info">
           <div class="app-name">Buka Portal QFinance</div>
