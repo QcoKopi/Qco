@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-22-portal-token-guard';
+const QSYSTEM_HTML_VERSION = '2026-08-22-content-log-button-guard';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -4614,7 +4614,7 @@ function contentPlanHTML(){
     <div class="greeting">Content Plan 📅</div>
     <div class="greeting-sub">Analisis Instagram, TikTok, FB & FB Marketplace — data live dari sheet IG_Insight & KPI_Insight</div>
 
-    <a href="https://qcokopi.github.io/Content_log/content_log.html" target="_blank" rel="noopener" class="btn btn-primary btn-block" style="margin-bottom:16px; text-decoration:none; text-align:center;">🛠️ Buka Content Plan Tool</a>
+    <button onclick="openPortalWithToken('content_log', 'https://qcokopi.github.io/Content_log/content_log.html')" class="btn btn-primary btn-block" style="margin-bottom:16px; text-align:center;">🛠️ Buka Content Plan Tool</button>
 
     ${!d.igReady ? `<div class="card" style="background:#FFF3E0; margin-bottom:14px;"><div style="font-size:12.5px; color:#E65100;">⚠ Sheet "IG_Insight" tidak ditemukan -- analisis Instagram tidak bisa ditampilkan.</div></div>` : ''}
     ${!d.kpiReady ? `<div class="card" style="background:#FFF3E0; margin-bottom:14px;"><div style="font-size:12.5px; color:#E65100;">⚠ Sheet "KPI_Insight" tidak ditemukan -- analisis TikTok/FB/FB Marketplace tidak bisa ditampilkan.</div></div>` : ''}
