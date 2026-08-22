@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-21-qsales-persales-ownergate';
+const QSYSTEM_HTML_VERSION = '2026-08-21-kpi-jadwal-hari-kerja';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -773,6 +773,7 @@ let state = {
   absensiReportLoading: false,
   absensiReportError: null,
   absensiExpandedDates: [], // tanggal yang sedang di-expand di laporan absensi
+  kpiExpandedDays: [], // tanggal yang sedang di-expand di jadwal kunjungan KPI Sales
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
@@ -2728,7 +2729,7 @@ function qsalesKPIHTML(){
       <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--surface);">
         <div>
           <div style="font-weight:600; font-size:13px;">${escapeHTML(w.weekLabel)}</div>
-          <div style="font-size:11px; color:var(--ink-soft);">${w.month}</div>
+          <div style="font-size:11px; color:var(--ink-soft);">${w.month} · ${w.visitDays || 0} hari kerja</div>
         </div>
         <div style="text-align:right;">
           <div style="font-family:var(--font-mono); font-size:18px; font-weight:500; color:${statusColor};">${w.totalVisit}</div>
@@ -2738,27 +2739,46 @@ function qsalesKPIHTML(){
     `;
   }).join('');
 
-  // Daily HTML (last 14 days)
+  // Daily HTML (last 14 days) -- expandable, menampilkan JADWAL KUNJUNGAN
+  // (nama shop + area + visit ke), bukan cuma hitung V1/V2/V3 agregat.
   const dailyHTML = daily.slice(-14).reverse().map(day => {
     const isAchieved = day.status === 'TERCAPAI';
     const statusColor = isAchieved ? 'var(--success)' : (day.isWorkingDay ? 'var(--danger)' : 'var(--ink-faint)');
     const dateObj = new Date(day.date + 'T00:00:00');
     const dayName = DAYS_ID[dateObj.getDay()];
+    const isOpen = (state.kpiExpandedDays || []).includes(day.date);
+    const hasSchedule = (day.visitList || []).length > 0;
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); ${!day.isWorkingDay ? 'opacity:.6;' : ''}">
-        <div>
-          <div style="font-weight:600; font-size:12px;">${dayName}, ${fmtDate(day.date)}</div>
-          <div style="font-size:11px; color:var(--ink-soft);">
-            ${day.isWorkingDay ? 'Hari Kerja' : 'Libur'}
-            ${day.visit1 > 0 ? ` · V1:${day.visit1}` : ''}
-            ${day.visit2 > 0 ? ` · V2:${day.visit2}` : ''}
-            ${day.visit3 > 0 ? ` · V3:${day.visit3}` : ''}
+      <div style="border-bottom:1px solid var(--line); ${!day.isWorkingDay ? 'opacity:.6;' : ''}">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; ${hasSchedule ? 'cursor:pointer;' : ''}" ${hasSchedule ? `data-action="toggle-kpi-day" data-date="${escapeHTML(day.date)}"` : ''}>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${hasSchedule ? `<span class="chev" style="color:var(--ink-faint); font-size:10px;">${isOpen ? '⌃' : '⌄'}</span>` : ''}
+            <div>
+              <div style="font-weight:600; font-size:12px;">${dayName}, ${fmtDate(day.date)}</div>
+              <div style="font-size:11px; color:var(--ink-soft);">
+                ${day.isWorkingDay ? 'Hari Kerja' : 'Libur'}
+                ${day.visit1 > 0 ? ` · V1:${day.visit1}` : ''}
+                ${day.visit2 > 0 ? ` · V2:${day.visit2}` : ''}
+                ${day.visit3 > 0 ? ` · V3:${day.visit3}` : ''}
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono); font-size:16px; font-weight:500; color:${statusColor};">${day.totalVisit}</div>
+            <div style="font-size:10px; color:var(--ink-soft);">/ ${day.target}</div>
           </div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-family:var(--font-mono); font-size:16px; font-weight:500; color:${statusColor};">${day.totalVisit}</div>
-          <div style="font-size:10px; color:var(--ink-soft);">/ ${day.target}</div>
-        </div>
+        ${isOpen && hasSchedule ? `
+          <div style="padding:0 10px 10px 26px;">
+            <div class="faint" style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;">Jadwal Kunjungan</div>
+            ${day.visitList.map(v => `
+              <div style="display:flex; justify-content:space-between; font-size:11.5px; padding:3px 0; border-top:1px dashed var(--line);">
+                <div>${escapeHTML(v.shop || '(tanpa nama)')}${v.area ? ` <span class="faint">· ${escapeHTML(v.area)}</span>` : ''}${!isStaff ? ` <span class="faint">· ${escapeHTML(v.sales)}</span>` : ''}</div>
+                <div class="faint">V${v.visitKe}</div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -5628,6 +5648,13 @@ document.addEventListener('click', function(e){
     const idx = state.absensiExpandedDates.indexOf(date);
     if (idx >= 0) state.absensiExpandedDates.splice(idx, 1);
     else state.absensiExpandedDates.push(date);
+    render();
+  }
+  else if (el.dataset.action === 'toggle-kpi-day'){
+    const date = el.dataset.date;
+    const idx = state.kpiExpandedDays.indexOf(date);
+    if (idx >= 0) state.kpiExpandedDays.splice(idx, 1);
+    else state.kpiExpandedDays.push(date);
     render();
   }
   else if (el.dataset.action === 'toggle-fee-recon-detail'){
