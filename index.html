@@ -760,7 +760,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-20-sample-analysis';
+const QSYSTEM_HTML_VERSION = '2026-08-20-absensi-harian';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -768,6 +768,11 @@ let state = {
   qfinStockOnlySisa: false, // true = cuma tampilkan baris dengan sisa > 0
   qfinStockSearch: '', // teks pencarian bebas: nama_produk, id_produk, batch_no
   rekapPiutangLoading: null, // nama customer yang sedang di-generate PDF-nya, null kalau tidak ada
+  piutangReminderLoading: null, // nama customer yang sedang dikirim reminder-nya, null kalau tidak ada
+  absensiReportData: null,
+  absensiReportLoading: false,
+  absensiReportError: null,
+  absensiExpandedDates: [], // tanggal yang sedang di-expand di laporan absensi
   qfinData: null,
   qfinLoading: false,
   qfinError: null,
@@ -2071,6 +2076,47 @@ function qtaskSettingsHTML(){
     ` : ''}
 
     ${emp.role==='owner' ? `
+    <div class="section-title">🗓️ Absensi Harian</div>
+    <div class="card">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Siapa saja yang benar-benar buka QSystem tiap hari (dari sheet Absensi_Log), termasuk yang TIDAK buka -- 30 hari terakhir.</div>
+      <button class="btn btn-primary btn-sm" data-action="load-absensi-report" style="margin-bottom:12px;" ${state.absensiReportLoading ? 'disabled' : ''}>${state.absensiReportLoading ? 'Memuat...' : 'Muat Laporan Absensi'}</button>
+
+      ${state.absensiReportError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.absensiReportError)}</div>` : ''}
+
+      ${state.absensiReportData ? (
+        !state.absensiReportData.sheetFound ? `<div class="faint" style="font-size:12px;">Belum ada data absensi tercatat (sheet Absensi_Log belum ada -- akan otomatis dibuat begitu ada yang login).</div>` :
+        state.absensiReportData.days.length === 0 ? `<div class="faint" style="font-size:12px;">Belum ada riwayat login tercatat.</div>` : `
+        ${state.absensiReportData.days.map(day => {
+          const isOpen = (state.absensiExpandedDates || []).includes(day.date);
+          const allPresent = day.presentCount === day.totalCount;
+          return `
+          <div style="border-bottom:1px solid var(--line); padding:8px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-absensi-date" data-date="${escapeHTML(day.date)}">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="chev" style="color:var(--ink-faint); font-size:11px;">${isOpen ? '⌃' : '⌄'}</span>
+                <div style="font-weight:600; font-size:12.5px;">${escapeHTML(day.date)}</div>
+              </div>
+              <div style="font-weight:700; font-size:12.5px; color:${allPresent ? 'var(--success)' : 'var(--warning)'};">${day.presentCount}/${day.totalCount} hadir</div>
+            </div>
+            ${isOpen ? `
+              <div style="margin-top:8px; margin-left:19px; display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:140px;">
+                  <div class="faint" style="font-size:10.5px; font-weight:700; margin-bottom:4px;">✅ HADIR (${day.present.length})</div>
+                  ${day.present.map(p => `<div style="font-size:11.5px; display:flex; justify-content:space-between; padding:2px 0;"><span>${escapeHTML(p.name)}</span><span class="faint">${escapeHTML(p.time)}</span></div>`).join('')}
+                </div>
+                <div style="flex:1; min-width:140px;">
+                  <div class="faint" style="font-size:10.5px; font-weight:700; margin-bottom:4px; color:var(--danger);">❌ TIDAK HADIR (${day.absent.length})</div>
+                  ${day.absent.length === 0 ? `<div class="faint" style="font-size:11px;">-</div>` : day.absent.map(p => `<div style="font-size:11.5px; padding:2px 0;">${escapeHTML(p.name)}</div>`).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `; }).join('')}
+      `) : ''}
+    </div>
+    ` : ''}
+
+    ${emp.role==='owner' ? `
     <div class="section-title">&#128227; Management Notes</div>
     <div class="card">
       <div style="margin-bottom:12px;">
@@ -2434,6 +2480,22 @@ function qsalesDashboardHTML(){
       <div class="qstat"><div class="qnum" style="color:#7B6B4D;">${d.v3Ongoing || 0}</div><div class="qlbl">V3 On Going</div></div>
       <div class="qstat"><div class="qnum" style="color:var(--accent-dark);">${d.sampling || 0}</div><div class="qlbl">Sampling</div></div>
     </div>
+
+    ${(d.piutangReminders || []).length > 0 ? `
+    <div class="card" style="background:var(--danger-soft); border-color:#E8B4A8; margin-bottom:16px;">
+      <div class="row gap-8" style="margin-bottom:8px;"><b style="color:var(--danger);">💰 ${d.piutangReminders.length} klien punya piutang jatuh tempo</b></div>
+      ${d.piutangReminders.map(r => `
+        <div style="padding:8px 0; border-top:1px dashed #E8B4A8; display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div style="min-width:0;">
+            <div style="font-weight:600; font-size:12.5px;">${escapeHTML(r.customerName)}</div>
+            <div class="faint" style="font-size:11px;">Invoice jatuh tempo: ${escapeHTML(r.invoiceRefs)}</div>
+            <div style="font-weight:700; font-size:12px; color:var(--danger); margin-top:2px;">${fmtRupiah(r.grandTotal)}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-action="ack-piutang-reminder" data-id="${escapeHTML(r.id)}" style="padding:3px 8px; font-size:10.5px; white-space:nowrap;">✓ Sudah Dibaca</button>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
 
     ${reminderTotal > 0 ? `
     <div class="card" style="background:var(--warning-soft); border-color:#E6C68E; margin-bottom:16px;">
@@ -3438,6 +3500,9 @@ function qfinDashboardHTML(){
                         <div style="font-weight:600;">${fmtRupiah(c.total)}</div>
                         <button class="btn btn-ghost btn-sm" data-action="download-rekap-piutang" data-customer="${escapeHTML(c.customerName)}" style="padding:3px 8px; font-size:10.5px;" ${state.rekapPiutangLoading === c.customerName ? 'disabled' : ''}>
                           ${state.rekapPiutangLoading === c.customerName ? '⏳' : '📄 PDF'}
+                        </button>
+                        <button class="btn btn-ghost btn-sm" data-action="send-piutang-reminder" data-customer="${escapeHTML(c.customerName)}" style="padding:3px 8px; font-size:10.5px;" ${state.piutangReminderLoading === c.customerName ? 'disabled' : ''} title="Kirim reminder ke dashboard sales -- HANYA jika ada invoice yang sudah jatuh tempo">
+                          ${state.piutangReminderLoading === c.customerName ? '⏳' : '⏰ Reminder'}
                         </button>
                       </div>
                     </div>
@@ -5484,6 +5549,41 @@ document.addEventListener('click', function(e){
       render();
     });
   }
+  else if (el.dataset.action === 'send-piutang-reminder'){
+    const customerName = el.dataset.customer;
+    if (!customerName || state.piutangReminderLoading) return;
+    state.piutangReminderLoading = customerName;
+    render();
+    apiCall('sendPiutangReminderToSales', { customerName }).then(result => {
+      state.piutangReminderLoading = null;
+      showToast(result && result.success ? result.message : ('Gagal: ' + ((result && result.error) || 'coba lagi')));
+      render();
+    }).catch(err => {
+      state.piutangReminderLoading = null;
+      showToast('Gagal kirim reminder: ' + (err.message || 'coba lagi'));
+      render();
+    });
+  }
+  else if (el.dataset.action === 'ack-piutang-reminder'){
+    const reminderId = el.dataset.id;
+    if (!reminderId) return;
+    // Optimistic: hilangkan dari tampilan LANGSUNG, rollback kalau gagal --
+    // sama seperti pola optimistic-update yang sudah dipakai di fitur lain.
+    const prevList = state.qsalesData.piutangReminders;
+    state.qsalesData.piutangReminders = prevList.filter(r => r.id !== reminderId);
+    render();
+    apiCall('acknowledgePiutangReminder', { reminderId }).then(result => {
+      if (!result || !result.success) {
+        state.qsalesData.piutangReminders = prevList; // rollback
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+        render();
+      }
+    }).catch(err => {
+      state.qsalesData.piutangReminders = prevList; // rollback
+      showToast('Gagal: ' + (err.message || 'coba lagi'));
+      render();
+    });
+  }
   else if (el.dataset.action === 'load-payroll'){
     fetchPayrollData();
   }
@@ -5502,6 +5602,32 @@ document.addEventListener('click', function(e){
   }
   else if (el.dataset.action === 'save-payroll-rates'){
     savePayrollRates();
+  }
+  else if (el.dataset.action === 'load-absensi-report'){
+    if (state.absensiReportLoading) return;
+    state.absensiReportLoading = true;
+    state.absensiReportError = null;
+    render();
+    apiCall('getAbsensiReport').then(result => {
+      state.absensiReportLoading = false;
+      if (result && result.success) {
+        state.absensiReportData = result;
+      } else {
+        state.absensiReportError = (result && result.error) || 'Gagal memuat laporan absensi';
+      }
+      render();
+    }).catch(err => {
+      state.absensiReportLoading = false;
+      state.absensiReportError = err.message || 'Gagal memuat laporan absensi';
+      render();
+    });
+  }
+  else if (el.dataset.action === 'toggle-absensi-date'){
+    const date = el.dataset.date;
+    const idx = state.absensiExpandedDates.indexOf(date);
+    if (idx >= 0) state.absensiExpandedDates.splice(idx, 1);
+    else state.absensiExpandedDates.push(date);
+    render();
   }
   else if (el.dataset.action === 'toggle-fee-recon-detail'){
     const id = el.dataset.id;
