@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-22-jadwal-kunjungan';
+const QSYSTEM_HTML_VERSION = '2026-08-22-filter-diagnostic-hardening';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2243,7 +2243,7 @@ async function fetchQSalesData(){
   render();
   try {
     const emp = findEmp(state.currentUser);
-    const isStaff = emp && emp.role === 'staff';
+    const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff'; // FIX (2026-08-22): tahan terhadap variasi casing/spasi di kolom role sheet Employees, bukan cuma perbandingan string persis
     let salesName, userRole;
     if (isStaff) {
       salesName = emp ? emp.name : '';
@@ -2289,7 +2289,7 @@ async function fetchQSalesKPI(){
   render();
   try {
     const emp = findEmp(state.currentUser);
-    const isStaff = emp && emp.role === 'staff';
+    const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff'; // FIX (2026-08-22): tahan terhadap variasi casing/spasi di kolom role sheet Employees, bukan cuma perbandingan string persis
     let salesName, userRole;
     if (isStaff) {
       salesName = emp ? emp.name : '';
@@ -2367,7 +2367,7 @@ function qsalesDashboardHTML(){
   }
 
   const emp = findEmp(state.currentUser);
-  const isStaff = emp && emp.role === 'staff';
+  const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff'; // FIX (2026-08-22): tahan terhadap variasi casing/spasi di kolom role sheet Employees, bukan cuma perbandingan string persis
   const isSpvOrOwner = emp && (emp.role === 'spv' || emp.role === 'owner');
   const isOwner = emp && emp.role === 'owner';
   const reminderTotal = (d.needV2 || 0) + (d.needV3 || 0) + (d.v3Ongoing || 0);
@@ -2388,9 +2388,17 @@ function qsalesDashboardHTML(){
     <div class="greeting">QSales Intelligence 🎯</div>
     <div class="greeting-sub">
       Ringkasan leads, reminder, &amp; pipeline penjualan
-      ${isStaff ? `<span class="badge badge-active" style="margin-left:6px;">👤 ${escapeHTML(emp.name)} only</span>` : ''}
-      ${isSpvOrOwner && state.qsalesFilterSales !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Filter: ${escapeHTML(state.qsalesFilterSales)}</span>` : ''}
+      ${d.filteredBy && d.filteredBy !== 'all' ? `<span class="badge badge-active" style="margin-left:6px;">👤 Data difilter: ${escapeHTML(d.filteredBy)}</span>` : `<span class="badge" style="margin-left:6px; background:var(--warning-soft); color:var(--warning);">👥 Data TIDAK difilter (semua sales)</span>`}
     </div>
+
+    ${isStaff && (!d.filteredBy || d.filteredBy === 'all') ? `
+    <div class="card" style="background:var(--danger-soft); border-color:#E8B4A8; margin-bottom:16px;">
+      <div style="font-size:12.5px; color:var(--danger); font-weight:700;">⚠ PERINGATAN: filter tidak diterapkan</div>
+      <div style="font-size:11.5px; color:var(--danger); margin-top:4px;">
+        Anda login sebagai staff (${escapeHTML(emp.name)}), TAPI backend mengirim data TANPA filter (semua sales). Kemungkinan besar server GAS/backend yang aktif BELUM di-deploy dengan versi 06_QSales.gs terbaru -- deploy ulang backend, lalu refresh halaman ini.
+      </div>
+    </div>
+    ` : ''}
 
     ${salesFilterHTML}
     ${qsalesSubNavHTML()}
@@ -2664,7 +2672,7 @@ function qsalesLeadsHTML(){
   const totalLeads = needFollowUp.length;
   needFollowUp = needFollowUp.slice(0, 50);
   const emp = findEmp(state.currentUser);
-  const isStaff = emp && emp.role === 'staff';
+  const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff'; // FIX (2026-08-22): tahan terhadap variasi casing/spasi di kolom role sheet Employees, bukan cuma perbandingan string persis
   return `
     <div class="greeting">Daftar Leads</div>
     <div class="greeting-sub">
@@ -2725,7 +2733,7 @@ function qsalesKPIHTML(){
   }
 
   const emp = findEmp(state.currentUser);
-  const isStaff = emp && emp.role === 'staff';
+  const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff'; // FIX (2026-08-22): tahan terhadap variasi casing/spasi di kolom role sheet Employees, bukan cuma perbandingan string persis
   const isSpvOrOwner = emp && (emp.role === 'spv' || emp.role === 'owner');
   const summary = d.summary || {};
   const monthly = d.monthly || [];
