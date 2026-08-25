@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-22-filter-diagnostic-hardening';
+const QSYSTEM_HTML_VERSION = '2026-08-25-login-dropdown-fix';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -6380,7 +6380,19 @@ async function init(){
     console.error('[QSystem] getData failed:', e);
     state.syncStatus = 'offline';
   }
-  render();
+  // FIX (2026-08-25, BUG NYATA -- dilaporkan user): SEBELUMNYA render()
+  // di sini SELALU dipanggil, TANPA SYARAT -- kalau ini selesai TEPAT
+  // saat user sedang klik dropdown "Pilih nama" di layar login, SELURUH
+  // elemen <select> dihancurkan & dibuat ulang di tengah interaksi
+  // (karena render() mengganti innerHTML penuh), membuat klik pertama
+  // gagal/salah pilih, perlu klik dua kali. Sekarang render ulang ini
+  // DILEWATI kalau user BELUM login (state.currentUser masih kosong) --
+  // aman karena do-login membaca <select> LANGSUNG dari DOM dan validasi
+  // PIN tetap server-side (lihat handler 'do-login'), jadi user tetap
+  // bisa login dgn benar pakai draft render manapun yang sedang tampil;
+  // begitu BERHASIL login, render() yang normal (lewat selectUser())
+  // akan menampilkan data yang sudah termuat.
+  if (state.currentUser) render();
 }
 init();
 
