@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-29-fix-owner-gate-leak';
+const QSYSTEM_HTML_VERSION = '2026-08-29-bonus-bulanan-2x-margin';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1975,7 +1975,7 @@ function qtaskSettingsHTML(){
     ${emp.role==='owner' ? `
     <div class="section-title">💰 Gaji & Bonus Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya).</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya). <b>Bonus Bulanan</b> = rate flat (diatur di ⚙️ Kelola Rate Gaji & Komisi) yang ditambahkan HANYA kalau gross margin bulan ini ≥2x cost (Gaji + Komisi) bulan ini.</div>
       <div class="row gap-8" style="margin-bottom:12px;">
         <select data-action="set-payroll-month" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
           ${MONTH_NAMES_ID.map((m,i)=>`<option value="${i+1}" ${state.payrollMonth===i+1?'selected':''}>${m}</option>`).join('')}
@@ -1997,7 +1997,7 @@ function qtaskSettingsHTML(){
         ${!state.payrollData.assemblyReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "Assembly" tidak ditemukan -- bagian Fee Roasting tidak bisa dihitung (akan tampil 0).</div>` : ''}
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Gaji</th><th>Komisi Penjualan<div class="faint" style="font-weight:400; font-size:9.5px;">kumulatif</div></th><th>Total</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Gaji</th><th>Komisi Penjualan<div class="faint" style="font-weight:400; font-size:9.5px;">kumulatif</div></th><th>Bonus Bulanan<div class="faint" style="font-weight:400; font-size:9.5px;">jika margin ≥2x cost</div></th><th>Total</th></tr></thead>
             <tbody>
               ${state.payrollData.employees.map(pe => {
                 const isExpanded = (state.payrollExpandedIds || []).includes(pe.id);
@@ -2006,16 +2006,18 @@ function qtaskSettingsHTML(){
                   <td style="font-weight:600;">${escapeHTML(pe.name)}<div class="faint" style="font-size:10px;">${escapeHTML(pe.jabatan)}</div></td>
                   <td>${fmtRupiah(pe.gaji)}<div class="faint" style="font-size:10px;">Tetap ${fmtRupiah(pe.gajiTetap)}${pe.harianRate ? ` + Harian ${pe.visitDaysCount}h x ${fmtRupiah(pe.harianRate)}` : ''}</div></td>
                   <td style="color:${pe.komisiPenjualan > 0 ? 'var(--danger)' : (pe.komisiPenjualan < 0 ? 'var(--success)' : 'inherit')};">${fmtRupiah(pe.komisiPenjualan)}${(pe.feeMarketingPct || pe.feeRoastRate) ? `<div class="faint" style="font-size:10px;">Marketing ${fmtRupiah(pe.feeMarketing)}${pe.feeRoastRate ? ` + Roasting ${fmtRupiah(pe.bonusRoasting)}` : ''} − Dibayar ${fmtRupiah(pe.totalPaidCum)}</div>` : ''}</td>
+                  <td style="color:${pe.bonusBulananTriggered ? 'var(--success)' : 'inherit'};">${pe.bonusBulananRate > 0 ? (pe.bonusBulananTriggered ? '✓ ' + fmtRupiah(pe.bonusBulanan) : '-') : '-'}${pe.bonusBulananRate > 0 ? `<div class="faint" style="font-size:10px;">Margin ${fmtRupiah(pe.grossMarginBulanIni)} vs cost ${fmtRupiah(pe.costSebelumBonus)}</div>` : ''}</td>
                   <td style="font-weight:700;">${fmtRupiah(pe.total)}</td>
                 </tr>
                 ${isExpanded ? `
                 <tr>
-                  <td colspan="4" style="background:var(--bg-soft); font-size:11px; padding:10px;">
+                  <td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
                     ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;"><b>Hari kunjungan bulan ini (${pe.visitDaysCount}):</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
                     ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;"><b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (total penjualan sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}</div>` : ''}
                     ${pe.feeRoastRate > 0 ? `<div style="margin-bottom:6px;"><b>Fee Roasting kumulatif:</b> ${pe.roastKg.toFixed(2)} kg hasil roasting (dari ${pe.roastBatchCount} batch unik RB+GB) x ${fmtRupiah(pe.feeRoastRate)}/kg = ${fmtRupiah(pe.bonusRoasting)}</div>` : ''}
+                    ${pe.bonusBulananRate > 0 ? `<div style="margin-bottom:6px;"><b>Bonus Bulanan (rate ${fmtRupiah(pe.bonusBulananRate)}):</b> Gross margin bulan ini ${fmtRupiah(pe.grossMarginBulanIni)} (revenue ${fmtRupiah(pe.revenueBulanIni)} − HPP ${fmtRupiah(pe.hppBulanIni)}) dibanding 2x cost bulan ini (2 x ${fmtRupiah(pe.costSebelumBonus)} = ${fmtRupiah(2 * pe.costSebelumBonus)}) -- ${pe.bonusBulananTriggered ? `<span style="color:var(--success); font-weight:700;">TERPENUHI, bonus ${fmtRupiah(pe.bonusBulanan)} ditambahkan</span>` : `<span class="faint">belum terpenuhi, bonus tidak ditambahkan</span>`}</div>` : ''}
                     ${pe.paymentHistory && pe.paymentHistory.length > 0 ? `<div><b>Riwayat pembayaran Komisi (${pe.paymentHistory.length}):</b><br>${pe.paymentHistory.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}</div>` : ''}
-                    ${pe.visitDates.length === 0 && !pe.feeMarketingPct && !pe.feeRoastRate ? '<span class="faint">Tidak ada aktivitas tercatat.</span>' : ''}
+                    ${pe.visitDates.length === 0 && !pe.feeMarketingPct && !pe.feeRoastRate && !pe.bonusBulananRate ? '<span class="faint">Tidak ada aktivitas tercatat.</span>' : ''}
                   </td>
                 </tr>
                 ` : ''}
@@ -2121,7 +2123,7 @@ function qtaskSettingsHTML(){
       ${state.payrollRatesData ? `
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Harian</th><th>Fee Marketing %</th><th>Fee Roast Rp/kg</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Gaji Tetap</th><th>Harian</th><th>Fee Marketing %</th><th>Fee Roast Rp/kg</th><th>Bonus Bulanan<div class="faint" style="font-weight:400; font-size:9.5px;">jika margin ≥2x cost</div></th></tr></thead>
             <tbody>
               ${state.payrollRatesData.staff.map(s => `
                 <tr data-payroll-rate-row="${s.id}">
@@ -2130,6 +2132,7 @@ function qtaskSettingsHTML(){
                   <td><input type="number" data-field="harian" value="${s.harian}" style="width:70px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
                   <td><input type="number" data-field="feeMarketingPct" value="${s.feeMarketingPct}" step="0.1" style="width:55px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
                   <td><input type="number" data-field="feeRoastRate" value="${s.feeRoastRate}" style="width:70px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
+                  <td><input type="number" data-field="bonusBulanan" value="${s.bonusBulanan}" style="width:90px; padding:5px 6px; border:1px solid var(--line); border-radius:6px; font-size:12px;"></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -3166,12 +3169,14 @@ async function savePayrollRates(){
     const harian = row.querySelector('[data-field="harian"]').value;
     const feeMarketingPct = row.querySelector('[data-field="feeMarketingPct"]').value;
     const feeRoastRate = row.querySelector('[data-field="feeRoastRate"]').value;
+    const bonusBulanan = row.querySelector('[data-field="bonusBulanan"]').value;
     updates.push({
       id: id,
       gaji: Number(gaji) || 0,
       harian: Number(harian) || 0,
       feeMarketingPct: Number(feeMarketingPct) || 0,
-      feeRoastRate: Number(feeRoastRate) || 0
+      feeRoastRate: Number(feeRoastRate) || 0,
+      bonusBulanan: Number(bonusBulanan) || 0
     });
   });
 
