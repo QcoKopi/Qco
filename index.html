@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-29-sales-cost-vs-margin';
+const QSYSTEM_HTML_VERSION = '2026-08-29-sales-margin-aggregate-staffonly';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2030,25 +2030,22 @@ function qtaskSettingsHTML(){
     <div class="section-title">📈 Cost vs Gross Margin per Sales (Bonus Tambahan)</div>
     <div class="card">
       <div class="faint" style="font-size:11.5px; margin-bottom:10px;">
-        Membandingkan <b>Total Cost</b> (gaji + bonus harian + komisi, sama seperti tabel di atas) dengan <b>Gross Margin</b> (omzet dikurangi HPP) dari penjualan masing-masing sales -- untuk pertimbangan bonus tambahan. Hanya menampilkan orang yang punya penjualan tercatat di bulan yang dipilih (pakai bulan/tahun yang sama seperti tabel Gaji & Bonus di atas).
-        <br><b>Catatan penting soal skala waktu:</b> Total Cost bisa termasuk komisi KUMULATIF dari bulan-bulan lalu yang belum dibayar, sedangkan Gross Margin murni kinerja BULAN INI SAJA -- kalau "Selisih" tampak sangat negatif, cek dulu apakah itu karena tunggakan komisi lama, bukan berarti bulan ini rugi.
+        Membandingkan <b>Total Cost</b> (gaji tetap + bonus harian + komisi) dengan <b>Gross Margin</b> (omzet dikurangi HPP) -- KEDUANYA agregat <b>SEPANJANG WAKTU</b> (bukan per bulan), untuk pertimbangan bonus tambahan. Hanya untuk staff sales biasa (SPV & Owner tidak termasuk, karena punya skema kompensasi sendiri) yang punya penjualan tercatat.
       </div>
       <button class="btn btn-primary btn-sm" data-action="load-sales-margin" style="margin-bottom:12px;">Muat Cost vs Margin</button>
       ${state.salesMarginLoading ? `<div class="faint" style="font-size:12px;">Memuat data...</div>` : ''}
       ${state.salesMarginError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.salesMarginError)}</div>` : ''}
       ${state.salesMarginData ? (() => {
         const activeSales = state.salesMarginData.employees.filter(e => e.hasSalesActivity);
-        return `
-        <div style="font-weight:700; font-size:13px; margin-bottom:8px;">${escapeHTML(state.salesMarginData.monthName)}</div>
-        ${activeSales.length === 0 ? `<div class="faint" style="font-size:12px;">Tidak ada penjualan tercatat untuk siapa pun di bulan ini.</div>` : `
+        return activeSales.length === 0 ? `<div class="faint" style="font-size:12px;">Tidak ada staff sales dengan penjualan tercatat.</div>` : `
         <div class="table-wrap">
           <table class="task-table" style="min-width:0;">
-            <thead><tr><th>Nama</th><th>Total Cost</th><th>Revenue</th><th>Gross Margin</th><th>Selisih</th></tr></thead>
+            <thead><tr><th>Nama</th><th>Total Cost<div class="faint" style="font-weight:400; font-size:9.5px;">sepanjang waktu</div></th><th>Revenue</th><th>Gross Margin</th><th>Selisih</th></tr></thead>
             <tbody>
               ${activeSales.map(pe => `
                 <tr>
                   <td style="font-weight:600;">${escapeHTML(pe.name)}<div class="faint" style="font-size:10px;">${escapeHTML(pe.jabatan)}</div></td>
-                  <td>${fmtRupiah(pe.totalCost)}</td>
+                  <td>${fmtRupiah(pe.totalCost)}<div class="faint" style="font-size:10px;">${pe.monthsActiveCount} bulan aktif x gaji, ${pe.visitDaysCount} hari kunjungan, komisi ${fmtRupiah(pe.komisiPenjualan)}</div></td>
                   <td>${fmtRupiah(pe.revenue)}</td>
                   <td>${fmtRupiah(pe.grossMargin)}<div class="faint" style="font-size:10px;">${pe.marginPct.toFixed(1)}% dari revenue</div></td>
                   <td style="font-weight:700; color:${pe.netContribution >= 0 ? 'var(--success)' : 'var(--danger)'};">${pe.netContribution >= 0 ? '+' : ''}${fmtRupiah(pe.netContribution)}</td>
@@ -2057,8 +2054,8 @@ function qtaskSettingsHTML(){
             </tbody>
           </table>
         </div>
-        `}
-      `; })() : ''}
+        `;
+      })() : ''}
     </div>
 
     <div class="section-title">📊 Rekonsiliasi Fee & Bonus (Sepanjang Waktu)</div>
@@ -3103,7 +3100,7 @@ async function fetchSalesMarginData(){
   state.salesMarginError = null;
   render();
   try {
-    const result = await apiCall('getSalesCostVsMarginReport', { month: state.payrollMonth, year: state.payrollYear, requestingUserId: state.currentUser });
+    const result = await apiCall('getSalesCostVsMarginReport', { requestingUserId: state.currentUser });
     if (result && result.success) {
       state.salesMarginData = result;
       state.salesMarginLoading = false;
