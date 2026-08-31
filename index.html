@@ -790,11 +790,12 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-29-bonus-bulanan-recon-and-monthly-breakdown';
+const QSYSTEM_HTML_VERSION = '2026-08-31-stock-laporan-schema-v2';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
   qfinStockFilterProduk: 'all', // all | nama_produk
+  qfinStockFilterKategori: 'all', // all | kategori
   qfinStockOnlySisa: false, // true = cuma tampilkan baris dengan sisa > 0
   qfinStockSearch: '', // teks pencarian bebas: nama_produk, id_produk, batch_no
   rekapPiutangLoading: null, // nama customer yang sedang di-generate PDF-nya, null kalau tidak ada
@@ -830,6 +831,14 @@ let state = {
   salesMarginLoading: false,
   salesMarginError: null,
   salesMarginExpandedIds: [],
+  poData: null,
+  poLoading: false,
+  poError: null,
+  poFormNamaBarang: '',
+  poFormNamaKlien: '',
+  poStockPreview: null,
+  poStockPreviewLoading: false,
+  poSaving: false,
   payrollRatesData: null,
   payrollRatesLoading: false,
   payrollRatesError: null,
@@ -2391,16 +2400,93 @@ async function fetchQSalesKPI(){
   }
   render();
 }
+
+async function fetchPurchaseOrderData(){
+  state.poLoading = true;
+  state.poError = null;
+  render();
+  try {
+    const result = await apiCall('getPurchaseOrderPageData', { requestingUserId: state.currentUser });
+    if (result && result.success) {
+      state.poData = result;
+      state.poLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.poLoading = false;
+    state.poError = e.message || 'Gagal memuat data Purchase Order';
+    showToast('Purchase Order: ' + state.poError);
+  }
+  render();
+}
+
+async function fetchPOStockPreview(namaBarang){
+  if (!namaBarang) { state.poStockPreview = null; render(); return; }
+  state.poStockPreviewLoading = true;
+  render();
+  try {
+    const result = await apiCall('qsalesGetStockPreview', { requestingUserId: state.currentUser, namaBarang });
+    state.poStockPreview = (result && result.success) ? result.stockInfo : null;
+  } catch(e) {
+    state.poStockPreview = null;
+    showToast('Gagal memuat info stok: ' + (e.message || ''));
+  }
+  state.poStockPreviewLoading = false;
+  render();
+}
+
+async function savePurchaseOrder(){
+  const tanggalPO = document.getElementById('po-tanggal-po').value;
+  const tanggalKirim = document.getElementById('po-tanggal-kirim').value;
+  const namaBarang = document.getElementById('po-nama-barang').value;
+  const namaKlien = document.getElementById('po-nama-klien').value;
+  if (!tanggalPO || !tanggalKirim || !namaBarang || !namaKlien) {
+    showToast('Tanggal PO, Tanggal Kirim, Nama Barang, dan Nama Klien wajib diisi.');
+    return;
+  }
+  const customer = (state.poData.customerOptions || []).find(c => c.nama === namaKlien);
+  state.poSaving = true;
+  render();
+  try {
+    const result = await apiCall('qsalesSavePurchaseOrder', {
+      requestingUserId: state.currentUser,
+      tanggalPO, tanggalKirim, namaBarang, namaKlien,
+      alamatKlien: customer ? customer.alamat : '',
+      teleponKlien: customer ? customer.telepon : ''
+    });
+    if (result && result.success) {
+      showToast(result.message || 'Purchase Order berhasil dicatat.');
+      state.poFormNamaBarang = '';
+      state.poFormNamaKlien = '';
+      state.poStockPreview = null;
+      state.poSaving = false;
+      await fetchPurchaseOrderData();
+      return;
+    } else {
+      throw new Error((result && result.error) || 'Gagal menyimpan');
+    }
+  } catch(e) {
+    state.poSaving = false;
+    showToast('Gagal menyimpan Purchase Order: ' + (e.message || ''));
+  }
+  render();
+}
+
 function qsalesSubNavHTML(){
   const tabBtn = (tab, label) => `
     <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
   `;
+  const emp = findEmp(state.currentUser);
+  const PO_JABATAN_ = ['Ass Ops & Product Development', 'Ops & Product Development'];
+  const canSeePO = emp && (emp.role === 'owner' || PO_JABATAN_.includes(String(emp.jabatan || '').trim()));
   return `
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
       ${tabBtn('dashboard','📊 Dashboard')}
       ${tabBtn('leads','🎯 Leads')}
       ${tabBtn('kpi','📈 KPI')}
       ${tabBtn('kunjungan','📅 Kunjungan')}
+      ${canSeePO ? tabBtn('po','📦 Purchase Order') : ''}
     </div>
   `;
 }
@@ -2764,6 +2850,96 @@ function qsalesKunjunganHTML(){
       <p style="color:var(--ink-soft); font-size:13px; margin-bottom:16px;">Jadwal kunjungan lengkap tersedia di Portal QSales.</p>
       <button class="btn btn-primary" onclick="openPortalWithToken('qsales', CONFIG.QSALES_PORTAL_URL)">Buka Portal QSales</button>
     </div>
+  `;
+}
+
+function qsalesPurchaseOrderHTML(){
+  if (state.poLoading && !state.poData) {
+    return `
+      <div class="greeting">Purchase Order</div>
+      ${qsalesSubNavHTML()}
+      <div class="card" style="text-align:center; padding:40px 20px;"><span class="faint">Memuat data...</span></div>
+    `;
+  }
+  if (state.poError) {
+    return `
+      <div class="greeting">Purchase Order</div>
+      ${qsalesSubNavHTML()}
+      <div class="card" style="padding:20px; color:var(--danger);">⚠ ${escapeHTML(state.poError)}</div>
+    `;
+  }
+  if (!state.poData) {
+    return `<div class="greeting">Purchase Order</div>${qsalesSubNavHTML()}`;
+  }
+
+  const d = state.poData;
+  const selectedCustomer = d.customerOptions.find(c => c.nama === state.poFormNamaKlien);
+
+  const stockValFmt = (v) => {
+    if (typeof v !== 'number') return escapeHTML(String(v));
+    const txt = `${v} kg`;
+    return v < 0 ? `<span style="color:var(--danger); font-weight:700;">⚠ ${txt}</span>` : `<b>${txt}</b>`;
+  };
+  const stockBlockHTML = (info, label) => {
+    if (!info) return '';
+    const anyNegative = info.stokBarang < 0 || info.materialRB.some(m => m.stok < 0) || info.materialGB.some(m => m.stok < 0);
+    return `
+      <div class="card" style="background:var(--bg-soft); margin-top:10px; padding:12px;">
+        <div style="font-weight:700; font-size:12px; margin-bottom:6px;">📦 Konteks Stok -- ${escapeHTML(label)}</div>
+        <div style="font-size:12px; margin-bottom:6px;">Stok Barang Jadi: ${stockValFmt(info.stokBarang)}</div>
+        ${info.materialRB.length > 0 ? `<div style="font-size:12px; margin-bottom:4px;"><b>Material RB:</b><br>${info.materialRB.map(m => `${escapeHTML(m.nama)}: ${stockValFmt(m.stok)}`).join('<br>')}</div>` : '<div class="faint" style="font-size:11px; margin-bottom:4px;">Tidak ada material RB antara (produk single-origin, langsung dari GB).</div>'}
+        ${info.materialGB.length > 0 ? `<div style="font-size:12px;"><b>Material GB:</b><br>${info.materialGB.map(m => `${escapeHTML(m.nama)}: ${stockValFmt(m.stok)}`).join('<br>')}</div>` : ''}
+        ${anyNegative ? `<div class="faint" style="font-size:10px; margin-top:6px; color:var(--danger);">⚠ Stok negatif secara fisik tidak mungkin -- kemungkinan ada pembelian/pergerakan "Masuk" yang belum tercatat di sheet Stock untuk bahan ini.</div>` : ''}
+      </div>
+    `;
+  };
+
+  return `
+    <div class="greeting">Purchase Order</div>
+    <div class="greeting-sub">Khusus Ass Ops & Product Development, Ops & Product Development, dan Owner</div>
+    ${qsalesSubNavHTML()}
+    ${!d.resepSheetDitemukan ? `<div class="card" style="padding:12px; margin-bottom:12px; color:var(--danger); font-size:12px;">⚠ Sheet resep ("Master Resep") tidak ditemukan di spreadsheet ini -- info Stok Material RB/GB tidak bisa dihitung. Kalau resep ada di spreadsheet TERPISAH, ini perlu dikonfigurasi ulang di backend.</div>` : ''}
+
+    <div class="card" style="margin-bottom:16px;">
+      <div style="font-weight:700; margin-bottom:10px;">+ Catat Purchase Order Baru</div>
+      <div class="form-group"><label>Tanggal PO</label><input type="date" id="po-tanggal-po" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
+      <div class="form-group" style="margin-top:8px;"><label>Tanggal Kirim</label><input type="date" id="po-tanggal-kirim" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
+      <div class="form-group" style="margin-top:8px;">
+        <label>Nama Barang</label>
+        <select id="po-nama-barang" data-action="po-product-changed" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+          <option value="">-- Pilih Barang --</option>
+          ${d.productOptions.map(p => `<option value="${escapeHTML(p)}" ${state.poFormNamaBarang===p?'selected':''}>${escapeHTML(p)}</option>`).join('')}
+        </select>
+      </div>
+      ${state.poStockPreviewLoading ? `<div class="faint" style="font-size:11px; margin-top:8px;">Memuat info stok...</div>` : stockBlockHTML(state.poStockPreview, state.poFormNamaBarang)}
+      <div class="form-group" style="margin-top:8px;">
+        <label>Nama Klien</label>
+        <select id="po-nama-klien" data-action="po-customer-changed" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+          <option value="">-- Pilih Klien --</option>
+          ${d.customerOptions.map(c => `<option value="${escapeHTML(c.nama)}" ${state.poFormNamaKlien===c.nama?'selected':''}>${escapeHTML(c.nama)}</option>`).join('')}
+        </select>
+      </div>
+      ${selectedCustomer ? `<div class="faint" style="font-size:11px; margin-top:6px;">📍 ${escapeHTML(selectedCustomer.alamat || '(alamat belum ada)')} &nbsp;|&nbsp; 📞 ${escapeHTML(selectedCustomer.telepon || '(telepon belum ada)')}</div>` : ''}
+      <button class="btn btn-primary btn-block" data-action="save-purchase-order" style="margin-top:14px;" ${state.poSaving?'disabled':''}>${state.poSaving?'Menyimpan...':'Simpan Purchase Order'}</button>
+    </div>
+
+    <div class="section-title">📋 Daftar Purchase Order (${d.poList.length})</div>
+    ${d.poList.length === 0 ? `<div class="card"><span class="faint" style="font-size:12px;">Belum ada Purchase Order tercatat.</span></div>` : d.poList.map(po => `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+          <div>
+            <div style="font-weight:700;">${escapeHTML(po.namaBarang)}</div>
+            <div class="faint" style="font-size:11px;">PO: ${escapeHTML(po.tanggalPO)} &nbsp;→&nbsp; Kirim: ${escapeHTML(po.tanggalKirim)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:600; font-size:12px;">${escapeHTML(po.namaKlien)}</div>
+            <div class="faint" style="font-size:10px;">${escapeHTML(po.teleponKlien)}</div>
+          </div>
+        </div>
+        <div class="faint" style="font-size:11px; margin-top:4px;">📍 ${escapeHTML(po.alamatKlien || '-')}</div>
+        ${stockBlockHTML({ stokBarang: po.stokBarang, materialRB: po.materialRB, materialGB: po.materialGB }, po.namaBarang)}
+      </div>
+    `).join('')}
   `;
 }
 
@@ -3477,16 +3653,22 @@ function qfinDashboardHTML(){
   const hutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('hutang'));
   const piutangRows = (d.hutangPiutangRows || []).filter(r => String(r.jenis || '').toLowerCase().includes('piutang'));
 
-  // Filter Stock: dropdown per produk + toggle "hanya ada sisa" + pencarian
-  // bebas (client-side filter, NOT calculation)
+  // Filter Stock: dropdown per produk + kategori + toggle "hanya ada sisa"
+  // + pencarian bebas (client-side filter, NOT calculation)
+  // DIUBAH LAGI (2026-08-31, migrasi KEDUA hari ini): sheet Stock diganti
+  // user jadi LAPORAN PER BATCH bergaya Laporan Stock -- field: nama_produk,
+  // id_produk, kategori (BARU!), batch_no, tanggal, diproduksi, terjual,
+  // dipakai_assembly_lain, sisa, hpp_per_unit, nilai_hpp.
   const stockAll = d.stockKopiRows || [];
   const stockProdukOptions = [...new Set(stockAll.map(r => r.nama_produk).filter(Boolean))].sort();
+  const stockKategoriOptions = [...new Set(stockAll.map(r => r.kategori).filter(Boolean))].sort();
   const stockSearchQuery = String(state.qfinStockSearch || '').trim().toLowerCase();
   const stockRows = stockAll.filter(r => {
     if (state.qfinStockFilterProduk !== 'all' && r.nama_produk !== state.qfinStockFilterProduk) return false;
-    if (state.qfinStockOnlySisa && !(Number(r.sisa_kg) > 0)) return false;
+    if (state.qfinStockFilterKategori && state.qfinStockFilterKategori !== 'all' && r.kategori !== state.qfinStockFilterKategori) return false;
+    if (state.qfinStockOnlySisa && !(Number(r.sisa) > 0)) return false;
     if (stockSearchQuery) {
-      const haystack = [r.nama_produk, r.sku, r.batch_no].map(v => String(v || '').toLowerCase()).join(' ');
+      const haystack = [r.nama_produk, r.id_produk, r.batch_no].map(v => String(v || '').toLowerCase()).join(' ');
       if (!haystack.includes(stockSearchQuery)) return false;
     }
     return true;
@@ -3738,16 +3920,21 @@ function qfinDashboardHTML(){
       <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding:4px 0;" data-action="toggle-qfin" data-key="qfin-stock">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:18px;">☕</span>
-          <div style="font-weight:600; font-size:14px;">Stock Produk (sheet Stock) · ${stockRows.length}/${stockAll.length} baris</div>
+          <div style="font-weight:600; font-size:14px;">Stock Produk (sheet Stock) · ${stockRows.length}/${stockAll.length} baris batch</div>
         </div>
         <span class="chev" style="color:var(--ink-faint); font-size:12px;">${expandStock ? '⌃' : '⌄'}</span>
       </div>
+      ${expandStock && d.totalNilaiStock ? `<div class="faint" style="font-size:12px; margin-top:6px;">💰 Total Nilai Stock Tersedia: <b>${fmtRupiah(d.totalNilaiStock)}</b></div>` : ''}
       ${expandStock ? `
       <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line);" onclick="event.stopPropagation()">
-        <input type="text" class="inline-input" data-action="set-qfin-stock-search" placeholder="🔍 Cari produk, SKU, atau batch..." value="${escapeHTML(state.qfinStockSearch || '')}" style="flex:1; min-width:180px; max-width:260px;">
+        <input type="text" class="inline-input" data-action="set-qfin-stock-search" placeholder="🔍 Cari produk, kode, atau batch..." value="${escapeHTML(state.qfinStockSearch || '')}" style="flex:1; min-width:180px; max-width:260px;">
         <select class="inline-select" data-action="set-qfin-stock-produk" style="max-width:220px;">
           <option value="all" ${state.qfinStockFilterProduk==='all'?'selected':''}>Semua Produk (${stockProdukOptions.length})</option>
           ${stockProdukOptions.map(p => `<option value="${escapeHTML(p)}" ${state.qfinStockFilterProduk===p?'selected':''}>${escapeHTML(p)}</option>`).join('')}
+        </select>
+        <select class="inline-select" data-action="set-qfin-stock-kategori" style="max-width:180px;">
+          <option value="all" ${(!state.qfinStockFilterKategori || state.qfinStockFilterKategori==='all')?'selected':''}>Semua Kategori</option>
+          ${stockKategoriOptions.map(k => `<option value="${escapeHTML(k)}" ${state.qfinStockFilterKategori===k?'selected':''}>${escapeHTML(k)}</option>`).join('')}
         </select>
         <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer;">
           <input type="checkbox" data-action="toggle-qfin-stock-sisa" ${state.qfinStockOnlySisa ? 'checked' : ''} style="cursor:pointer;">
@@ -3757,13 +3944,16 @@ function qfinDashboardHTML(){
       ` : ''}
       ${expandStock ? renderRows(stockRows, [
         {label:'Produk', key:'nama_produk'},
-        {label:'SKU', key:'sku'},
+        {label:'Kategori', key:'kategori'},
         {label:'Batch', key:'batch_no'},
         {label:'Tanggal', key:'tanggal'},
-        {label:'Produksi Awal (kg)', key:'produksi_awal_kg'},
-        {label:'Sisa (kg)', key:'sisa_kg'},
-        {label:'Status', key:'status', fn: v => `<span style="font-size:10.5px; padding:2px 8px; border-radius:99px; background:${v==='Tersedia'?'var(--success-soft, #E8F5E9)':'var(--line)'}; color:${v==='Tersedia'?'var(--success)':'var(--ink-faint)'}; font-weight:600;">${escapeHTML(v)}</span>`}
+        {label:'Diproduksi', key:'diproduksi'},
+        {label:'Terjual', key:'terjual'},
+        {label:'Dipakai Assembly', key:'dipakai_assembly_lain'},
+        {label:'Sisa', key:'sisa', fn: v => Number(v) < 0 ? `<span style="color:var(--danger); font-weight:700;">⚠ ${v}</span>` : `<b>${v}</b>`},
+        {label:'Nilai HPP', key:'nilai_hpp', fn: v => fmtRupiah(v)}
       ]) : ''}
+      ${expandStock && stockRows.some(r => Number(r.sisa) < 0) ? `<div class="faint" style="font-size:10.5px; color:var(--danger); margin-top:8px; padding:0 4px;">⚠ Ada batch dengan sisa negatif (secara fisik tidak mungkin) -- kemungkinan ada koreksi/pergerakan yang belum tercatat lengkap untuk batch tersebut.</div>` : ''}
     </div>
   `;
 
@@ -5314,6 +5504,7 @@ function render(){
     else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
     else if (state.qsalesTab === 'kpi') body = qsalesKPIHTML();
     else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
+    else if (state.qsalesTab === 'po') body = qsalesPurchaseOrderHTML();
     else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
   } else if (state.appTab === 'qaff'){
     body = qaffDashboardHTML();
@@ -5651,6 +5842,9 @@ document.addEventListener('click', function(e){
     if (state.qsalesTab === 'kpi' && !state.qsalesKPIData && !state.qsalesKPILoading) {
       fetchQSalesKPI();
     }
+    if (state.qsalesTab === 'po' && !state.poData && !state.poLoading) {
+      fetchPurchaseOrderData();
+    }
     render();
   }
   else if (el.dataset.action === 'switch-qfin-tab'){
@@ -5843,6 +6037,9 @@ document.addEventListener('click', function(e){
     if (idx >= 0) state.salesMarginExpandedIds.splice(idx, 1);
     else state.salesMarginExpandedIds.push(id);
     render();
+  }
+  else if (el.dataset.action === 'save-purchase-order'){
+    savePurchaseOrder();
   }
   else if (el.dataset.action === 'crm-refresh'){
     state.crmError = null;
@@ -6045,12 +6242,24 @@ document.addEventListener('change', function(e){
     state.qfinStockFilterProduk = e.target.value;
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'set-qfin-stock-kategori'){
+    state.qfinStockFilterKategori = e.target.value;
+    render();
+  }
   else if (e.target.dataset && e.target.dataset.action === 'toggle-qfin-stock-sisa'){
     state.qfinStockOnlySisa = e.target.checked;
     render();
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-crm-task-filter'){
     state.crmTaskFilterStatus = e.target.value;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'po-product-changed'){
+    state.poFormNamaBarang = e.target.value;
+    fetchPOStockPreview(e.target.value);
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'po-customer-changed'){
+    state.poFormNamaKlien = e.target.value;
     render();
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-crm-wa-template'){
@@ -6629,6 +6838,17 @@ function getAllowedApps(userId){
   // salah, cukup ubah CONTENT_PLAN_ALLOWED_IDS di atas (dekat definisi APPS).
   if (CONTENT_PLAN_ALLOWED_IDS.includes(userId) && !allowed.includes('content')) {
     allowed.push('content');
+  }
+  // BARU (2026-08-30): "Purchase Order" -- fitur baru DI DALAM tab QSales,
+  // khusus jabatan "Ass Ops & Product Development" / "Ops & Product
+  // Development" + Owner. Tab qsales itu sendiri mungkin TIDAK ter-grant
+  // ke jabatan ini lewat kolom QcoSystem (mis. Razak cuma "Dashboard,
+  // Task") -- tanpa baris ini, mereka TIDAK AKAN PERNAH bisa membuka tab
+  // qsales sama sekali, sehingga tidak akan pernah melihat Purchase Order
+  // walau section-nya sendiri sudah benar digate di dalam qsales tab.
+  const PO_JABATAN_ = ['Ass Ops & Product Development', 'Ops & Product Development'];
+  if ((PO_JABATAN_.includes(String(emp.jabatan || '').trim()) || emp.role === 'owner') && !allowed.includes('qsales')) {
+    allowed.push('qsales');
   }
   return allowed;
 }
