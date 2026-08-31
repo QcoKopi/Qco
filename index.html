@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-31-po-kopi-filter-jumlah-search';
+const QSYSTEM_HTML_VERSION = '2026-08-31-po-custom-searchable-dropdown';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -837,6 +837,10 @@ let state = {
   poFormNamaBarang: '',
   poFormJumlah: '',
   poFormNamaKlien: '',
+  poProductSearchQuery: '',
+  poProductDropdownOpen: false,
+  poKlienSearchQuery: '',
+  poKlienDropdownOpen: false,
   poStockPreview: null,
   poStockPreviewLoading: false,
   poSaving: false,
@@ -2447,7 +2451,18 @@ async function savePurchaseOrder(){
     showToast('Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.');
     return;
   }
+  // FIX: Nama Barang & Nama Klien HARUS benar-benar dipilih dari daftar
+  // (bukan cuma ketikan bebas) -- supaya batasan "hanya Produk Kopi" utk
+  // Nama Barang benar-benar DITEGAKKAN, bukan cuma disarankan lewat UI.
+  if (!(state.poData.productOptions || []).includes(namaBarang)) {
+    showToast('Nama Barang harus dipilih dari daftar produk kopi yang muncul saat mengetik -- bukan ketikan bebas.');
+    return;
+  }
   const customer = (state.poData.customerOptions || []).find(c => c.nama === namaKlien);
+  if (!customer) {
+    showToast('Nama Klien harus dipilih dari daftar yang muncul saat mengetik -- bukan ketikan bebas.');
+    return;
+  }
   state.poSaving = true;
   render();
   try {
@@ -2462,6 +2477,8 @@ async function savePurchaseOrder(){
       state.poFormNamaBarang = '';
       state.poFormJumlah = '';
       state.poFormNamaKlien = '';
+      state.poProductSearchQuery = '';
+      state.poKlienSearchQuery = '';
       state.poStockPreview = null;
       state.poSaving = false;
       await fetchPurchaseOrderData();
@@ -2910,24 +2927,40 @@ function qsalesPurchaseOrderHTML(){
       <div style="font-weight:700; margin-bottom:10px;">+ Catat Purchase Order Baru</div>
       <div class="form-group"><label>Tanggal PO</label><input type="date" id="po-tanggal-po" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
       <div class="form-group" style="margin-top:8px;"><label>Tanggal Kirim</label><input type="date" id="po-tanggal-kirim" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
-      <div class="form-group" style="margin-top:8px;">
+      <div class="form-group" style="margin-top:8px; position:relative;">
         <label>Nama Barang <span class="faint" style="font-weight:400;">(ketik utk cari, hanya Produk Kopi)</span></label>
-        <input type="text" id="po-nama-barang" list="po-barang-datalist" data-action="po-product-changed" value="${escapeHTML(state.poFormNamaBarang || '')}" placeholder="🔍 Ketik nama produk kopi..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
-        <datalist id="po-barang-datalist">
-          ${d.productOptions.map(p => `<option value="${escapeHTML(p)}">`).join('')}
-        </datalist>
+        <input type="text" id="po-nama-barang" data-action="po-product-search-input" value="${escapeHTML(state.poProductSearchQuery != null ? state.poProductSearchQuery : (state.poFormNamaBarang || ''))}" placeholder="🔍 Ketik nama produk kopi..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+        ${state.poProductDropdownOpen ? (() => {
+          const q = String(state.poProductSearchQuery || '').toLowerCase();
+          const matches = d.productOptions.filter(p => p.toLowerCase().includes(q)).slice(0, 20);
+          return `
+          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+            ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada produk kopi yang cocok.</div>` : matches.map(p => `
+              <div data-action="po-product-select" data-value="${escapeHTML(p)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(p)}</div>
+            `).join('')}
+          </div>
+          `;
+        })() : ''}
       </div>
       <div class="form-group" style="margin-top:8px;">
         <label>Jumlah (kg)</label>
         <input type="number" id="po-jumlah" data-action="po-jumlah-changed" value="${state.poFormJumlah || ''}" min="0" step="0.01" placeholder="0" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
       </div>
       ${state.poStockPreviewLoading ? `<div class="faint" style="font-size:11px; margin-top:8px;">Memuat info stok...</div>` : stockBlockHTML(state.poStockPreview, state.poFormNamaBarang, jumlahDiminta)}
-      <div class="form-group" style="margin-top:8px;">
+      <div class="form-group" style="margin-top:8px; position:relative;">
         <label>Nama Klien <span class="faint" style="font-weight:400;">(ketik utk cari)</span></label>
-        <input type="text" id="po-nama-klien" list="po-klien-datalist" data-action="po-customer-changed" value="${escapeHTML(state.poFormNamaKlien || '')}" placeholder="🔍 Ketik nama klien..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
-        <datalist id="po-klien-datalist">
-          ${d.customerOptions.map(c => `<option value="${escapeHTML(c.nama)}">`).join('')}
-        </datalist>
+        <input type="text" id="po-nama-klien" data-action="po-klien-search-input" value="${escapeHTML(state.poKlienSearchQuery != null ? state.poKlienSearchQuery : (state.poFormNamaKlien || ''))}" placeholder="🔍 Ketik nama klien..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+        ${state.poKlienDropdownOpen ? (() => {
+          const q = String(state.poKlienSearchQuery || '').toLowerCase();
+          const matches = d.customerOptions.filter(c => c.nama.toLowerCase().includes(q)).slice(0, 20);
+          return `
+          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+            ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada klien yang cocok.</div>` : matches.map(c => `
+              <div data-action="po-klien-select" data-value="${escapeHTML(c.nama)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(c.nama)}</div>
+            `).join('')}
+          </div>
+          `;
+        })() : ''}
       </div>
       ${selectedCustomer ? `<div class="faint" style="font-size:11px; margin-top:6px;">📍 ${escapeHTML(selectedCustomer.alamat || '(alamat belum ada)')} &nbsp;|&nbsp; 📞 ${escapeHTML(selectedCustomer.telepon || '(telepon belum ada)')}</div>` : ''}
       <button class="btn btn-primary btn-block" data-action="save-purchase-order" style="margin-top:14px;" ${state.poSaving?'disabled':''}>${state.poSaving?'Menyimpan...':'Simpan Purchase Order'}</button>
@@ -6202,6 +6235,66 @@ document.addEventListener('input', function(e){
     state.qfinStockSearch = e.target.value;
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'po-product-search-input'){
+    state.poProductSearchQuery = e.target.value;
+    state.poProductDropdownOpen = true;
+    // Ketikan berubah -> pilihan lama (kalau ada) tidak valid lagi sampai
+    // user pilih ulang dari daftar, supaya tidak ke-submit nama yg cuma
+    // ketikan bebas (bukan produk kopi yg benar-benar ada).
+    state.poFormNamaBarang = '';
+    state.poStockPreview = null;
+    render();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'po-klien-search-input'){
+    state.poKlienSearchQuery = e.target.value;
+    state.poKlienDropdownOpen = true;
+    state.poFormNamaKlien = '';
+    render();
+  }
+});
+
+// BARU: pemilihan saran dropdown searchable Purchase Order (Nama Barang /
+// Nama Klien) -- SENGAJA pakai 'mousedown', BUKAN 'click', karena
+// mousedown fires SEBELUM 'blur'/'focusout' pada input yg sedang fokus.
+// Kalau pakai 'click', urutan event-nya: mousedown -> blur (dropdown
+// keburu ditutup/dihapus dari DOM oleh handler focusout) -> click (target
+// elemen sudah hilang, seleksi GAGAL). Pola 'mousedown' ini standar utk
+// custom autocomplete/typeahead.
+document.addEventListener('mousedown', function(e){
+  const el = e.target.closest ? e.target.closest('[data-action="po-product-select"]') : null;
+  if (el) {
+    e.preventDefault(); // cegah blur duluan sebelum state sempat di-set
+    const val = el.dataset.value;
+    state.poFormNamaBarang = val;
+    state.poProductSearchQuery = val;
+    state.poProductDropdownOpen = false;
+    fetchPOStockPreview(val);
+    return;
+  }
+  const elK = e.target.closest ? e.target.closest('[data-action="po-klien-select"]') : null;
+  if (elK) {
+    e.preventDefault();
+    const val = elK.dataset.value;
+    state.poFormNamaKlien = val;
+    state.poKlienSearchQuery = val;
+    state.poKlienDropdownOpen = false;
+    render();
+  }
+});
+
+// Tutup dropdown searchable kalau fokus pindah keluar dari input terkait
+// (mis. user klik di luar tanpa memilih apa pun dari daftar saran).
+// 'focusout' (BEDA dari 'blur') sengaja dipilih karena BUBBLES, jadi bisa
+// didelegasikan di level document seperti listener lain di file ini.
+document.addEventListener('focusout', function(e){
+  if (e.target.id === 'po-nama-barang' && state.poProductDropdownOpen) {
+    state.poProductDropdownOpen = false;
+    render();
+  }
+  if (e.target.id === 'po-nama-klien' && state.poKlienDropdownOpen) {
+    state.poKlienDropdownOpen = false;
+    render();
+  }
 });
 
 document.addEventListener('change', function(e){
@@ -6265,16 +6358,8 @@ document.addEventListener('change', function(e){
     state.crmTaskFilterStatus = e.target.value;
     render();
   }
-  else if (e.target.dataset && e.target.dataset.action === 'po-product-changed'){
-    state.poFormNamaBarang = e.target.value;
-    fetchPOStockPreview(e.target.value);
-  }
   else if (e.target.dataset && e.target.dataset.action === 'po-jumlah-changed'){
     state.poFormJumlah = e.target.value;
-    render();
-  }
-  else if (e.target.dataset && e.target.dataset.action === 'po-customer-changed'){
-    state.poFormNamaKlien = e.target.value;
     render();
   }
   else if (e.target.dataset && e.target.dataset.action === 'set-crm-wa-template'){
