@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-08-31-slip-gaji-feature';
+const QSYSTEM_HTML_VERSION = '2026-09-01-bonus-harian-visit-kunjungan';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1995,7 +1995,7 @@ function qtaskSettingsHTML(){
     ${emp.role==='owner' ? `
     <div class="section-title">💰 Gaji & Bonus Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya). <b>Bonus Bulanan</b> = rate flat (diatur di ⚙️ Kelola Rate Gaji & Komisi) yang ditambahkan HANYA kalau gross margin bulan ini ≥2x cost (Gaji + Komisi) bulan ini.</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Bonus Harian</b> = (jumlah Visit x 1 + jumlah Kunjungan x 2) ÷ 5 x rate Harian -- Visit dari ENTRY (kunjungan prospekting rutin), Kunjungan dari sheet Kunjungan (appointment/demo yang sudah ada janji, bobot 2x lipat). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya). <b>Bonus Bulanan</b> = rate flat (diatur di ⚙️ Kelola Rate Gaji & Komisi) yang ditambahkan HANYA kalau gross margin bulan ini ≥2x cost (Gaji + Komisi) bulan ini.</div>
       <div class="row gap-8" style="margin-bottom:12px;">
         <select data-action="set-payroll-month" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
           ${MONTH_NAMES_ID.map((m,i)=>`<option value="${i+1}" ${state.payrollMonth===i+1?'selected':''}>${m}</option>`).join('')}
@@ -2024,7 +2024,7 @@ function qtaskSettingsHTML(){
                 return `
                 <tr style="cursor:pointer;" data-action="toggle-payroll-detail" data-id="${pe.id}">
                   <td style="font-weight:600;">${escapeHTML(pe.name)}<div class="faint" style="font-size:10px;">${escapeHTML(pe.jabatan)}</div></td>
-                  <td>${fmtRupiah(pe.gaji)}<div class="faint" style="font-size:10px;">Tetap ${fmtRupiah(pe.gajiTetap)}${pe.harianRate ? ` + Harian ${pe.visitDaysCount}h x ${fmtRupiah(pe.harianRate)}` : ''}</div></td>
+                  <td>${fmtRupiah(pe.gaji)}<div class="faint" style="font-size:10px;">Tetap ${fmtRupiah(pe.gajiTetap)}${pe.harianRate ? ` + Harian ${pe.jumlahHari.toFixed(2)}h x ${fmtRupiah(pe.harianRate)}` : ''}</div></td>
                   <td style="color:${pe.komisiPenjualan > 0 ? 'var(--danger)' : (pe.komisiPenjualan < 0 ? 'var(--success)' : 'inherit')};">${fmtRupiah(pe.komisiPenjualan)}${(pe.feeMarketingPct || pe.feeRoastRate) ? `<div class="faint" style="font-size:10px;">Marketing ${fmtRupiah(pe.feeMarketing)}${pe.feeRoastRate ? ` + Roasting ${fmtRupiah(pe.bonusRoasting)}` : ''} − Dibayar ${fmtRupiah(pe.totalPaidCum)}</div>` : ''}</td>
                   <td style="color:${pe.bonusBulananTriggered ? 'var(--success)' : 'inherit'};">${pe.bonusBulananRate > 0 ? (pe.bonusBulananTriggered ? '✓ ' + fmtRupiah(pe.bonusBulanan) : '-') : '-'}${pe.bonusBulananRate > 0 ? `<div class="faint" style="font-size:10px;">Margin ${fmtRupiah(pe.grossMarginBulanIni)} vs cost ${fmtRupiah(pe.costSebelumBonus)}</div>` : ''}</td>
                   <td style="font-weight:700;">${fmtRupiah(pe.total)}</td>
@@ -2032,7 +2032,8 @@ function qtaskSettingsHTML(){
                 ${isExpanded ? `
                 <tr>
                   <td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                    ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;"><b>Hari kunjungan bulan ini (${pe.visitDaysCount}):</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
+                    <div style="margin-bottom:6px;"><b>Bonus Harian:</b> ${pe.jumlahVisit} visit x 1 + ${pe.jumlahKunjungan} kunjungan x 2 = ${(pe.jumlahVisit*1 + pe.jumlahKunjungan*2)} ÷ 5 = ${pe.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(pe.harianRate)} = ${fmtRupiah(pe.bonusHarian)}</div>
+                    ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;" class="faint"><b>Tanggal visit bulan ini:</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
                     ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;"><b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (total penjualan sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}</div>` : ''}
                     ${pe.feeRoastRate > 0 ? `<div style="margin-bottom:6px;"><b>Fee Roasting kumulatif:</b> ${pe.roastKg.toFixed(2)} kg hasil roasting (dari ${pe.roastBatchCount} batch unik RB+GB) x ${fmtRupiah(pe.feeRoastRate)}/kg = ${fmtRupiah(pe.bonusRoasting)}</div>` : ''}
                     ${pe.bonusBulananRate > 0 ? `<div style="margin-bottom:6px;"><b>Bonus Bulanan (rate ${fmtRupiah(pe.bonusBulananRate)}):</b> Gross margin bulan ini ${fmtRupiah(pe.grossMarginBulanIni)} (revenue ${fmtRupiah(pe.revenueBulanIni)} − HPP ${fmtRupiah(pe.hppBulanIni)}) dibanding 2x cost bulan ini (2 x ${fmtRupiah(pe.costSebelumBonus)} = ${fmtRupiah(2 * pe.costSebelumBonus)}) -- ${pe.bonusBulananTriggered ? `<span style="color:var(--success); font-weight:700;">TERPENUHI, bonus ${fmtRupiah(pe.bonusBulanan)} ditambahkan</span>` : `<span class="faint">belum terpenuhi, bonus tidak ditambahkan</span>`}</div>` : ''}
@@ -2070,7 +2071,7 @@ function qtaskSettingsHTML(){
                 return `
                 <tr style="cursor:pointer;" data-action="toggle-sales-margin-detail" data-id="${pe.id}">
                   <td style="font-weight:600;">${escapeHTML(pe.name)}<div class="faint" style="font-size:10px;">${escapeHTML(pe.jabatan)}</div></td>
-                  <td>${fmtRupiah(pe.totalCost)}<div class="faint" style="font-size:10px;">${pe.monthsActiveCount} bulan aktif x gaji, ${pe.visitDaysCount} hari kunjungan, komisi ${fmtRupiah(pe.komisiPenjualan)}</div></td>
+                  <td>${fmtRupiah(pe.totalCost)}<div class="faint" style="font-size:10px;">${pe.monthsActiveCount} bulan aktif x gaji, ${pe.jumlahVisit} visit + ${pe.jumlahKunjungan} kunjungan = ${pe.jumlahHari.toFixed(2)} hari setara, komisi ${fmtRupiah(pe.komisiPenjualan)}</div></td>
                   <td>${fmtRupiah(pe.revenue)}</td>
                   <td>${fmtRupiah(pe.grossMargin)}<div class="faint" style="font-size:10px;">${pe.marginPct.toFixed(1)}% dari revenue</div></td>
                   <td style="font-weight:700; color:${pe.netContribution >= 0 ? 'var(--success)' : 'var(--danger)'};">${pe.netContribution >= 0 ? '+' : ''}${fmtRupiah(pe.netContribution)}</td>
