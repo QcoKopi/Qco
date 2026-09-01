@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-01-bonus-harian-visit-kunjungan';
+const QSYSTEM_HTML_VERSION = '2026-09-01-fee-harian-rename-slip-breakdown';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1995,7 +1995,7 @@ function qtaskSettingsHTML(){
     ${emp.role==='owner' ? `
     <div class="section-title">💰 Gaji & Bonus Staff</div>
     <div class="card">
-      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Bonus Harian (dibayar penuh tiap bulan). <b>Bonus Harian</b> = (jumlah Visit x 1 + jumlah Kunjungan x 2) ÷ 5 x rate Harian -- Visit dari ENTRY (kunjungan prospekting rutin), Kunjungan dari sheet Kunjungan (appointment/demo yang sudah ada janji, bobot 2x lipat). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya). <b>Bonus Bulanan</b> = rate flat (diatur di ⚙️ Kelola Rate Gaji & Komisi) yang ditambahkan HANYA kalau gross margin bulan ini ≥2x cost (Gaji + Komisi) bulan ini.</div>
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>Gaji</b> = Gaji Tetap + Fee Harian (dibayar penuh tiap bulan). <b>Fee Harian</b> = (jumlah Visit x 1 + jumlah Kunjungan x 2) ÷ 5 x rate Harian -- Visit dari ENTRY (kunjungan prospekting rutin), Kunjungan dari sheet Kunjungan (appointment/demo yang sudah ada janji, bobot 2x lipat). <b>Komisi Penjualan</b> = Fee Marketing + Fee Roasting (kumulatif, karena kadang tidak dibayar penuh dan sisanya menumpuk ke bulan berikutnya). <b>Bonus Bulanan</b> = rate flat (diatur di ⚙️ Kelola Rate Gaji & Komisi) yang ditambahkan HANYA kalau gross margin bulan ini ≥2x cost (Gaji + Komisi) bulan ini.</div>
       <div class="row gap-8" style="margin-bottom:12px;">
         <select data-action="set-payroll-month" style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
           ${MONTH_NAMES_ID.map((m,i)=>`<option value="${i+1}" ${state.payrollMonth===i+1?'selected':''}>${m}</option>`).join('')}
@@ -2032,7 +2032,7 @@ function qtaskSettingsHTML(){
                 ${isExpanded ? `
                 <tr>
                   <td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                    <div style="margin-bottom:6px;"><b>Bonus Harian:</b> ${pe.jumlahVisit} visit x 1 + ${pe.jumlahKunjungan} kunjungan x 2 = ${(pe.jumlahVisit*1 + pe.jumlahKunjungan*2)} ÷ 5 = ${pe.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(pe.harianRate)} = ${fmtRupiah(pe.bonusHarian)}</div>
+                    <div style="margin-bottom:6px;"><b>Fee Harian:</b> ${pe.jumlahVisit} visit x 1 + ${pe.jumlahKunjungan} kunjungan x 2 = ${(pe.jumlahVisit*1 + pe.jumlahKunjungan*2)} ÷ 5 = ${pe.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(pe.harianRate)} = ${fmtRupiah(pe.feeHarian)}</div>
                     ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;" class="faint"><b>Tanggal visit bulan ini:</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
                     ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;"><b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (total penjualan sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}</div>` : ''}
                     ${pe.feeRoastRate > 0 ? `<div style="margin-bottom:6px;"><b>Fee Roasting kumulatif:</b> ${pe.roastKg.toFixed(2)} kg hasil roasting (dari ${pe.roastBatchCount} batch unik RB+GB) x ${fmtRupiah(pe.feeRoastRate)}/kg = ${fmtRupiah(pe.bonusRoasting)}</div>` : ''}
@@ -5220,8 +5220,9 @@ function modalHTML(){
             <input type="number" name="sg-gaji-tetap" placeholder="${Math.round(ctx.gajiTetap || 0)}" step="1">
           </div>
           <div class="field">
-            <label>Bonus Harian</label>
-            <input type="number" name="sg-bonus-harian" placeholder="${Math.round(ctx.bonusHarian || 0)}" step="1">
+            <label>Fee Harian</label>
+            <input type="number" name="sg-fee-harian" placeholder="${Math.round(ctx.feeHarian || 0)}" step="1">
+            ${(ctx.jumlahVisit != null && ctx.jumlahKunjungan != null && ctx.jumlahHari != null) ? `<div class="hint">${ctx.jumlahVisit} visit x 1 + ${ctx.jumlahKunjungan} kunjungan x 2 = ${(ctx.jumlahVisit*1 + ctx.jumlahKunjungan*2)} ÷ 5 = ${ctx.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(ctx.harianRate || 0)}</div>` : ''}
           </div>
           <div class="field">
             <label>Komisi Penjualan</label>
@@ -6077,7 +6078,11 @@ document.addEventListener('click', function(e){
       year: state.payrollData.year,
       monthName: state.payrollData.monthName,
       gajiTetap: pe.gajiTetap,
-      bonusHarian: pe.bonusHarian,
+      feeHarian: pe.feeHarian,
+      jumlahVisit: pe.jumlahVisit,
+      jumlahKunjungan: pe.jumlahKunjungan,
+      jumlahHari: pe.jumlahHari,
+      harianRate: pe.harianRate,
       komisiPenjualan: pe.komisiPenjualan,
       bonusBulanan: pe.bonusBulanan
     };
@@ -6743,7 +6748,7 @@ document.addEventListener('submit', function(e){
       return isNaN(n) ? (Number(fallback) || 0) : n;
     }
     const gajiTetap = resolveVal('sg-gaji-tetap', ctx.gajiTetap);
-    const bonusHarian = resolveVal('sg-bonus-harian', ctx.bonusHarian);
+    const feeHarian = resolveVal('sg-fee-harian', ctx.feeHarian);
     const komisiPenjualan = resolveVal('sg-komisi', ctx.komisiPenjualan);
     const bonusBulanan = resolveVal('sg-bonus-bulanan', ctx.bonusBulanan);
 
@@ -6752,7 +6757,12 @@ document.addEventListener('submit', function(e){
     apiCall('generateSlipGajiPDF', {
       requestingUserId: state.currentUser,
       employeeId: ctx.employeeId, month: ctx.month, year: ctx.year,
-      gajiTetap, bonusHarian, komisiPenjualan, bonusBulanan
+      gajiTetap, feeHarian, komisiPenjualan, bonusBulanan,
+      // Breakdown Visit+Kunjungan dikirim TERPISAH dari feeHarian (yang bisa
+      // dikoreksi Owner) -- supaya slip TETAP bisa tampilkan formula asal
+      // perhitungannya, walau angka akhirnya dikoreksi manual.
+      jumlahVisit: ctx.jumlahVisit, jumlahKunjungan: ctx.jumlahKunjungan,
+      jumlahHari: ctx.jumlahHari, harianRate: ctx.harianRate
     }).then(result => {
       state.slipGajiGenerating = false;
       if (result && result.success && result.pdfBase64) {
