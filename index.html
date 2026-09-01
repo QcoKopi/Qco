@@ -413,6 +413,7 @@
 <base target="_blank">
 <base target="_blank">
 <base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div id="app"></div>
@@ -838,6 +839,8 @@ let state = {
   poError: null,
   poFormNamaBarang: '',
   poFormJumlah: '',
+  poFormHargaJual: '',
+  poFormSales: '',
   poFormNamaKlien: '',
   poProductSearchQuery: '',
   poProductDropdownOpen: false,
@@ -2450,6 +2453,8 @@ async function savePurchaseOrder(){
   const tanggalKirim = document.getElementById('po-tanggal-kirim').value;
   const namaBarang = document.getElementById('po-nama-barang').value;
   const jumlah = Number(document.getElementById('po-jumlah').value) || 0;
+  const hargaJual = Number(document.getElementById('po-harga-jual').value) || 0;
+  const sales = document.getElementById('po-sales').value;
   const namaKlien = document.getElementById('po-nama-klien').value;
   if (!tanggalPO || !tanggalKirim || !namaBarang || jumlah <= 0 || !namaKlien) {
     showToast('Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.');
@@ -2472,7 +2477,7 @@ async function savePurchaseOrder(){
   try {
     const result = await apiCall('qsalesSavePurchaseOrder', {
       requestingUserId: state.currentUser,
-      tanggalPO, tanggalKirim, namaBarang, jumlah, namaKlien,
+      tanggalPO, tanggalKirim, namaBarang, jumlah, hargaJual, sales, namaKlien,
       alamatKlien: customer ? customer.alamat : '',
       teleponKlien: customer ? customer.telepon : ''
     });
@@ -2480,6 +2485,8 @@ async function savePurchaseOrder(){
       showToast(result.message || 'Purchase Order berhasil dicatat.');
       state.poFormNamaBarang = '';
       state.poFormJumlah = '';
+      state.poFormHargaJual = '';
+      state.poFormSales = '';
       state.poFormNamaKlien = '';
       state.poProductSearchQuery = '';
       state.poKlienSearchQuery = '';
@@ -2502,7 +2509,7 @@ function qsalesSubNavHTML(){
     <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
   `;
   const emp = findEmp(state.currentUser);
-  const PO_JABATAN_ = ['Ass Ops & Product Development', 'Ops & Product Development'];
+  const PO_JABATAN_ = ['Ass Ops & Product Development', 'Ops & Product Development', 'Canvaser', 'Marketing & Sales'];
   const canSeePO = emp && (emp.role === 'owner' || PO_JABATAN_.includes(String(emp.jabatan || '').trim()));
   return `
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
@@ -2923,7 +2930,7 @@ function qsalesPurchaseOrderHTML(){
 
   return `
     <div class="greeting">Purchase Order</div>
-    <div class="greeting-sub">Khusus Ass Ops & Product Development, Ops & Product Development, dan Owner</div>
+    <div class="greeting-sub">Khusus Owner, Ops & Product Development, Ass Ops & Product Development, Canvaser, dan Marketing & Sales</div>
     ${qsalesSubNavHTML()}
     ${!d.resepSheetDitemukan ? `<div class="card" style="padding:12px; margin-bottom:12px; color:var(--danger); font-size:12px;">⚠ Sheet resep ("Resep") tidak ditemukan di spreadsheet ini -- info Stok Material RB/GB tidak bisa dihitung.</div>` : ''}
 
@@ -2949,6 +2956,17 @@ function qsalesPurchaseOrderHTML(){
       <div class="form-group" style="margin-top:8px;">
         <label>Jumlah (kg)</label>
         <input type="number" id="po-jumlah" data-action="po-jumlah-changed" value="${state.poFormJumlah || ''}" min="0" step="0.01" placeholder="0" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+      </div>
+      <div class="form-group" style="margin-top:8px;">
+        <label>Harga Jual (Rp/kg)</label>
+        <input type="number" id="po-harga-jual" value="${state.poFormHargaJual || ''}" min="0" step="1" placeholder="0" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+      </div>
+      <div class="form-group" style="margin-top:8px;">
+        <label>Sales</label>
+        <select id="po-sales" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:14px; background:var(--surface);">
+          <option value="">-- Pilih Sales --</option>
+          ${(d.salesOptions || []).map(s => `<option value="${escapeHTML(s.name)}" ${state.poFormSales === s.name ? 'selected' : ''}>${escapeHTML(s.name)} (${escapeHTML(s.jabatan)})</option>`).join('')}
+        </select>
       </div>
       ${state.poStockPreviewLoading ? `<div class="faint" style="font-size:11px; margin-top:8px;">Memuat info stok...</div>` : stockBlockHTML(state.poStockPreview, state.poFormNamaBarang, jumlahDiminta)}
       <div class="form-group" style="margin-top:8px; position:relative;">
@@ -2977,6 +2995,8 @@ function qsalesPurchaseOrderHTML(){
           <div>
             <div style="font-weight:700;">${escapeHTML(po.namaBarang)} <span class="faint" style="font-weight:400;">× ${po.jumlah} kg</span></div>
             <div class="faint" style="font-size:11px;">PO: ${escapeHTML(po.tanggalPO)} &nbsp;→&nbsp; Kirim: ${escapeHTML(po.tanggalKirim)}</div>
+            ${po.hargaJual > 0 ? `<div style="font-size:11px; margin-top:2px; color:var(--accent-dark);">💰 ${fmtRupiah(po.hargaJual)}/kg · Total: ${fmtRupiah(po.hargaJual * po.jumlah)}</div>` : ''}
+            ${po.sales ? `<div style="font-size:11px; margin-top:2px;">👤 Sales: ${escapeHTML(po.sales)}</div>` : ''}
           </div>
           <div style="text-align:right;">
             <div style="font-weight:600; font-size:12px;">${escapeHTML(po.namaKlien)}</div>
