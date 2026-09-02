@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-02-stock-schema3-fix';
+const QSYSTEM_HTML_VERSION = '2026-09-02-cursor-fix-po-expandable';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -858,6 +858,7 @@ let state = {
   poStockPreviewLoading: false,
   poSaving: false,
   poStatusUpdatingRowIndex: null,
+  poExpandedRowIndexes: [],
   payrollRatesData: null,
   payrollRatesLoading: false,
   payrollRatesError: null,
@@ -2964,6 +2965,64 @@ function qsalesKunjunganHTML(){
   `;
 }
 
+// FIX BUG KURSOR (2026-09-02, PERBAIKAN TUNTAS -- laporan ke-3 dari user):
+// PENYEBAB SEBENARNYA kursor selalu lompat ke awal saat mengetik di field
+// Nama Barang/Sales/Nama Klien: SETIAP ketikan memanggil render() PENUH,
+// yang MENGHANCURKAN & MEMBUAT ULANG elemen <input> itu sendiri di SETIAP
+// huruf yang diketik -- bukan soal urutan simpan/pulihkan fokus (itu
+// sudah ada sebelumnya, tapi TIDAK CUKUP kalau elemennya sendiri dibuat
+// ulang tiap saat). FIX TUNTAS: <input> field pencarian ini SEKARANG
+// TIDAK PERNAH disentuh sama sekali selama pengetikan -- HANYA konten
+// dropdown saran di BAWAHNYA (elemen terpisah, id stabil, SELALU ada di
+// DOM) yang di-update langsung lewat innerHTML, TANPA render() global
+// sama sekali. Karena <input>-nya sendiri tidak pernah dibuat ulang,
+// browser TIDAK PERNAH kehilangan posisi kursor -- ini native didukung
+// browser, bukan lagi trik simpan/pulihkan software yang rawan meleset.
+function qsalesRenderProdukDropdownHTML_(){
+  if (!state.poProductDropdownOpen) return '';
+  const d = state.poData;
+  if (!d) return '';
+  const q = String(state.poProductSearchQuery || '').toLowerCase();
+  const matches = (d.productOptions || []).filter(p => p.toLowerCase().includes(q)).slice(0, 20);
+  return `
+    <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+      ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada produk kopi yang cocok.</div>` : matches.map(p => `
+        <div data-action="po-product-select" data-value="${escapeHTML(p)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(p)}</div>
+      `).join('')}
+      <div data-action="po-pilih-produk-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Produk Baru (belum ada di katalog)</div>
+    </div>
+  `;
+}
+function qsalesRenderSalesDropdownHTML_(){
+  if (!state.poSalesDropdownOpen) return '';
+  const d = state.poData;
+  if (!d) return '';
+  const q = String(state.poSalesSearchQuery || '').toLowerCase();
+  const matches = (d.salesOptions || []).filter(s => s.toLowerCase().includes(q)).slice(0, 20);
+  return `
+    <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+      ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada nama sales yang cocok.</div>` : matches.map(s => `
+        <div data-action="po-sales-select" data-value="${escapeHTML(s)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(s)}</div>
+      `).join('')}
+    </div>
+  `;
+}
+function qsalesRenderKlienDropdownHTML_(){
+  if (!state.poKlienDropdownOpen) return '';
+  const d = state.poData;
+  if (!d) return '';
+  const q = String(state.poKlienSearchQuery || '').toLowerCase();
+  const matches = (d.customerOptions || []).filter(c => c.nama.toLowerCase().includes(q)).slice(0, 20);
+  return `
+    <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+      ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada klien yang cocok.</div>` : matches.map(c => `
+        <div data-action="po-klien-select" data-value="${escapeHTML(c.nama)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(c.nama)}</div>
+      `).join('')}
+      <div data-action="po-pilih-klien-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Klien Baru (belum ada di daftar)</div>
+    </div>
+  `;
+}
+
 function qsalesPurchaseOrderHTML(){
   if (state.poLoading && !state.poData) {
     return `
@@ -3031,18 +3090,7 @@ function qsalesPurchaseOrderHTML(){
           <div style="margin-top:4px;"><span class="faint" style="font-size:11px; color:var(--warning); font-weight:600;">🆕 Produk baru -- belum ada di katalog, stok/resep tidak bisa dihitung.</span> <span data-action="po-batal-produk-baru" style="font-size:11px; color:var(--accent-dark); cursor:pointer; text-decoration:underline;">✕ Batal, pilih dari katalog</span></div>
         ` : `
         <input type="text" id="po-nama-barang" data-action="po-product-search-input" value="${escapeHTML(state.poProductSearchQuery != null ? state.poProductSearchQuery : (state.poFormNamaBarang || ''))}" placeholder="🔍 Ketik nama produk kopi..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
-        ${state.poProductDropdownOpen ? (() => {
-          const q = String(state.poProductSearchQuery || '').toLowerCase();
-          const matches = d.productOptions.filter(p => p.toLowerCase().includes(q)).slice(0, 20);
-          return `
-          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-            ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada produk kopi yang cocok.</div>` : matches.map(p => `
-              <div data-action="po-product-select" data-value="${escapeHTML(p)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(p)}</div>
-            `).join('')}
-            <div data-action="po-pilih-produk-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Produk Baru (belum ada di katalog)</div>
-          </div>
-          `;
-        })() : ''}
+        <div id="po-produk-dropdown-container">${qsalesRenderProdukDropdownHTML_()}</div>
         `}
       </div>
       <div style="display:flex; gap:10px; margin-top:8px;">
@@ -3060,17 +3108,7 @@ function qsalesPurchaseOrderHTML(){
       <div class="form-group" style="margin-top:8px; position:relative;">
         <label>Sales <span class="faint" style="font-weight:400;">(ketik utk cari, diisi manual)</span></label>
         <input type="text" id="po-sales" data-action="po-sales-search-input" value="${escapeHTML(state.poSalesSearchQuery != null ? state.poSalesSearchQuery : (state.poFormSales || ''))}" placeholder="🔍 Ketik nama sales..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
-        ${state.poSalesDropdownOpen ? (() => {
-          const q = String(state.poSalesSearchQuery || '').toLowerCase();
-          const matches = (d.salesOptions || []).filter(s => s.toLowerCase().includes(q)).slice(0, 20);
-          return `
-          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-            ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada nama sales yang cocok.</div>` : matches.map(s => `
-              <div data-action="po-sales-select" data-value="${escapeHTML(s)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(s)}</div>
-            `).join('')}
-          </div>
-          `;
-        })() : ''}
+        <div id="po-sales-dropdown-container">${qsalesRenderSalesDropdownHTML_()}</div>
       </div>
       <div class="form-group" style="margin-top:8px; position:relative;">
         <label>Nama Klien <span class="faint" style="font-weight:400;">${state.poIsKlienBaru ? '' : '(ketik utk cari)'}</span></label>
@@ -3082,18 +3120,7 @@ function qsalesPurchaseOrderHTML(){
           <div style="margin-top:4px;"><span class="faint" style="font-size:11px; color:var(--warning); font-weight:600;">🆕 Klien baru -- akan otomatis terdaftar ke daftar klien.</span> <span data-action="po-batal-klien-baru" style="font-size:11px; color:var(--accent-dark); cursor:pointer; text-decoration:underline;">✕ Batal, pilih dari daftar</span></div>
         ` : `
         <input type="text" id="po-nama-klien" data-action="po-klien-search-input" value="${escapeHTML(state.poKlienSearchQuery != null ? state.poKlienSearchQuery : (state.poFormNamaKlien || ''))}" placeholder="🔍 Ketik nama klien..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
-        ${state.poKlienDropdownOpen ? (() => {
-          const q = String(state.poKlienSearchQuery || '').toLowerCase();
-          const matches = d.customerOptions.filter(c => c.nama.toLowerCase().includes(q)).slice(0, 20);
-          return `
-          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-            ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada klien yang cocok.</div>` : matches.map(c => `
-              <div data-action="po-klien-select" data-value="${escapeHTML(c.nama)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(c.nama)}</div>
-            `).join('')}
-            <div data-action="po-pilih-klien-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Klien Baru (belum ada di daftar)</div>
-          </div>
-          `;
-        })() : ''}
+        <div id="po-klien-dropdown-container">${qsalesRenderKlienDropdownHTML_()}</div>
         `}
       </div>
       ${(!state.poIsKlienBaru && selectedCustomer) ? `<div class="faint" style="font-size:11px; margin-top:6px;">📍 ${escapeHTML(selectedCustomer.alamat || '(alamat belum ada)')} &nbsp;|&nbsp; 📞 ${escapeHTML(selectedCustomer.telepon || '(telepon belum ada)')}</div>` : ''}
@@ -3104,13 +3131,17 @@ function qsalesPurchaseOrderHTML(){
     ${d.poList.length === 0 ? `<div class="card"><span class="faint" style="font-size:12px;">Belum ada Purchase Order tercatat.</span></div>` : d.poList.map(po => {
       const statusColor = po.status === 'Delivered' ? 'var(--success)' : (po.status === 'Diterima untuk Diproses' ? 'var(--warning)' : 'var(--ink-faint)');
       const statusBg = po.status === 'Delivered' ? 'var(--success-soft)' : (po.status === 'Diterima untuk Diproses' ? 'var(--warning-soft)' : 'var(--surface-alt)');
+      const isExpanded = (state.poExpandedRowIndexes || []).includes(po.rowIndex);
       return `
       <div class="card" style="margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; cursor:pointer;" data-action="toggle-po-detail" data-rowindex="${po.rowIndex}">
           <div>
-            <div style="font-weight:700;">${po.isProdukBaru ? `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); margin-right:6px;">🆕 Produk Baru</span>` : ''}${escapeHTML(po.namaBarang)} <span class="faint" style="font-weight:400;">× ${po.jumlah} kg</span></div>
-            <div class="faint" style="font-size:11px;">PO: ${escapeHTML(po.tanggalPO)} &nbsp;→&nbsp; Kirim: ${escapeHTML(po.tanggalKirim)}</div>
-            ${po.sales ? `<div class="faint" style="font-size:11px;">👤 Sales: ${escapeHTML(po.sales)}</div>` : ''}
+            <div style="font-weight:700;">
+              <span class="chev" style="color:var(--ink-faint); font-size:12px; margin-right:2px;">${isExpanded ? '⌃' : '⌄'}</span>
+              ${po.isProdukBaru ? `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); margin-right:6px;">🆕 Produk Baru</span>` : ''}${escapeHTML(po.namaBarang)} <span class="faint" style="font-weight:400;">× ${po.jumlah} kg</span>
+            </div>
+            <div class="faint" style="font-size:11px; margin-left:18px;">PO: ${escapeHTML(po.tanggalPO)} &nbsp;→&nbsp; Kirim: ${escapeHTML(po.tanggalKirim)}</div>
+            ${po.sales ? `<div class="faint" style="font-size:11px; margin-left:18px;">👤 Sales: ${escapeHTML(po.sales)}</div>` : ''}
           </div>
           <div style="text-align:right;">
             <div style="font-weight:600; font-size:12px;">${po.namaPIC ? `<span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); margin-right:4px;">🆕</span>` : ''}${escapeHTML(po.namaKlien)}</div>
@@ -3119,19 +3150,23 @@ function qsalesPurchaseOrderHTML(){
             ${po.hargaJual > 0 ? `<div style="font-size:11px; font-weight:700; margin-top:2px;">${fmtRupiah(po.hargaJual)}/kg · ${fmtRupiah(po.totalNilai)}</div>` : ''}
           </div>
         </div>
-        <div class="faint" style="font-size:11px; margin-top:4px;">📍 ${escapeHTML(po.alamatKlien || '-')}</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; flex-wrap:wrap; gap:6px;">
           <span style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:99px; background:${statusBg}; color:${statusColor};">${po.status ? escapeHTML(po.status) : 'Belum Diproses'}</span>
           ${(!po.status || po.status === 'Diterima untuk Diproses') && po.status !== 'Delivered' ? `
             <button class="btn btn-ghost btn-sm" data-action="po-mark-diterima" data-rowindex="${po.rowIndex}" ${(po.status === 'Diterima untuk Diproses' || state.poStatusUpdatingRowIndex === po.rowIndex) ? 'disabled' : ''}>${state.poStatusUpdatingRowIndex === po.rowIndex ? '⏳ Menyimpan...' : (po.status === 'Diterima untuk Diproses' ? '✓ Diterima utk Diproses' : '📥 Tandai Diterima utk Diproses')}</button>
           ` : ''}
         </div>
-        ${po.isProdukBaru ? `
-          <div class="faint" style="font-size:11px; margin-top:6px; color:var(--warning);">🆕 Produk baru -- belum ada di katalog resep/stok, tidak bisa dihitung stok atau aksi produksinya.</div>
-        ` : `
-          ${po.stokCukup !== null ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700; color:${po.stokCukup ? 'var(--success)' : 'var(--danger)'};">${po.stokCukup ? '✓ Stok cukup' : '⚠ Stok tidak cukup'}</div>` : ''}
-          ${stockBlockHTML({ stokBarang: po.stokBarang, materialRB: po.materialRB, materialGB: po.materialGB }, po.namaBarang, po.jumlah, po.recommendedAction, po.rbCheck)}
-        `}
+        ${isExpanded ? `
+          <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
+            <div class="faint" style="font-size:11px; margin-bottom:6px;">📍 ${escapeHTML(po.alamatKlien || '-')}</div>
+            ${po.isProdukBaru ? `
+              <div class="faint" style="font-size:11px; color:var(--warning);">🆕 Produk baru -- belum ada di katalog resep/stok, tidak bisa dihitung stok atau aksi produksinya.</div>
+            ` : `
+              ${po.stokCukup !== null ? `<div style="font-size:11.5px; font-weight:700; color:${po.stokCukup ? 'var(--success)' : 'var(--danger)'};">${po.stokCukup ? '✓ Stok cukup' : '⚠ Stok tidak cukup'}</div>` : ''}
+              ${stockBlockHTML({ stokBarang: po.stokBarang, materialRB: po.materialRB, materialGB: po.materialGB }, po.namaBarang, po.jumlah, po.recommendedAction, po.rbCheck)}
+            `}
+          </div>
+        ` : ''}
       </div>
     `; }).join('')}
   `;
@@ -6332,6 +6367,14 @@ document.addEventListener('click', function(e){
     state.poFormKlienPIC = '';
     render();
   }
+  else if (el.dataset.action === 'toggle-po-detail'){
+    const rowIndex = Number(el.dataset.rowindex);
+    if (!rowIndex) return;
+    const idx = state.poExpandedRowIndexes.indexOf(rowIndex);
+    if (idx >= 0) state.poExpandedRowIndexes.splice(idx, 1);
+    else state.poExpandedRowIndexes.push(rowIndex);
+    render();
+  }
   else if (el.dataset.action === 'po-mark-diterima'){
     const rowIndex = Number(el.dataset.rowindex);
     if (!rowIndex || state.poStatusUpdatingRowIndex) return;
@@ -6510,19 +6553,27 @@ document.addEventListener('input', function(e){
     // ketikan bebas (bukan produk kopi yg benar-benar ada).
     state.poFormNamaBarang = '';
     state.poStockPreview = null;
-    render();
+    // FIX KURSOR TUNTAS (2026-09-02): TIDAK panggil render() sama sekali
+    // di sini -- HANYA update innerHTML container dropdown, <input> ini
+    // SENDIRI tidak pernah disentuh/dibuat ulang, jadi kursor browser
+    // aman 100% (native browser behavior, bukan lagi trik simpan/pulihkan
+    // fokus via JS yang terbukti tidak selalu bisa diandalkan).
+    const prodContainer = document.getElementById('po-produk-dropdown-container');
+    if (prodContainer) prodContainer.innerHTML = qsalesRenderProdukDropdownHTML_();
   }
   else if (e.target.dataset && e.target.dataset.action === 'po-sales-search-input'){
     state.poSalesSearchQuery = e.target.value;
     state.poSalesDropdownOpen = true;
     state.poFormSales = '';
-    render();
+    const salesContainer = document.getElementById('po-sales-dropdown-container');
+    if (salesContainer) salesContainer.innerHTML = qsalesRenderSalesDropdownHTML_();
   }
   else if (e.target.dataset && e.target.dataset.action === 'po-klien-search-input'){
     state.poKlienSearchQuery = e.target.value;
     state.poKlienDropdownOpen = true;
     state.poFormNamaKlien = '';
-    render();
+    const klienContainer = document.getElementById('po-klien-dropdown-container');
+    if (klienContainer) klienContainer.innerHTML = qsalesRenderKlienDropdownHTML_();
   }
 });
 
@@ -6600,17 +6651,27 @@ document.addEventListener('mousedown', function(e){
 // BUBBLES, sama seperti alasan 'focusout' dipakai di bawah -- bisa
 // didelegasikan di level document.
 document.addEventListener('focusin', function(e){
+  // FIX KURSOR (2026-09-02): SAMA seperti handler 'input' di atas -- TIDAK
+  // panggil render() global di sini. Kalau field ini SEDANG DIKETIK cepat
+  // (mis. hasil restore fokus dari render lain), memanggil render() di
+  // sini bisa memicu SIKLUS render tambahan yang TIDAK PERLU tepat saat
+  // user sedang mengetik. Targeted-update SAMA seperti 'input' aman &
+  // konsisten -- <input> tidak pernah disentuh, cukup isi kontainer
+  // dropdown-nya.
   if (e.target.id === 'po-nama-barang' && !state.poProductDropdownOpen) {
     state.poProductDropdownOpen = true;
-    render();
+    const c = document.getElementById('po-produk-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderProdukDropdownHTML_();
   }
   if (e.target.id === 'po-sales' && !state.poSalesDropdownOpen) {
     state.poSalesDropdownOpen = true;
-    render();
+    const c = document.getElementById('po-sales-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderSalesDropdownHTML_();
   }
   if (e.target.id === 'po-nama-klien' && !state.poKlienDropdownOpen) {
     state.poKlienDropdownOpen = true;
-    render();
+    const c = document.getElementById('po-klien-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderKlienDropdownHTML_();
   }
 });
 
@@ -6621,15 +6682,18 @@ document.addEventListener('focusin', function(e){
 document.addEventListener('focusout', function(e){
   if (e.target.id === 'po-nama-barang' && state.poProductDropdownOpen) {
     state.poProductDropdownOpen = false;
-    render();
+    const c = document.getElementById('po-produk-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderProdukDropdownHTML_();
   }
   if (e.target.id === 'po-sales' && state.poSalesDropdownOpen) {
     state.poSalesDropdownOpen = false;
-    render();
+    const c = document.getElementById('po-sales-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderSalesDropdownHTML_();
   }
   if (e.target.id === 'po-nama-klien' && state.poKlienDropdownOpen) {
     state.poKlienDropdownOpen = false;
-    render();
+    const c = document.getElementById('po-klien-dropdown-container');
+    if (c) c.innerHTML = qsalesRenderKlienDropdownHTML_();
   }
 });
 
