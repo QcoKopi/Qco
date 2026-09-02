@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-02-po-canvaser-access-deeplink';
+const QSYSTEM_HTML_VERSION = '2026-09-02-po-klien-baru-dropdown-fix';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -843,6 +843,11 @@ let state = {
   poFormHargaJual: '',
   poFormSales: '',
   poFormNamaKlien: '',
+  poIsKlienBaru: false,
+  poFormNamaCoffeeShop: '',
+  poFormKlienAlamat: '',
+  poFormKlienTelp: '',
+  poFormKlienPIC: '',
   poProductSearchQuery: '',
   poProductDropdownOpen: false,
   poSalesSearchQuery: '',
@@ -2467,11 +2472,28 @@ async function savePurchaseOrder(){
   const jumlah = Number(document.getElementById('po-jumlah').value) || 0;
   const hargaJual = Number(document.getElementById('po-harga-jual').value) || 0; // opsional, default 0
   const sales = document.getElementById('po-sales').value.trim(); // opsional, diisi manual
-  const namaKlien = document.getElementById('po-nama-klien').value;
+
+  // FIX PENTING (SAMA seperti Nama Barang di atas): kalau poIsKlienBaru
+  // true, id="po-nama-klien" JUGA TIDAK ADA di DOM (diganti 4 field
+  // terpisah: po-nama-coffeeshop, po-klien-alamat, po-klien-telp,
+  // po-klien-pic). Baca dari elemen yg BENAR-BENAR ADA sesuai mode.
+  let namaKlien, alamatKlienBaru, teleponKlienBaru, namaCoffeeShop, namaPIC;
+  if (state.poIsKlienBaru) {
+    namaCoffeeShop = (document.getElementById('po-nama-coffeeshop').value || '').trim();
+    alamatKlienBaru = (document.getElementById('po-klien-alamat').value || '').trim();
+    teleponKlienBaru = (document.getElementById('po-klien-telp').value || '').trim();
+    namaPIC = (document.getElementById('po-klien-pic').value || '').trim();
+    namaKlien = namaCoffeeShop; // dipakai utk cek wajib-isi generik di bawah
+  } else {
+    namaKlien = document.getElementById('po-nama-klien').value;
+  }
+
   if (!tanggalPO || !tanggalKirim || !namaBarang || jumlah <= 0 || !namaKlien) {
     showToast(state.poIsProdukBaru
       ? 'Tanggal PO, Tanggal Kirim, Deskripsi Produk Baru, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.'
-      : 'Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.');
+      : (state.poIsKlienBaru
+        ? 'Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama CoffeeShop wajib diisi.'
+        : 'Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.'));
     return;
   }
   // FIX: Nama Barang & Nama Klien HARUS benar-benar dipilih dari daftar
@@ -2490,20 +2512,38 @@ async function savePurchaseOrder(){
     showToast('Sales harus dipilih dari daftar yang muncul saat mengetik -- bukan ketikan bebas. Kosongkan kalau tidak yakin.');
     return;
   }
-  const customer = (state.poData.customerOptions || []).find(c => c.nama === namaKlien);
-  if (!customer) {
-    showToast('Nama Klien harus dipilih dari daftar yang muncul saat mengetik -- bukan ketikan bebas.');
-    return;
+
+  // BARU (2026-09-02): Klien Baru -- 4 field WAJIB semua (Nama CoffeeShop,
+  // Alamat, No Telp, Nama PIC), SAMA seperti yg divalidasi ulang di
+  // backend (qsalesSavePurchaseOrder) -- validasi di sini cuma utk kasih
+  // feedback CEPAT ke user tanpa perlu nunggu roundtrip ke server.
+  let customer = null;
+  if (state.poIsKlienBaru) {
+    if (!namaCoffeeShop || !alamatKlienBaru || !teleponKlienBaru || !namaPIC) {
+      showToast('Untuk Klien Baru: Nama CoffeeShop, Alamat, No Telp, dan Nama PIC semua wajib diisi.');
+      return;
+    }
+  } else {
+    customer = (state.poData.customerOptions || []).find(c => c.nama === namaKlien);
+    if (!customer) {
+      showToast('Nama Klien harus dipilih dari daftar yang muncul saat mengetik -- bukan ketikan bebas. Kalau klien belum ada, pilih "＋ Ini Klien Baru".');
+      return;
+    }
   }
+
   state.poSaving = true;
   render();
   try {
     const result = await apiCall('qsalesSavePurchaseOrder', {
       requestingUserId: state.currentUser,
       tanggalPO, tanggalKirim, namaBarang, isProdukBaru: state.poIsProdukBaru,
-      jumlah, hargaJual, sales, namaKlien,
-      alamatKlien: customer ? customer.alamat : '',
-      teleponKlien: customer ? customer.telepon : ''
+      jumlah, hargaJual, sales,
+      isKlienBaru: state.poIsKlienBaru,
+      namaKlien: state.poIsKlienBaru ? '' : namaKlien, // backend isi namaKlien dari namaCoffeeShop kalau Klien Baru
+      namaCoffeeShop: state.poIsKlienBaru ? namaCoffeeShop : '',
+      namaPIC: state.poIsKlienBaru ? namaPIC : '',
+      alamatKlien: state.poIsKlienBaru ? alamatKlienBaru : (customer ? customer.alamat : ''),
+      teleponKlien: state.poIsKlienBaru ? teleponKlienBaru : (customer ? customer.telepon : '')
     });
     if (result && result.success) {
       showToast(result.message || 'Purchase Order berhasil dicatat.');
@@ -2514,6 +2554,11 @@ async function savePurchaseOrder(){
       state.poFormHargaJual = '';
       state.poFormSales = '';
       state.poFormNamaKlien = '';
+      state.poIsKlienBaru = false;
+      state.poFormNamaCoffeeShop = '';
+      state.poFormKlienAlamat = '';
+      state.poFormKlienTelp = '';
+      state.poFormKlienPIC = '';
       state.poProductSearchQuery = '';
       state.poSalesSearchQuery = '';
       state.poKlienSearchQuery = '';
@@ -3028,21 +3073,30 @@ function qsalesPurchaseOrderHTML(){
         })() : ''}
       </div>
       <div class="form-group" style="margin-top:8px; position:relative;">
-        <label>Nama Klien <span class="faint" style="font-weight:400;">(ketik utk cari)</span></label>
+        <label>Nama Klien <span class="faint" style="font-weight:400;">${state.poIsKlienBaru ? '' : '(ketik utk cari)'}</span></label>
+        ${state.poIsKlienBaru ? `
+          <input type="text" id="po-nama-coffeeshop" placeholder="Nama CoffeeShop" value="${escapeHTML(state.poFormNamaCoffeeShop || '')}" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:8px;">
+          <input type="text" id="po-klien-alamat" placeholder="Alamat" value="${escapeHTML(state.poFormKlienAlamat || '')}" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:8px;">
+          <input type="tel" id="po-klien-telp" placeholder="No Telp" value="${escapeHTML(state.poFormKlienTelp || '')}" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; margin-bottom:8px;">
+          <input type="text" id="po-klien-pic" placeholder="Nama PIC" value="${escapeHTML(state.poFormKlienPIC || '')}" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
+          <div style="margin-top:4px;"><span class="faint" style="font-size:11px; color:var(--warning); font-weight:600;">🆕 Klien baru -- akan otomatis terdaftar ke daftar klien.</span> <span data-action="po-batal-klien-baru" style="font-size:11px; color:var(--accent-dark); cursor:pointer; text-decoration:underline;">✕ Batal, pilih dari daftar</span></div>
+        ` : `
         <input type="text" id="po-nama-klien" data-action="po-klien-search-input" value="${escapeHTML(state.poKlienSearchQuery != null ? state.poKlienSearchQuery : (state.poFormNamaKlien || ''))}" placeholder="🔍 Ketik nama klien..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
         ${state.poKlienDropdownOpen ? (() => {
           const q = String(state.poKlienSearchQuery || '').toLowerCase();
           const matches = d.customerOptions.filter(c => c.nama.toLowerCase().includes(q)).slice(0, 20);
           return `
-          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
             ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada klien yang cocok.</div>` : matches.map(c => `
               <div data-action="po-klien-select" data-value="${escapeHTML(c.nama)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(c.nama)}</div>
             `).join('')}
+            <div data-action="po-pilih-klien-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Klien Baru (belum ada di daftar)</div>
           </div>
           `;
         })() : ''}
+        `}
       </div>
-      ${selectedCustomer ? `<div class="faint" style="font-size:11px; margin-top:6px;">📍 ${escapeHTML(selectedCustomer.alamat || '(alamat belum ada)')} &nbsp;|&nbsp; 📞 ${escapeHTML(selectedCustomer.telepon || '(telepon belum ada)')}</div>` : ''}
+      ${(!state.poIsKlienBaru && selectedCustomer) ? `<div class="faint" style="font-size:11px; margin-top:6px;">📍 ${escapeHTML(selectedCustomer.alamat || '(alamat belum ada)')} &nbsp;|&nbsp; 📞 ${escapeHTML(selectedCustomer.telepon || '(telepon belum ada)')}</div>` : ''}
       <button class="btn btn-primary btn-block" data-action="save-purchase-order" style="margin-top:14px;" ${state.poSaving?'disabled':''}>${state.poSaving?'Menyimpan...':'Simpan Purchase Order'}</button>
     </div>
 
@@ -3059,8 +3113,9 @@ function qsalesPurchaseOrderHTML(){
             ${po.sales ? `<div class="faint" style="font-size:11px;">👤 Sales: ${escapeHTML(po.sales)}</div>` : ''}
           </div>
           <div style="text-align:right;">
-            <div style="font-weight:600; font-size:12px;">${escapeHTML(po.namaKlien)}</div>
+            <div style="font-weight:600; font-size:12px;">${po.namaPIC ? `<span style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); margin-right:4px;">🆕</span>` : ''}${escapeHTML(po.namaKlien)}</div>
             <div class="faint" style="font-size:10px;">${escapeHTML(po.teleponKlien)}</div>
+            ${po.namaPIC ? `<div class="faint" style="font-size:10px;">PIC: ${escapeHTML(po.namaPIC)}</div>` : ''}
             ${po.hargaJual > 0 ? `<div style="font-size:11px; font-weight:700; margin-top:2px;">${fmtRupiah(po.hargaJual)}/kg · ${fmtRupiah(po.totalNilai)}</div>` : ''}
           </div>
         </div>
@@ -6269,6 +6324,14 @@ document.addEventListener('click', function(e){
     state.poFormDeskripsiProdukBaru = '';
     render();
   }
+  else if (el.dataset.action === 'po-batal-klien-baru'){
+    state.poIsKlienBaru = false;
+    state.poFormNamaCoffeeShop = '';
+    state.poFormKlienAlamat = '';
+    state.poFormKlienTelp = '';
+    state.poFormKlienPIC = '';
+    render();
+  }
   else if (el.dataset.action === 'po-mark-diterima'){
     const rowIndex = Number(el.dataset.rowindex);
     if (!rowIndex || state.poStatusUpdatingRowIndex) return;
@@ -6510,6 +6573,43 @@ document.addEventListener('mousedown', function(e){
     state.poFormNamaKlien = val;
     state.poKlienSearchQuery = val;
     state.poKlienDropdownOpen = false;
+    render();
+    return;
+  }
+  const elKBaru = e.target.closest ? e.target.closest('[data-action="po-pilih-klien-baru"]') : null;
+  if (elKBaru) {
+    e.preventDefault();
+    state.poIsKlienBaru = true;
+    state.poFormNamaKlien = '';
+    state.poKlienSearchQuery = '';
+    state.poKlienDropdownOpen = false;
+    state.poFormNamaCoffeeShop = '';
+    state.poFormKlienAlamat = '';
+    state.poFormKlienTelp = '';
+    state.poFormKlienPIC = '';
+    render();
+  }
+});
+
+// BARU (2026-09-02, FIX BUG NYATA): SEBELUMNYA dropdown Nama Barang/Sales/
+// Nama Klien HANYA terbuka lewat listener 'input' (yaitu SETELAH user
+// mulai MENGETIK) -- kalau user cuma KLIK/FOKUS ke field tanpa ketik apa
+// pun dulu (ekspektasi wajar: klik lalu lihat semua pilihan), dropdown-nya
+// TIDAK PERNAH muncul sama sekali, seolah daftarnya kosong padahal
+// datanya ada. 'focusin' (BEDA dari 'focus') sengaja dipilih karena
+// BUBBLES, sama seperti alasan 'focusout' dipakai di bawah -- bisa
+// didelegasikan di level document.
+document.addEventListener('focusin', function(e){
+  if (e.target.id === 'po-nama-barang' && !state.poProductDropdownOpen) {
+    state.poProductDropdownOpen = true;
+    render();
+  }
+  if (e.target.id === 'po-sales' && !state.poSalesDropdownOpen) {
+    state.poSalesDropdownOpen = true;
+    render();
+  }
+  if (e.target.id === 'po-nama-klien' && !state.poKlienDropdownOpen) {
+    state.poKlienDropdownOpen = true;
     render();
   }
 });
