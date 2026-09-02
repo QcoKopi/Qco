@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-02-po-workflow-sales-hargajual';
+const QSYSTEM_HTML_VERSION = '2026-09-02-po-canvaser-access-deeplink';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -837,6 +837,8 @@ let state = {
   poLoading: false,
   poError: null,
   poFormNamaBarang: '',
+  poIsProdukBaru: false,
+  poFormDeskripsiProdukBaru: '',
   poFormJumlah: '',
   poFormHargaJual: '',
   poFormSales: '',
@@ -2454,20 +2456,31 @@ async function fetchPOStockPreview(namaBarang){
 async function savePurchaseOrder(){
   const tanggalPO = document.getElementById('po-tanggal-po').value;
   const tanggalKirim = document.getElementById('po-tanggal-kirim').value;
-  const namaBarang = document.getElementById('po-nama-barang').value;
+  // FIX PENTING: elemen Nama Barang BEDA tergantung mode -- kalau
+  // poIsProdukBaru true, id="po-nama-barang" TIDAK ADA sama sekali di DOM
+  // (diganti textarea id="po-deskripsi-produk-baru"). Baca dari elemen yg
+  // BENAR-BENAR ADA, atau document.getElementById() akan return null dan
+  // .value akan error.
+  const namaBarang = state.poIsProdukBaru
+    ? (document.getElementById('po-deskripsi-produk-baru').value || '').trim()
+    : document.getElementById('po-nama-barang').value;
   const jumlah = Number(document.getElementById('po-jumlah').value) || 0;
   const hargaJual = Number(document.getElementById('po-harga-jual').value) || 0; // opsional, default 0
   const sales = document.getElementById('po-sales').value.trim(); // opsional, diisi manual
   const namaKlien = document.getElementById('po-nama-klien').value;
   if (!tanggalPO || !tanggalKirim || !namaBarang || jumlah <= 0 || !namaKlien) {
-    showToast('Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.');
+    showToast(state.poIsProdukBaru
+      ? 'Tanggal PO, Tanggal Kirim, Deskripsi Produk Baru, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.'
+      : 'Tanggal PO, Tanggal Kirim, Nama Barang, Jumlah (harus lebih dari 0), dan Nama Klien wajib diisi.');
     return;
   }
   // FIX: Nama Barang & Nama Klien HARUS benar-benar dipilih dari daftar
   // (bukan cuma ketikan bebas) -- supaya batasan "hanya Produk Kopi" utk
   // Nama Barang benar-benar DITEGAKKAN, bukan cuma disarankan lewat UI.
-  if (!(state.poData.productOptions || []).includes(namaBarang)) {
-    showToast('Nama Barang harus dipilih dari daftar produk kopi yang muncul saat mengetik -- bukan ketikan bebas.');
+  // KECUALI kalau ini Produk Baru -- justru TUJUANNYA supaya bisa nulis
+  // nama/deskripsi bebas utk produk yg belum ada di katalog sama sekali.
+  if (!state.poIsProdukBaru && !(state.poData.productOptions || []).includes(namaBarang)) {
+    showToast('Nama Barang harus dipilih dari daftar produk kopi yang muncul saat mengetik -- bukan ketikan bebas. Kalau produknya belum ada di katalog, pilih "＋ Ini Produk Baru".');
     return;
   }
   // Sales OPSIONAL -- tapi KALAU diisi, harus benar-benar dari daftar staff
@@ -2487,13 +2500,16 @@ async function savePurchaseOrder(){
   try {
     const result = await apiCall('qsalesSavePurchaseOrder', {
       requestingUserId: state.currentUser,
-      tanggalPO, tanggalKirim, namaBarang, jumlah, hargaJual, sales, namaKlien,
+      tanggalPO, tanggalKirim, namaBarang, isProdukBaru: state.poIsProdukBaru,
+      jumlah, hargaJual, sales, namaKlien,
       alamatKlien: customer ? customer.alamat : '',
       teleponKlien: customer ? customer.telepon : ''
     });
     if (result && result.success) {
       showToast(result.message || 'Purchase Order berhasil dicatat.');
       state.poFormNamaBarang = '';
+      state.poIsProdukBaru = false;
+      state.poFormDeskripsiProdukBaru = '';
       state.poFormJumlah = '';
       state.poFormHargaJual = '';
       state.poFormSales = '';
@@ -2519,9 +2535,17 @@ function qsalesSubNavHTML(){
   const tabBtn = (tab, label) => `
     <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
   `;
+  // FIX (2026-09-02, per instruksi user): SEBELUMNYA tombol "📦 Purchase
+  // Order" cuma muncul utk Owner + 2 jabatan Ops/Product Development --
+  // padahal backend (qsalesCheckPOAccess_) SUDAH dibuka utk SEMUA
+  // karyawan sejak instruksi "Tombol purchase order ada di halaman semua
+  // karyawan". Ini GAP NYATA yg baru ketahuan: staff Canvaser/Marketing &
+  // Sales (yg justru paling sering isi closing) TIDAK PERNAH melihat
+  // tombol ini sama sekali walau backend-nya sudah izinkan. Sekarang
+  // disamakan persis dgn backend -- tombol muncul selama orangnya valid
+  // (findEmp berhasil), tidak dibatasi jabatan/role apa pun lagi.
   const emp = findEmp(state.currentUser);
-  const PO_JABATAN_ = ['Ass Ops & Product Development', 'Ops & Product Development'];
-  const canSeePO = emp && (emp.role === 'owner' || PO_JABATAN_.includes(String(emp.jabatan || '').trim()));
+  const canSeePO = !!emp;
   return `
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
       ${tabBtn('dashboard','📊 Dashboard')}
@@ -2956,19 +2980,25 @@ function qsalesPurchaseOrderHTML(){
       <div class="form-group"><label>Tanggal PO</label><input type="date" id="po-tanggal-po" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
       <div class="form-group" style="margin-top:8px;"><label>Tanggal Kirim</label><input type="date" id="po-tanggal-kirim" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;"></div>
       <div class="form-group" style="margin-top:8px; position:relative;">
-        <label>Nama Barang <span class="faint" style="font-weight:400;">(ketik utk cari, hanya Produk Kopi)</span></label>
+        <label>Nama Barang <span class="faint" style="font-weight:400;">${state.poIsProdukBaru ? '' : '(ketik utk cari, hanya Produk Kopi)'}</span></label>
+        ${state.poIsProdukBaru ? `
+          <textarea id="po-deskripsi-produk-baru" placeholder="Tulis deskripsi produk baru ini (nama, jenis, catatan lain)..." style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; min-height:70px; font-family:inherit;">${escapeHTML(state.poFormDeskripsiProdukBaru || '')}</textarea>
+          <div style="margin-top:4px;"><span class="faint" style="font-size:11px; color:var(--warning); font-weight:600;">🆕 Produk baru -- belum ada di katalog, stok/resep tidak bisa dihitung.</span> <span data-action="po-batal-produk-baru" style="font-size:11px; color:var(--accent-dark); cursor:pointer; text-decoration:underline;">✕ Batal, pilih dari katalog</span></div>
+        ` : `
         <input type="text" id="po-nama-barang" data-action="po-product-search-input" value="${escapeHTML(state.poProductSearchQuery != null ? state.poProductSearchQuery : (state.poFormNamaBarang || ''))}" placeholder="🔍 Ketik nama produk kopi..." autocomplete="off" style="width:100%; padding:8px; border:1px solid var(--line); border-radius:6px;">
         ${state.poProductDropdownOpen ? (() => {
           const q = String(state.poProductSearchQuery || '').toLowerCase();
           const matches = d.productOptions.filter(p => p.toLowerCase().includes(q)).slice(0, 20);
           return `
-          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
             ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada produk kopi yang cocok.</div>` : matches.map(p => `
               <div data-action="po-product-select" data-value="${escapeHTML(p)}" style="padding:9px 10px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);">${escapeHTML(p)}</div>
             `).join('')}
+            <div data-action="po-pilih-produk-baru" style="padding:9px 10px; font-size:13px; cursor:pointer; font-weight:700; color:var(--accent-dark); background:var(--accent-soft);">＋ Ini Produk Baru (belum ada di katalog)</div>
           </div>
           `;
         })() : ''}
+        `}
       </div>
       <div style="display:flex; gap:10px; margin-top:8px;">
         <div class="form-group" style="flex:1;">
@@ -3024,7 +3054,7 @@ function qsalesPurchaseOrderHTML(){
       <div class="card" style="margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;">
           <div>
-            <div style="font-weight:700;">${escapeHTML(po.namaBarang)} <span class="faint" style="font-weight:400;">× ${po.jumlah} kg</span></div>
+            <div style="font-weight:700;">${po.isProdukBaru ? `<span style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent-dark); margin-right:6px;">🆕 Produk Baru</span>` : ''}${escapeHTML(po.namaBarang)} <span class="faint" style="font-weight:400;">× ${po.jumlah} kg</span></div>
             <div class="faint" style="font-size:11px;">PO: ${escapeHTML(po.tanggalPO)} &nbsp;→&nbsp; Kirim: ${escapeHTML(po.tanggalKirim)}</div>
             ${po.sales ? `<div class="faint" style="font-size:11px;">👤 Sales: ${escapeHTML(po.sales)}</div>` : ''}
           </div>
@@ -3041,8 +3071,12 @@ function qsalesPurchaseOrderHTML(){
             <button class="btn btn-ghost btn-sm" data-action="po-mark-diterima" data-rowindex="${po.rowIndex}" ${(po.status === 'Diterima untuk Diproses' || state.poStatusUpdatingRowIndex === po.rowIndex) ? 'disabled' : ''}>${state.poStatusUpdatingRowIndex === po.rowIndex ? '⏳ Menyimpan...' : (po.status === 'Diterima untuk Diproses' ? '✓ Diterima utk Diproses' : '📥 Tandai Diterima utk Diproses')}</button>
           ` : ''}
         </div>
-        ${po.stokCukup !== null ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700; color:${po.stokCukup ? 'var(--success)' : 'var(--danger)'};">${po.stokCukup ? '✓ Stok cukup' : '⚠ Stok tidak cukup'}</div>` : ''}
-        ${stockBlockHTML({ stokBarang: po.stokBarang, materialRB: po.materialRB, materialGB: po.materialGB }, po.namaBarang, po.jumlah, po.recommendedAction, po.rbCheck)}
+        ${po.isProdukBaru ? `
+          <div class="faint" style="font-size:11px; margin-top:6px; color:var(--warning);">🆕 Produk baru -- belum ada di katalog resep/stok, tidak bisa dihitung stok atau aksi produksinya.</div>
+        ` : `
+          ${po.stokCukup !== null ? `<div style="font-size:11.5px; margin-top:6px; font-weight:700; color:${po.stokCukup ? 'var(--success)' : 'var(--danger)'};">${po.stokCukup ? '✓ Stok cukup' : '⚠ Stok tidak cukup'}</div>` : ''}
+          ${stockBlockHTML({ stokBarang: po.stokBarang, materialRB: po.materialRB, materialGB: po.materialGB }, po.namaBarang, po.jumlah, po.recommendedAction, po.rbCheck)}
+        `}
       </div>
     `; }).join('')}
   `;
@@ -5685,10 +5719,35 @@ function closeModal(){
   render();
 }
 
+// BARU (2026-09-02): dukungan deep-link via URL, dipakai supaya redirect
+// dari Sales Portal (form "Closing") bisa langsung mendarat di tab
+// Purchase Order setelah login -- BUKAN cuma dilempar ke layar login lalu
+// harus navigasi manual sendiri. Dibaca SEKALI saat file ini di-load
+// (bukan di init(), supaya sudah tersedia SEBELUM user sempat login).
+// Contoh URL: https://qsys.qcoid.com/?goto=po
+function qsystemReadDeepLinkGoto_(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('goto') || null;
+  } catch(e) { return null; }
+}
+let qsystemPendingDeepLink = qsystemReadDeepLinkGoto_();
+
 async function selectUser(id){
   state.currentUser = id;
-  state.appTab = 'dashboard';
-  state.qtaskTab = 'home';
+  // Deep-link "goto=po" -- SETELAH login, langsung arahkan ke QSales >
+  // Purchase Order, bukan ke dashboard default. BENAR-BENAR HANYA SEKALI:
+  // variabel di-clear (null) segera setelah dipakai, supaya kalau user
+  // nanti pindah tab lain lalu ganti akun lagi (tanpa refresh halaman),
+  // TIDAK terus-menerus dilempar balik ke Purchase Order setiap login.
+  if (qsystemPendingDeepLink === 'po') {
+    state.appTab = 'qsales';
+    state.qsalesTab = 'po';
+    qsystemPendingDeepLink = null;
+  } else {
+    state.appTab = 'dashboard';
+    state.qtaskTab = 'home';
+  }
   state.mnNotes = []; // clear notes lama saat ganti user
   state.mnMyResponses = {};
   state.mnModalOpen = false;
@@ -6205,6 +6264,11 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'save-purchase-order'){
     savePurchaseOrder();
   }
+  else if (el.dataset.action === 'po-batal-produk-baru'){
+    state.poIsProdukBaru = false;
+    state.poFormDeskripsiProdukBaru = '';
+    render();
+  }
   else if (el.dataset.action === 'po-mark-diterima'){
     const rowIndex = Number(el.dataset.rowindex);
     if (!rowIndex || state.poStatusUpdatingRowIndex) return;
@@ -6415,6 +6479,18 @@ document.addEventListener('mousedown', function(e){
     state.poProductSearchQuery = val;
     state.poProductDropdownOpen = false;
     fetchPOStockPreview(val);
+    return;
+  }
+  const elBaru = e.target.closest ? e.target.closest('[data-action="po-pilih-produk-baru"]') : null;
+  if (elBaru) {
+    e.preventDefault();
+    state.poIsProdukBaru = true;
+    state.poFormNamaBarang = '';
+    state.poProductSearchQuery = '';
+    state.poProductDropdownOpen = false;
+    state.poFormDeskripsiProdukBaru = '';
+    state.poStockPreview = null;
+    render();
     return;
   }
   const elS = e.target.closest ? e.target.closest('[data-action="po-sales-select"]') : null;
