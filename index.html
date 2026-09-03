@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-03-fix-deeplink-po-fetch';
+const QSYSTEM_HTML_VERSION = '2026-09-03-getdashboardbundle-traffic-fix';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -1149,40 +1149,47 @@ async function fetchManagementNotes(){
   if(!state.modal.open && !state.mnModalOpen) render();
 }
 
+// BARU (2026-09-03, OPTIMASI TRAFFIK GAS): panggil recordAttendance dgn
+// retry TERBATAS (maks 3x percobaan, jeda 10 detik antar percobaan) --
+// MENGGANTIKAN pola lama "panggil ulang di SETIAP siklus refreshData
+// SEPANJANG hari" yg jadi traffic GAS tak perlu. recordAttendance HANYA
+// PERLU BERHASIL SEKALI SEHARI (sudah idempoten di server) -- retry
+// sebentar di sekitar waktu login SUDAH CUKUP utk atasi transport hiccup
+// sesaat, tanpa terus menambah beban request sepanjang jam kerja.
+function qsystemRecordAttendanceWithLimitedRetry_(staffId, attempt){
+  attempt = attempt || 1;
+  apiCall('recordAttendance', { staffId: staffId }).catch(()=>{
+    if (attempt < 3) {
+      setTimeout(()=> qsystemRecordAttendanceWithLimitedRetry_(staffId, attempt + 1), 10000);
+    }
+  });
+}
+
 async function refreshData(){
-  // BARU (2026-08-03): auto-retry SEKALI kalau percobaan pertama gagal --
-  // terbukti (via Executions log QSystem) bahwa kegagalan seperti ini bisa
-  // terjadi WALAU server sendiri berhasil eksekusi dengan cepat & bersih
-  // (hambatan transport sesaat, bukan bug di kode) -- jadi retry singkat di
-  // sisi browser adalah mitigasi yang tepat, sama seperti pola yang sudah
-  // terbukti bekerja di fetchWabotStats().
+  // DIUBAH (2026-09-03, OPTIMASI TRAFFIK GAS): SEBELUMNYA fungsi ini
+  // memanggil getData() SENDIRI, LALU fetchManagementNotes() memanggil 2
+  // endpoint LAGI (getManagementNotes/getAllManagementNotes +
+  // getMyNoteResponses) SECARA TERPISAH -- TOTAL 2-3 request per siklus,
+  // tiap 60 detik, utk SETIAP staff yg buka dashboard/qtask (sumber
+  // request TERBESAR di seluruh sistem, per catatan lama di bawah).
+  // Sekarang SEMUA digabung jadi SATU panggilan getDashboardBundle,
+  // hasilnya didistribusikan ke state.data/state.mnNotes/
+  // state.mnMyResponses sekaligus -- retry singkat (2x percobaan) TETAP
+  // dipertahankan persis seperti sebelumnya, cuma sasarannya sekarang 1
+  // endpoint gabungan, bukan 2-3 endpoint terpisah.
   let gotData = false;
   for (let attempt = 1; attempt <= 2 && !gotData; attempt++) {
     try {
-      state.data = await apiCall('getData');
+      const bundle = await apiCall('getDashboardBundle', { viewerId: state.currentUser });
+      state.data = bundle.data;
+      if (bundle.notes) state.mnNotes = bundle.notes;
+      if (bundle.myResponses) state.mnMyResponses = bundle.myResponses;
       state.syncStatus = 'synced';
       state.lastSyncedAt = Date.now();
       gotData = true;
     } catch(e){
       if (attempt === 2) state.syncStatus = 'offline';
     }
-  }
-  if (state.currentUser) {
-    fetchManagementNotes();
-    // BARU (2026-08-18, FIX BUG NYATA): recordAttendance() SEBELUMNYA cuma
-    // dipanggil SEKALI, tepat setelah login, fire-and-forget TANPA retry
-    // (.catch(()=>{})). TERBUKTI dari laporan nyata: staff (Nanda) yang
-    // GENUINELY sudah login dan aktif memakai QSystem TETAP dapat reminder
-    // "belum login" -- artinya panggilan tunggal itu gagal diam-diam
-    // (kemungkinan besar sama seperti transport hiccup yang sudah berkali-
-    // kali ditemukan sepanjang malam ini utk getData/dsb), dan tidak ada
-    // kesempatan kedua untuk berhasil. Sekarang DIPANGGIL ULANG di SETIAP
-    // refreshData() (tiap 60 detik selama di tab dashboard/qtask, PLUS
-    // instan tiap pindah ke tab itu) -- aman dipanggil berkali-kali karena
-    // recordAttendance() di server SUDAH idempoten (tidak menulis apa-apa
-    // kalau firstLoginAt hari ini sudah tercatat), jadi ini murni jaring
-    // pengaman, bukan menambah beban tulis ke sheet.
-    apiCall('recordAttendance', { staffId: state.currentUser }).catch(()=>{});
   }
   if (!state.modal.open && !state.mnModalOpen) render();
   else {
@@ -6031,12 +6038,20 @@ document.addEventListener('click', function(e){
     showToast('Memverifikasi…');
     apiCall('validatePin', empId, pin).then(result => {
       if (result && result.valid) {
-        // BARU (2026-08-13): catat absensi -- FIRE-AND-FORGET, SENGAJA tidak
-        // di-await dan tidak boleh pernah mengganggu/menunda proses login
-        // sama sekali (login sudah dioptimasi habis-habisan malam ini,
-        // TIDAK BOLEH ada penambahan yang memperlambatnya). Kalau gagal,
-        // diam saja -- tidak ditampilkan ke user, tidak menghalangi apa pun.
-        apiCall('recordAttendance', { staffId: empId }).catch(()=>{});
+        // DIUBAH (2026-09-03, OPTIMASI TRAFFIK GAS): SEBELUMNYA cuma 1x
+        // panggilan fire-and-forget di sini, TANPA retry sama sekali --
+        // kalau gagal (mis. transport hiccup), TIDAK ADA kesempatan kedua
+        // SAMA SEKALI dari titik ini. "Solusinya" sebelumnya adalah
+        // memanggil ULANG recordAttendance() di SETIAP siklus refreshData()
+        // (tiap 60 detik, SEPANJANG jam kerja, utk SEMUA staff yg buka tab
+        // dashboard/qtask) -- padahal recordAttendance CUMA PERLU BERHASIL
+        // SEKALI SEHARI (sudah idempoten). Retry TAK TERBATAS sepanjang hari
+        // itu SIA-SIA & jadi salah satu sumber traffic GAS yg tidak perlu,
+        // apalagi utk akun personal dgn kuota concurrent execution yg lebih
+        // ketat. Sekarang: retry TERBATAS (maks 3x, jeda 10 detik) HANYA di
+        // sekitar waktu login -- cukup utk mengatasi transport hiccup
+        // sesaat, TANPA terus-menerus menambah beban sepanjang hari kerja.
+        qsystemRecordAttendanceWithLimitedRetry_(empId);
         selectUser(empId);
       } else {
         showToast('PIN salah');
