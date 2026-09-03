@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-03-po-edit-cancel-namafilter';
+const QSYSTEM_HTML_VERSION = '2026-09-03-fix-deeplink-po-fetch';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3216,6 +3216,16 @@ function qsalesPurchaseOrderHTML(){
 
     <div class="section-title">📋 Daftar Purchase Order (${d.poList.length})</div>
     ${d.poList.length === 0 ? `<div class="card"><span class="faint" style="font-size:12px;">Belum ada Purchase Order tercatat.</span></div>` : d.poList.map(po => {
+      // FIX PENTING (2026-09-03): jaga-jaga kalau ada entri po yang datang
+      // dari respons backend LAMA/tidak sinkron (mis. browser belum hard-
+      // refresh, atau deployment backend belum ke-update) sehingga
+      // produkList belum ada -- SEBELUMNYA satu entri rusak seperti ini
+      // bikin SELURUH render() crash (bukan cuma kartu PO ini), sehingga
+      // SELURUH APLIKASI ikut macet setiap render() dipanggil dari mana
+      // pun (refreshData, fetchManagementNotes, dst). Sekarang: entri yang
+      // datanya tidak lengkap dilewati dgn AMAN (tidak ikut ditampilkan),
+      // TIDAK menghentikan render bagian lain.
+      if (!po || !Array.isArray(po.produkList)) return '';
       const isExpanded = (state.poExpandedGroupKeys || []).includes(po.groupKey);
       // Ringkasan status AGREGAT utk tampilan collapsed -- "X/Y Delivered"
       // kalau semua produk SUDAH delivered warnanya hijau, kalau SEBAGIAN
@@ -5871,37 +5881,59 @@ function render(){
     state.appTab = 'dashboard';
   }
   let body = '';
-  if (state.appTab === 'dashboard'){
-    body = dashboardHTML();
-  } else if (state.appTab === 'qtask'){
-    body = qtaskSubNavHTML();
-    if (state.qtaskTab==='home') body += qtaskHomeHTML();
-    else if (state.qtaskTab==='tasks') body += qtaskTasksHTML();
-    else if (state.qtaskTab==='team' && hasTeamView(state.currentUser)) body += qtaskTeamHTML();
-    else if (state.qtaskTab==='report') body += qtaskReportHTML();
-    else { state.qtaskTab='home'; body += qtaskHomeHTML(); }
-  } else if (state.appTab === 'qfin'){
-    body = qfinDashboardHTML();
-  } else if (state.appTab === 'crm'){
-    body = crmDashboardHTML();
-  } else if (state.appTab === 'wabot'){
-    body = wabotHTML();
-  } else if (state.appTab === 'qsales'){
-    if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
-    else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
-    else if (state.qsalesTab === 'kpi') body = qsalesKPIHTML();
-    else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
-    else if (state.qsalesTab === 'po') body = qsalesPurchaseOrderHTML();
-    else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
-  } else if (state.appTab === 'qaff'){
-    body = qaffDashboardHTML();
-  } else if (state.appTab === 'content'){
-    body = contentPlanHTML();
-  } else if (state.appTab === 'settings'){
-    body = qtaskSettingsHTML();
-  } else {
-    state.appTab = 'dashboard';
-    body = dashboardHTML();
+  // FIX PENTING (2026-09-03): SEBELUMNYA kalau salah SATU fungsi render tab
+  // (qsalesPurchaseOrderHTML dkk) melempar error apa pun, error itu
+  // merambat KELUAR dari render() SEBELUM app.innerHTML sempat di-update
+  // -- artinya layar TERAKHIR (mis. "Memuat data...") MACET SELAMANYA,
+  // dan karena render() dipanggil ulang dari BANYAK tempat (polling
+  // refreshData, fetchManagementNotes, dst), errornya TERUS BERULANG
+  // tanpa ada cara pulih SELAIN hard-refresh manual. Sekarang: SEMUA
+  // pembangunan body dibungkus try-catch -- kalau ADA tab yang error,
+  // yang lain (sidebar, navigasi) TETAP tampil, dan area konten cuma
+  // menampilkan pesan error + tombol muat ulang, BUKAN membekukan
+  // seluruh aplikasi.
+  try {
+    if (state.appTab === 'dashboard'){
+      body = dashboardHTML();
+    } else if (state.appTab === 'qtask'){
+      body = qtaskSubNavHTML();
+      if (state.qtaskTab==='home') body += qtaskHomeHTML();
+      else if (state.qtaskTab==='tasks') body += qtaskTasksHTML();
+      else if (state.qtaskTab==='team' && hasTeamView(state.currentUser)) body += qtaskTeamHTML();
+      else if (state.qtaskTab==='report') body += qtaskReportHTML();
+      else { state.qtaskTab='home'; body += qtaskHomeHTML(); }
+    } else if (state.appTab === 'qfin'){
+      body = qfinDashboardHTML();
+    } else if (state.appTab === 'crm'){
+      body = crmDashboardHTML();
+    } else if (state.appTab === 'wabot'){
+      body = wabotHTML();
+    } else if (state.appTab === 'qsales'){
+      if (state.qsalesTab === 'dashboard') body = qsalesDashboardHTML();
+      else if (state.qsalesTab === 'leads') body = qsalesLeadsHTML();
+      else if (state.qsalesTab === 'kpi') body = qsalesKPIHTML();
+      else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
+      else if (state.qsalesTab === 'po') body = qsalesPurchaseOrderHTML();
+      else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
+    } else if (state.appTab === 'qaff'){
+      body = qaffDashboardHTML();
+    } else if (state.appTab === 'content'){
+      body = contentPlanHTML();
+    } else if (state.appTab === 'settings'){
+      body = qtaskSettingsHTML();
+    } else {
+      state.appTab = 'dashboard';
+      body = dashboardHTML();
+    }
+  } catch (renderErr) {
+    console.error('[QSystem] Render error pada tab', state.appTab, state.qsalesTab, ':', renderErr);
+    body = `
+      <div class="card" style="padding:28px 20px; text-align:center;">
+        <div style="font-size:15px; font-weight:700; color:var(--danger); margin-bottom:8px;">⚠ Terjadi kesalahan saat menampilkan halaman ini</div>
+        <div class="faint" style="font-size:12px; margin-bottom:16px;">${escapeHTML(renderErr && renderErr.message || 'Error tidak diketahui')}</div>
+        <button class="btn btn-primary" onclick="location.reload()">🔄 Muat Ulang Halaman</button>
+      </div>
+    `;
   }
 
   app.innerHTML = `
@@ -5951,9 +5983,11 @@ async function selectUser(id){
   // variabel di-clear (null) segera setelah dipakai, supaya kalau user
   // nanti pindah tab lain lalu ganti akun lagi (tanpa refresh halaman),
   // TIDAK terus-menerus dilempar balik ke Purchase Order setiap login.
+  let deepLinkKePO = false;
   if (qsystemPendingDeepLink === 'po') {
     state.appTab = 'qsales';
     state.qsalesTab = 'po';
+    deepLinkKePO = true;
     qsystemPendingDeepLink = null;
   } else {
     state.appTab = 'dashboard';
@@ -5965,6 +5999,15 @@ async function selectUser(id){
   state.mnEditingId = null;
   await initData();
   fetchManagementNotes();
+  // FIX BUG NYATA (2026-09-03): SEBELUMNYA deep-link cuma set
+  // state.qsalesTab='po' LANGSUNG, TANPA PERNAH memanggil
+  // fetchPurchaseOrderData() -- fetch itu SEBELUMNYA HANYA terpasang di
+  // handler klik 'switch-qsales-tab' (lihat listener klik di bawah), yang
+  // TIDAK PERNAH terpicu kalau tab di-set programatik seperti ini. Efeknya:
+  // siapa pun yang login lewat link "?goto=po" akan macet SELAMANYA di
+  // layar "Memuat data..." krn tidak ada apa pun yang benar-benar
+  // memanggil fetch-nya. Sekarang dipanggil eksplisit di sini juga.
+  if (deepLinkKePO) fetchPurchaseOrderData();
   render();
 }
 
