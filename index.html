@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-03-getdashboardbundle-traffic-fix';
+const QSYSTEM_HTML_VERSION = '2026-09-04-fix-stockschema4-dropdown-mobile';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -6963,25 +6963,54 @@ document.addEventListener('focusin', function(e){
 // (mis. user klik di luar tanpa memilih apa pun dari daftar saran).
 // 'focusout' (BEDA dari 'blur') sengaja dipilih karena BUBBLES, jadi bisa
 // didelegasikan di level document seperti listener lain di file ini.
+//
+// FIX BUG NYATA (2026-09-04, laporan user: "pilihan tidak langsung
+// terpilih, harus diketik ulang manual"): SEBELUMNYA dropdown ditutup
+// LANGSUNG (synchronous) begitu focusout terjadi -- di DESKTOP ini aman
+// krn e.preventDefault() pada 'mousedown' (lihat listener mousedown di
+// atas) mencegah focusout terjadi SEBELUM logika pemilihan selesai. TAPI
+// di PERANGKAT SENTUH (HP -- yang justru paling sering dipakai staff
+// lapangan/Canvaser), URUTAN EVENT bisa BERBEDA: sebagian browser mobile
+// men-trigger blur/focusout SAAT 'touchstart' terjadi, SEBELUM event
+// mousedown sintetis sempat jalan -- artinya dropdown BISA TERTUTUP
+// (ke-render ulang, tanpa item yg SEDANG DI-TAP) SEBELUM tap SEMPAT
+// terdaftar sbg pemilihan, membuat tap terasa "tidak berpengaruh" persis
+// seperti yang dilaporkan.
+//
+// FIX: tunda aksi tutup dropdown 150ms via setTimeout. Kalau SEMENTARA
+// itu mousedown handler SUDAH SEMPAT jalan (menutup dropdown SENDIRI +
+// set nilai terpilih), maka saat callback tertunda ini akhirnya jalan,
+// dropdownOpen SUDAH false -- jadi TIDAK melakukan apa-apa lagi (aman,
+// tidak dobel). Kalau user MEMANG klik di luar tanpa memilih, dropdown
+// tetap tertutup seperti biasa, cuma telat sepersekian detik yang nyaris
+// tak terasa.
 document.addEventListener('focusout', function(e){
   if (e.target.dataset && e.target.dataset.action === 'po-product-search-input') {
     const rowUid = e.target.dataset.rowuid;
-    const row = (state.poProdukRows || []).find(r => r.uid === rowUid);
-    if (row && row.dropdownOpen) {
-      row.dropdownOpen = false;
-      const c = document.getElementById('po-produk-dropdown-container-' + rowUid);
-      if (c) c.innerHTML = qsalesRenderProdukDropdownHTML_(rowUid);
-    }
+    setTimeout(function(){
+      const row = (state.poProdukRows || []).find(r => r.uid === rowUid);
+      if (row && row.dropdownOpen) {
+        row.dropdownOpen = false;
+        const c = document.getElementById('po-produk-dropdown-container-' + rowUid);
+        if (c) c.innerHTML = qsalesRenderProdukDropdownHTML_(rowUid);
+      }
+    }, 150);
   }
-  if (e.target.id === 'po-sales' && state.poSalesDropdownOpen) {
-    state.poSalesDropdownOpen = false;
-    const c = document.getElementById('po-sales-dropdown-container');
-    if (c) c.innerHTML = qsalesRenderSalesDropdownHTML_();
+  if (e.target.id === 'po-sales') {
+    setTimeout(function(){
+      if (!state.poSalesDropdownOpen) return;
+      state.poSalesDropdownOpen = false;
+      const c = document.getElementById('po-sales-dropdown-container');
+      if (c) c.innerHTML = qsalesRenderSalesDropdownHTML_();
+    }, 150);
   }
-  if (e.target.id === 'po-nama-klien' && state.poKlienDropdownOpen) {
-    state.poKlienDropdownOpen = false;
-    const c = document.getElementById('po-klien-dropdown-container');
-    if (c) c.innerHTML = qsalesRenderKlienDropdownHTML_();
+  if (e.target.id === 'po-nama-klien') {
+    setTimeout(function(){
+      if (!state.poKlienDropdownOpen) return;
+      state.poKlienDropdownOpen = false;
+      const c = document.getElementById('po-klien-dropdown-container');
+      if (c) c.innerHTML = qsalesRenderKlienDropdownHTML_();
+    }, 150);
   }
 });
 
