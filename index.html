@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-06-fix-selection-value-sync-and-date-loss';
+const QSYSTEM_HTML_VERSION = '2026-09-06-klien-dropdown-full-list';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -3197,7 +3197,16 @@ function qsalesRenderKlienDropdownHTML_(){
   const d = state.poData;
   if (!d) return '';
   const q = String(state.poKlienSearchQuery || '').toLowerCase();
-  const matches = (d.customerOptions || []).filter(c => c.nama.toLowerCase().includes(q)).slice(0, 20);
+  // DIUBAH (2026-09-06, per instruksi user "keluarkan dropdownnya sesuai
+  // sheet costumer, jangan ada salah"): batas tampilan SEBELUMNYA cuma 20
+  // -- kalau sheet Costumer py LEBIH dari 20 klien valid (SEPERTI kondisi
+  // normalnya, ~46 klien), membuka dropdown TANPA mengetik apa pun HANYA
+  // menampilkan 20 PERTAMA, bukan SEMUA klien dari sheet -- bisa terkesan
+  // "klien hilang" padahal sebenarnya cuma soal batas tampilan, BUKAN
+  // data yang salah/hilang. Dinaikkan ke 200 (dropdown SUDAH scrollable,
+  // max-height:250px, jadi aman menampung lebih banyak tanpa masalah UX)
+  // supaya SEMUA klien di sheet SELALU bisa ditemukan/ditampilkan.
+  const matches = (d.customerOptions || []).filter(c => c.nama.toLowerCase().includes(q)).slice(0, 200);
   return `
     <div style="position:absolute; z-index:20; left:0; right:0; top:100%; background:var(--card-bg, #fff); border:1px solid var(--line); border-radius:6px; margin-top:2px; max-height:250px; overflow-y:auto; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
       ${matches.length === 0 ? `<div class="faint" style="padding:10px; font-size:12px;">Tidak ada klien yang cocok.</div>` : matches.map(c => `
