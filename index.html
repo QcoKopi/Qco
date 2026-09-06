@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-04-fix-stockschema4-dropdown-mobile';
+const QSYSTEM_HTML_VERSION = '2026-09-06-fix-stockpreview-race-condition';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2458,18 +2458,45 @@ async function fetchPurchaseOrderData(){
 async function fetchPOStockPreview(rowUid, namaBarang){
   const row = (state.poProdukRows || []).find(r => r.uid === rowUid);
   if (!row) return;
-  if (!namaBarang) { row.stockPreview = null; render(); return; }
+  if (!namaBarang) { row.stockPreview = null; row.stockFetchToken = (row.stockFetchToken || 0) + 1; render(); return; }
+  // FIX BUG NYATA (2026-09-06, race condition): fetchPOStockPreview
+  // ASYNCHRONOUS -- kalau user pilih/ubah produk atau jumlah, LALU
+  // langsung berubah LAGI SEBELUM fetch sebelumnya selesai, panggilan
+  // LAMA bisa BARU RESOLVE BELAKANGAN dan MEMAKSA MENIMPA hasil yang
+  // LEBIH BARU (bahkan setelah field sudah kosong lagi). Efeknya PERSIS
+  // laporan user: field Nama Barang kosong, tapi "Konteks Stok" tetap
+  // menampilkan data produk LAIN yang sudah tidak relevan. Solusi: token
+  // permintaan NAIK SETIAP kali fetch baru dimulai utk baris ini -- hasil
+  // HANYA diterapkan kalau token-nya MASIH SAMA dgn token TERBARU saat
+  // fetch itu SELESAI (artinya belum ada permintaan LEBIH BARU utk baris
+  // yang sama). Ini menangani SEMUA skenario (ganti produk, ganti jumlah,
+  // atau keduanya secara cepat berturut-turut), bukan cuma satu kasus
+  // spesifik.
+  row.stockFetchToken = (row.stockFetchToken || 0) + 1;
+  const tokenSaatIni = row.stockFetchToken;
   row.stockPreviewLoading = true;
   render();
+  let hasil = null;
+  let error = null;
   try {
     const jumlah = Number(row.jumlah) || 0;
     const result = await apiCall('qsalesGetStockPreview', { requestingUserId: state.currentUser, namaBarang, jumlah });
-    row.stockPreview = (result && result.success) ? result.stockInfo : null;
+    hasil = (result && result.success) ? result.stockInfo : null;
   } catch(e) {
-    row.stockPreview = null;
-    showToast('Gagal memuat info stok: ' + (e.message || ''));
+    error = e;
   }
-  row.stockPreviewLoading = false;
+  const rowSekarang = (state.poProdukRows || []).find(r => r.uid === rowUid);
+  // Baris sudah tidak ada (dihapus), ATAU sudah ada permintaan LEBIH BARU
+  // utk baris ini sejak fetch ini dimulai -- buang hasil, JANGAN diterapkan.
+  if (!rowSekarang || rowSekarang.stockFetchToken !== tokenSaatIni) return;
+  if (error) {
+    rowSekarang.stockPreview = null;
+    rowSekarang.stockPreviewLoading = false;
+    showToast('Gagal memuat info stok: ' + (error.message || ''));
+  } else {
+    rowSekarang.stockPreview = hasil;
+    rowSekarang.stockPreviewLoading = false;
+  }
   render();
 }
 
@@ -3079,7 +3106,7 @@ function qsalesCreateEmptyProdukRow_(){
     namaBarang: '', searchQuery: '', dropdownOpen: false,
     isProdukBaru: false, deskripsiProdukBaru: '',
     jumlah: '', hargaJual: '',
-    stockPreview: null, stockPreviewLoading: false
+    stockPreview: null, stockPreviewLoading: false, stockFetchToken: 0
   };
 }
 
@@ -6822,6 +6849,14 @@ document.addEventListener('input', function(e){
     // ketikan bebas (bukan produk kopi yg benar-benar ada).
     row.namaBarang = '';
     row.stockPreview = null;
+    // Naikkan token DI SINI JUGA (bukan cuma di dalam fetchPOStockPreview
+    // sendiri) -- kalau SEBELUMNYA ada fetch yg MASIH BERJALAN utk baris
+    // ini (mis. user baru saja pilih produk, lalu LANGSUNG mengetik lagi
+    // sebelum fetch itu selesai), fetch lama itu HARUS dianggap basi
+    // begitu user mulai mengetik ulang -- BUKAN menunggu sampai fetch lama
+    // selesai baru dianggap basi (yang justru MEMBUKA CELAH race condition
+    // yg sama, cuma dipindah waktunya).
+    row.stockFetchToken = (row.stockFetchToken || 0) + 1;
     // FIX KURSOR TUNTAS (2026-09-02): TIDAK panggil render() sama sekali
     // di sini -- HANYA update innerHTML container dropdown MILIK BARIS INI
     // (id disuffix rowUid), <input> ini SENDIRI tidak pernah disentuh/
@@ -6880,6 +6915,7 @@ document.addEventListener('mousedown', function(e){
     row.dropdownOpen = false;
     row.deskripsiProdukBaru = '';
     row.stockPreview = null;
+    row.stockFetchToken = (row.stockFetchToken || 0) + 1; // gugurkan fetch lama yg mungkin masih berjalan
     render();
     return;
   }
