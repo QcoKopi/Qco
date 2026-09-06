@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-06-fix-stockpreview-race-condition';
+const QSYSTEM_HTML_VERSION = '2026-09-06-fix-selection-value-sync-and-date-loss';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2503,7 +2503,20 @@ async function fetchPOStockPreview(rowUid, namaBarang){
 async function savePurchaseOrder(){
   const tanggalPO = document.getElementById('po-tanggal-po').value;
   const tanggalKirim = document.getElementById('po-tanggal-kirim').value;
-  const sales = document.getElementById('po-sales').value.trim(); // opsional, diisi manual
+  // FIX BUG NYATA (2026-09-06, akar penyebab "pilihan hilang/harus ketik
+  // ulang manual" yang dilaporkan berulang kali): SEBELUMNYA dibaca
+  // LANGSUNG dari document.getElementById('po-sales').value -- TERBUKTI
+  // lewat pengujian bahwa property ".value" elemen <input> BISA BELUM
+  // tersinkron dgn nilai yang SEHARUSNYA SESAAT setelah render()
+  // mengganti elemen tsb (mis. tepat setelah user PILIH dari dropdown,
+  // atau tepat setelah form di-prefill utk mode edit) -- akibatnya
+  // validasi/submit bisa salah baca nilai LAMA/kosong padahal user SUDAH
+  // benar memilih/mengisi. state.poSalesSearchQuery SELALU ter-update
+  // SINKRON baik saat mengetik MAUPUN saat memilih dari dropdown (SAMA
+  // PERSIS pattern yg dipakai template tampilan input ini) -- jadi baca
+  // dari sana, BUKAN dari DOM, supaya yg disubmit SELALU SAMA dgn yg
+  // TERLIHAT di layar.
+  const sales = String(state.poSalesSearchQuery != null ? state.poSalesSearchQuery : (state.poFormSales || '')).trim();
 
   if (!tanggalPO || !tanggalKirim) {
     showToast('Tanggal PO dan Tanggal Kirim wajib diisi.');
@@ -2521,10 +2534,22 @@ async function savePurchaseOrder(){
   const produkList = [];
   for (let i = 0; i < state.poProdukRows.length; i++) {
     const row = state.poProdukRows[i];
-    const namaBarangEl = row.isProdukBaru
-      ? document.getElementById('po-deskripsi-produk-baru-' + row.uid)
-      : document.getElementById('po-nama-barang-' + row.uid);
-    const namaBarang = namaBarangEl ? (namaBarangEl.value || '').trim() : '';
+    let namaBarang;
+    if (row.isProdukBaru) {
+      // Mode Produk Baru: textarea bebas, TIDAK pernah diganti render()
+      // segera setelah user mengetik (tidak ada dropdown/pemilihan di
+      // sini) -- aman dibaca langsung dari DOM.
+      const namaBarangEl = document.getElementById('po-deskripsi-produk-baru-' + row.uid);
+      namaBarang = namaBarangEl ? (namaBarangEl.value || '').trim() : '';
+    } else {
+      // FIX BUG NYATA (2026-09-06): lihat komentar panjang di pembacaan
+      // "sales"/"namaKlien" di atas -- masalah & fix PERSIS SAMA utk
+      // Nama Barang per baris: baca dari row.searchQuery (SELALU sinkron,
+      // SAMA pattern yg dipakai template tampilan input ini), BUKAN dari
+      // DOM yang bisa belum tersinkron sesaat setelah render() (mis.
+      // tepat setelah pilih dari dropdown).
+      namaBarang = String(row.searchQuery != null ? row.searchQuery : (row.namaBarang || '')).trim();
+    }
     const jumlahEl = document.getElementById('po-jumlah-' + row.uid);
     const jumlah = jumlahEl ? Number(jumlahEl.value) || 0 : 0;
     const hargaJualEl = document.getElementById('po-harga-jual-' + row.uid);
@@ -2564,7 +2589,13 @@ async function savePurchaseOrder(){
     namaPIC = (document.getElementById('po-klien-pic').value || '').trim();
     namaKlien = namaCoffeeShop;
   } else {
-    namaKlien = document.getElementById('po-nama-klien').value;
+    // FIX BUG NYATA (2026-09-06): lihat komentar panjang di pembacaan
+    // "sales" di atas -- masalah & fix PERSIS SAMA utk Nama Klien: baca
+    // dari state.poKlienSearchQuery (SELALU sinkron, SAMA pattern yg
+    // dipakai template tampilan input ini), BUKAN dari DOM yang bisa
+    // belum tersinkron sesaat setelah render() (mis. tepat setelah
+    // pilih dari dropdown, atau tepat setelah prefill mode edit).
+    namaKlien = String(state.poKlienSearchQuery != null ? state.poKlienSearchQuery : (state.poFormNamaKlien || '')).trim();
   }
 
   if (!namaKlien) {
@@ -6901,6 +6932,21 @@ document.addEventListener('mousedown', function(e){
     row.searchQuery = val;
     row.dropdownOpen = false;
     fetchPOStockPreview(rowUid, val);
+    // FIX BUG NYATA (2026-09-06): SEBELUMNYA HANYA mengandalkan render()
+    // (via fetchPOStockPreview) utk menampilkan ULANG <input> dgn value
+    // yang BENAR dari HTML template -- TERBUKTI lewat pengujian bahwa
+    // property ".value" elemen <input> KADANG TIDAK LANGSUNG tersinkron
+    // dgn atribut HTML "value" setelah innerHTML diganti (nilai LAMA yg
+    // sempat diketik user SEBELUM memilih bisa "nyangkut" sesaat) --
+    // PERSIS gejala yang dilaporkan berulang kali: "pilihan tidak
+    // langsung terpilih, harus ketik ulang manual". SEKARANG value
+    // di-set LANGSUNG & EKSPLISIT via JavaScript setelah render, TIDAK
+    // hanya mengandalkan atribut HTML -- ini menjamin tampilan BENAR
+    // apa pun penyebab pastinya.
+    setTimeout(function(){
+      const inputEl = document.getElementById('po-nama-barang-' + rowUid);
+      if (inputEl && inputEl.value !== val) inputEl.value = val;
+    }, 0);
     return;
   }
   const elBaru = e.target.closest ? e.target.closest('[data-action="po-pilih-produk-baru"]') : null;
@@ -6927,6 +6973,13 @@ document.addEventListener('mousedown', function(e){
     state.poSalesSearchQuery = val;
     state.poSalesDropdownOpen = false;
     render();
+    // FIX BUG NYATA (2026-09-06): lihat komentar panjang di handler
+    // po-product-select di atas -- masalah & fix PERSIS SAMA utk field
+    // Sales ini.
+    setTimeout(function(){
+      const inputEl = document.getElementById('po-sales');
+      if (inputEl && inputEl.value !== val) inputEl.value = val;
+    }, 0);
     return;
   }
   const elK = e.target.closest ? e.target.closest('[data-action="po-klien-select"]') : null;
@@ -6937,6 +6990,13 @@ document.addEventListener('mousedown', function(e){
     state.poKlienSearchQuery = val;
     state.poKlienDropdownOpen = false;
     render();
+    // FIX BUG NYATA (2026-09-06): lihat komentar panjang di handler
+    // po-product-select di atas -- masalah & fix PERSIS SAMA utk field
+    // Nama Klien ini.
+    setTimeout(function(){
+      const inputEl = document.getElementById('po-nama-klien');
+      if (inputEl && inputEl.value !== val) inputEl.value = val;
+    }, 0);
     return;
   }
   const elKBaru = e.target.closest ? e.target.closest('[data-action="po-pilih-klien-baru"]') : null;
@@ -7051,6 +7111,20 @@ document.addEventListener('focusout', function(e){
 });
 
 document.addEventListener('change', function(e){
+  // FIX BUG NYATA (2026-09-06): SEBELUMNYA state.poFormTanggalPO/
+  // poFormTanggalKirim TIDAK PERNAH di-update saat user mengetik/memilih
+  // tanggal secara langsung utk PO BARU (cuma ke-set saat mode edit atau
+  // reset form) -- artinya kalau ADA render() PENUH terjadi di LATAR
+  // BELAKANG antara user mengisi tanggal dan submit (mis. fetch stock
+  // preview async yg baru selesai SETELAH user pilih produk, memicu
+  // render() yg membangun ULANG SELURUH form dari state) -- input
+  // tanggal yg BARU DIKETIK bisa HILANG/TERTIMPA KOSONG, krn dibangun
+  // ulang dari state.poFormTanggalPO yg MASIH KOSONG. Sekarang disinkron
+  // SETIAP kali berubah, supaya AMAN dari render() latar belakang kapan
+  // pun terjadi.
+  if (e.target.id === 'po-tanggal-po') { state.poFormTanggalPO = e.target.value; }
+  else if (e.target.id === 'po-tanggal-kirim') { state.poFormTanggalKirim = e.target.value; }
+
   if (e.target.id === 'task-employee'){
     const emp = findEmp(e.target.value);
     const dEl = document.getElementById('task-dept-display');
