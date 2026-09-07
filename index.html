@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-06-fee-periode-note';
+const QSYSTEM_HTML_VERSION = '2026-09-07-fee-reconciliation-by-year';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -829,6 +829,11 @@ let state = {
   feeReconLoading: false,
   feeReconError: null,
   feeReconExpandedIds: [],
+  feeReconYear: new Date().getFullYear(),
+  feeReconYearData: null,
+  feeReconYearLoading: false,
+  feeReconYearError: null,
+  feeReconYearExpandedIds: [],
   salesMarginData: null,
   salesMarginLoading: false,
   salesMarginError: null,
@@ -2161,7 +2166,7 @@ function qtaskSettingsHTML(){
                 </tr>
                 ${isExpanded ? `
                 <tr><td colspan="6" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                  ${s.payments.length > 0 ? `<div style="margin-bottom:8px;"><b>Riwayat pembayaran Fee (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>${p.catatanPeriode ? ` <span style="background:#FFF3E0; color:#E65100; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600;">📌 ${escapeHTML(p.catatanPeriode)}</span>` : ''} <span data-action="edit-fee-periode-note" data-tanggal="${escapeHTML(p.date)}" data-jumlah="${p.jumlah}" data-keterangan="${escapeHTML(p.keterangan)}" data-catatan="${escapeHTML(p.catatanPeriode || '')}" style="cursor:pointer; color:var(--accent); font-size:10px;" title="Tambah/ubah catatan periode">✏️</span>`).join('<br>')}</div>` : '<div class="faint" style="margin-bottom:8px;">Belum ada pembayaran Fee tercatat.</div>'}
+                  ${s.payments.length > 0 ? `<div style="margin-bottom:8px;"><b>Riwayat pembayaran Fee (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>${p.catatanPeriode ? ` <span style="background:#FFF3E0; color:#E65100; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600;">📌 ${escapeHTML(p.catatanPeriode)}</span>` : ''} <span data-action="edit-fee-periode-note" data-tanggal="${escapeHTML(p.date)}" data-jumlah="${p.jumlah}" data-keterangan="${escapeHTML(p.keterangan)}" data-catatan="${escapeHTML(p.catatanPeriode || '')}" style="cursor:pointer; color:var(--accent); font-size:10px;" title="Tambah/ubah catatan & tahun efektif">✏️</span>`).join('<br>')}</div>` : '<div class="faint" style="margin-bottom:8px;">Belum ada pembayaran Fee tercatat.</div>'}
                   ${s.bonusBulananRate > 0 && s.bonusBulananHistory.length > 0 ? `<div><b>Riwayat Bonus Bulanan (${s.bonusBulananHistory.length} bulan tercatat, ${s.bonusBulananMonthsTriggered}x tercapai):</b><br>${s.bonusBulananHistory.map(h=>`${escapeHTML(h.monthName)} — margin ${fmtRupiah(h.grossMargin)} vs 2x cost ${fmtRupiah(2*h.cost)} ${h.triggered ? `<span style="color:var(--success); font-weight:700;">✓ tercapai (+${fmtRupiah(h.bonusBulanan)})</span>` : '<span class="faint">belum tercapai</span>'}`).join('<br>')}</div>` : ''}
                 </td></tr>
                 ` : ''}
@@ -2185,6 +2190,48 @@ function qtaskSettingsHTML(){
         ` : ''}
       ` : ''}
     </div>
+
+    <div class="section-title">📅 Rekonsiliasi Fee & Bonus (Per Tahun)</div>
+
+    <div class="card">
+      <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Beda dari ringkasan "Sepanjang Waktu" di atas (yang kumulatif) -- ini mengisolasi HANYA satu tahun: fee yang SEHARUSNYA didapat dari transaksi tahun itu SAJA, vs yang SUDAH DIBAYAR UNTUK tahun itu (menghormati catatan "tahun efektif" kalau ada pembayaran yang tanggalnya beda dari periode yang sebenarnya dilunasi, mis. dibayar Januari tapi utk fee tahun sebelumnya).</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+        <select id="fee-recon-year-select" style="padding:8px; border:1px solid var(--line); border-radius:6px; font-size:13px;">
+          ${[0,1,2,3].map(function(offset){ const y = new Date().getFullYear() - offset; return `<option value="${y}" ${state.feeReconYear === y ? 'selected' : ''}>${y}</option>`; }).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" data-action="load-fee-recon-year">Muat Tahun Ini</button>
+      </div>
+
+      ${state.feeReconYearLoading ? `<div class="faint" style="font-size:12px;">Memuat...</div>` : ''}
+      ${state.feeReconYearError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.feeReconYearError)}</div>` : ''}
+
+      ${state.feeReconYearData ? `
+        <div class="table-wrap">
+          <table class="task-table" style="min-width:0;">
+            <thead><tr><th>Nama</th><th>Fee Marketing<div class="faint" style="font-weight:400; font-size:9.5px;">dari Penjualan tahun ${state.feeReconYearData.year}</div></th><th>Fee Roast<div class="faint" style="font-weight:400; font-size:9.5px;">dari Assembly tahun ${state.feeReconYearData.year}</div></th><th>Sudah Dibayar<div class="faint" style="font-weight:400; font-size:9.5px;">utk tahun ${state.feeReconYearData.year}</div></th><th>Sisa</th></tr></thead>
+            <tbody>
+              ${state.feeReconYearData.staff.map(s => {
+                const isExpanded = (state.feeReconYearExpandedIds || []).includes(s.id);
+                return `
+                <tr style="cursor:pointer;" data-action="toggle-fee-recon-year-detail" data-id="${s.id}">
+                  <td style="font-weight:600;">${escapeHTML(s.name)}</td>
+                  <td>${fmtRupiah(s.feeMarketingEarned)}${s.feeMarketingPct ? `<div class="faint" style="font-size:10px;">${s.feeMarketingPct}% x ${fmtRupiah(s.totalSalesYear)}</div>` : ''}</td>
+                  <td>${s.roastRate > 0 ? fmtRupiah(s.roastingEarned) : '-'}${s.roastRate > 0 ? `<div class="faint" style="font-size:10px;">${s.roastKg.toFixed(2)} kg x ${fmtRupiah(s.roastRate)}/kg</div>` : ''}</td>
+                  <td>${fmtRupiah(s.totalPaid)}</td>
+                  <td style="font-weight:700; color:${s.remaining > 0 ? 'var(--danger)' : 'var(--success)'};">${fmtRupiah(s.remaining)}</td>
+                </tr>
+                ${isExpanded ? `
+                <tr><td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
+                  ${s.payments.length > 0 ? `<b>Pembayaran yg dihitung utk tahun ${state.feeReconYearData.year} (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>${p.tahunAsli !== p.tahunEfektif ? ` <span style="background:#E8F5E9; color:#2E7D32; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600;">↪ dari tahun ${p.tahunAsli}${p.catatanPeriode ? ': ' + escapeHTML(p.catatanPeriode) : ''}</span>` : ''}`).join('<br>')}` : `<span class="faint">Belum ada pembayaran yg tercatat utk tahun ${state.feeReconYearData.year}.</span>`}
+                </td></tr>
+                ` : ''}
+              `}).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+    </div>
+
 
     ${emp.role==='owner' ? `
     <div class="section-title">⚙️ Kelola Rate Gaji & Komisi</div>
@@ -3778,6 +3825,29 @@ async function fetchFeeReconciliation(){
     state.feeReconLoading = false;
     state.feeReconError = e.message || 'Gagal memuat rekonsiliasi fee';
     showToast('Rekonsiliasi Fee: ' + state.feeReconError);
+  }
+  render();
+}
+
+// BARU (2026-09-07): rekonsiliasi fee ISOLASI SATU TAHUN, terpisah dari
+// fetchFeeReconciliation() yg SEPANJANG WAKTU (kumulatif) di atas.
+async function fetchFeeReconciliationByYear(year){
+  state.feeReconYear = year;
+  state.feeReconYearLoading = true;
+  state.feeReconYearError = null;
+  render();
+  try {
+    const result = await apiCall('getFeeReconciliationByYear', { requestingUserId: state.currentUser, year: year });
+    if (result && result.success) {
+      state.feeReconYearData = result;
+      state.feeReconYearLoading = false;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.feeReconYearLoading = false;
+    state.feeReconYearError = e.message || 'Gagal memuat rekonsiliasi fee per tahun';
+    showToast('Rekonsiliasi Fee per Tahun: ' + state.feeReconYearError);
   }
   render();
 }
@@ -6543,6 +6613,19 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'load-fee-recon'){
     fetchFeeReconciliation();
   }
+  else if (el.dataset.action === 'load-fee-recon-year'){
+    const sel = document.getElementById('fee-recon-year-select');
+    const year = sel ? Number(sel.value) : new Date().getFullYear();
+    fetchFeeReconciliationByYear(year);
+  }
+  else if (el.dataset.action === 'toggle-fee-recon-year-detail'){
+    const id = el.dataset.id;
+    if (!state.feeReconYearExpandedIds) state.feeReconYearExpandedIds = [];
+    const idx = state.feeReconYearExpandedIds.indexOf(id);
+    if (idx >= 0) state.feeReconYearExpandedIds.splice(idx, 1);
+    else state.feeReconYearExpandedIds.push(id);
+    render();
+  }
   else if (el.dataset.action === 'load-payroll-rates'){
     fetchPayrollRates();
   }
@@ -6594,22 +6677,37 @@ document.addEventListener('click', function(e){
     const jumlahGL = el.dataset.jumlah;
     const keteranganGL = el.dataset.keterangan;
     const catatanLama = el.dataset.catatan || '';
-    // BARU (2026-09-06): dialog prompt native browser -- cukup utk fitur
-    // sederhana yg CUMA dipakai Owner sesekali (bukan alur kerja harian),
-    // tidak perlu modal/form terpisah.
+    // BARU (2026-09-07): SEKARANG minta 2 hal -- tahun EFEKTIF (angka
+    // terstruktur, DIPAKAI utk perhitungan Rekonsiliasi Per Tahun) DAN
+    // catatan bebas (HANYA label tampilan). Dialog prompt native browser
+    // -- cukup utk fitur sederhana yg CUMA dipakai Owner sesekali.
+    const tahunInput = prompt(
+      `Pembayaran ${tanggalGL} — ${fmtRupiah(Number(jumlahGL))}\n\n` +
+      `Tahun EFEKTIF (tahun fee yang SEBENARNYA dilunasi pembayaran ini) -- kosongkan kalau SAMA dgn tahun transaksi:`,
+      ''
+    );
+    if (tahunInput === null) return; // user klik Cancel
+    const tahunEfektif = tahunInput.trim() ? Number(tahunInput.trim()) : null;
+    if (tahunInput.trim() && (isNaN(tahunEfektif) || tahunEfektif < 2000 || tahunEfektif > 2100)) {
+      showToast('Tahun tidak valid.');
+      return;
+    }
     const catatanBaru = prompt(
-      `Catatan periode untuk pembayaran ${tanggalGL} — ${fmtRupiah(Number(jumlahGL))}:\n\n` +
-      `Contoh: "Sebenarnya utk fee 2025"`,
+      `Catatan (opsional, cuma label tampilan):\n\nContoh: "Sebenarnya utk fee 2025"`,
       catatanLama
     );
-    if (catatanBaru === null) return; // user klik Cancel
-    if (!catatanBaru.trim()) return; // dikosongkan -- anggap batal, tidak menyimpan apa pun
+    if (catatanBaru === null) return; // user klik Cancel di prompt kedua
+    if (!tahunEfektif && !catatanBaru.trim()) {
+      showToast('Tidak ada perubahan disimpan.');
+      return;
+    }
     showToast('Menyimpan catatan...');
-    apiCall('qsalesSaveFeePeriodeNote', { requestingUserId: state.currentUser, tanggalGL, jumlahGL, keteranganGL, catatanPeriode: catatanBaru.trim() })
+    apiCall('qsalesSaveFeePeriodeNote', { requestingUserId: state.currentUser, tanggalGL, jumlahGL, keteranganGL, catatanPeriode: catatanBaru.trim(), tahunEfektif: tahunEfektif })
       .then(function(result){
         if (result && result.success) {
           showToast('Catatan periode tersimpan.');
           fetchFeeReconciliation();
+          if (state.feeReconYearData) fetchFeeReconciliationByYear(state.feeReconYear);
         } else {
           showToast('Gagal: ' + ((result && result.error) || 'unknown error'));
         }
