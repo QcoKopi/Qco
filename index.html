@@ -790,7 +790,7 @@ function hasTeamView(id){ const e=findEmp(id); return !!e && (e.role==='spv' || 
 // Versi file ini -- ditampilkan di WA Bot Admin > Dashboard, buat cek cepat
 // apakah GitHub Pages sudah menampilkan versi index.html yang terbaru
 // (perlu commit+push, bukan cuma download file).
-const QSYSTEM_HTML_VERSION = '2026-09-06-klien-dropdown-full-list';
+const QSYSTEM_HTML_VERSION = '2026-09-06-fee-periode-note';
 
 let state = {
   qfinFilterSumber: 'all', // all | sumber name
@@ -2161,7 +2161,7 @@ function qtaskSettingsHTML(){
                 </tr>
                 ${isExpanded ? `
                 <tr><td colspan="6" style="background:var(--bg-soft); font-size:11px; padding:10px;">
-                  ${s.payments.length > 0 ? `<div style="margin-bottom:8px;"><b>Riwayat pembayaran Fee (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}</div>` : '<div class="faint" style="margin-bottom:8px;">Belum ada pembayaran Fee tercatat.</div>'}
+                  ${s.payments.length > 0 ? `<div style="margin-bottom:8px;"><b>Riwayat pembayaran Fee (${s.payments.length}):</b><br>${s.payments.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>${p.catatanPeriode ? ` <span style="background:#FFF3E0; color:#E65100; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600;">📌 ${escapeHTML(p.catatanPeriode)}</span>` : ''} <span data-action="edit-fee-periode-note" data-tanggal="${escapeHTML(p.date)}" data-jumlah="${p.jumlah}" data-keterangan="${escapeHTML(p.keterangan)}" data-catatan="${escapeHTML(p.catatanPeriode || '')}" style="cursor:pointer; color:var(--accent); font-size:10px;" title="Tambah/ubah catatan periode">✏️</span>`).join('<br>')}</div>` : '<div class="faint" style="margin-bottom:8px;">Belum ada pembayaran Fee tercatat.</div>'}
                   ${s.bonusBulananRate > 0 && s.bonusBulananHistory.length > 0 ? `<div><b>Riwayat Bonus Bulanan (${s.bonusBulananHistory.length} bulan tercatat, ${s.bonusBulananMonthsTriggered}x tercapai):</b><br>${s.bonusBulananHistory.map(h=>`${escapeHTML(h.monthName)} — margin ${fmtRupiah(h.grossMargin)} vs 2x cost ${fmtRupiah(2*h.cost)} ${h.triggered ? `<span style="color:var(--success); font-weight:700;">✓ tercapai (+${fmtRupiah(h.bonusBulanan)})</span>` : '<span class="faint">belum tercapai</span>'}`).join('<br>')}</div>` : ''}
                 </td></tr>
                 ` : ''}
@@ -6588,6 +6588,33 @@ document.addEventListener('click', function(e){
     if (idx >= 0) state.feeReconExpandedIds.splice(idx, 1);
     else state.feeReconExpandedIds.push(id);
     render();
+  }
+  else if (el.dataset.action === 'edit-fee-periode-note'){
+    const tanggalGL = el.dataset.tanggal;
+    const jumlahGL = el.dataset.jumlah;
+    const keteranganGL = el.dataset.keterangan;
+    const catatanLama = el.dataset.catatan || '';
+    // BARU (2026-09-06): dialog prompt native browser -- cukup utk fitur
+    // sederhana yg CUMA dipakai Owner sesekali (bukan alur kerja harian),
+    // tidak perlu modal/form terpisah.
+    const catatanBaru = prompt(
+      `Catatan periode untuk pembayaran ${tanggalGL} — ${fmtRupiah(Number(jumlahGL))}:\n\n` +
+      `Contoh: "Sebenarnya utk fee 2025"`,
+      catatanLama
+    );
+    if (catatanBaru === null) return; // user klik Cancel
+    if (!catatanBaru.trim()) return; // dikosongkan -- anggap batal, tidak menyimpan apa pun
+    showToast('Menyimpan catatan...');
+    apiCall('qsalesSaveFeePeriodeNote', { requestingUserId: state.currentUser, tanggalGL, jumlahGL, keteranganGL, catatanPeriode: catatanBaru.trim() })
+      .then(function(result){
+        if (result && result.success) {
+          showToast('Catatan periode tersimpan.');
+          fetchFeeReconciliation();
+        } else {
+          showToast('Gagal: ' + ((result && result.error) || 'unknown error'));
+        }
+      })
+      .catch(function(e){ showToast('Gagal menyimpan: ' + (e.message || '')); });
   }
   else if (el.dataset.action === 'toggle-sales-margin-detail'){
     const id = el.dataset.id;
