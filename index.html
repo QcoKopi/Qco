@@ -438,6 +438,24 @@ const CONFIG = {
 if (!CONFIG.GAS_URL) {
   console.error('[QSystem] config.js tidak termuat atau GAS_URL kosong! Cek apakah config.js ada di folder yang sama dengan index.html, dan sudah diisi sesuai config.example.js.');
 }
+// BARU (2026-09-10, FIX BUG NYATA -- akar penyebab "Buka Portal QSales
+// langsung redirect ke login QSys" yang dilaporkan): SEBELUMNYA HANYA
+// GAS_URL yang dicek kosong atau tidak -- QSALES_PORTAL_URL/QFIN_PORTAL_URL
+// TIDAK PERNAH divalidasi, jadi kalau config.js LUPA mengisi salah satu
+// dari keduanya, openPortalWithToken() akan diam-diam membangun URL
+// RELATIF (cuma "?t=<token>", tanpa domain) -- yang ketika di-set sbg
+// location tab baru, browser SERING kali menafsirkannya balik ke domain
+// QSystem sendiri (qsys.qcoid.com) alih-alih domain portal yang benar --
+// PERSIS gejala "langsung ke login QSys" yang dilaporkan, TANPA error
+// apa pun yang kelihatan. Sekarang keduanya JUGA divalidasi, supaya
+// masalah config.js yang kurang lengkap SEGERA terlihat di console,
+// bukan bermanifestasi sbg redirect yang membingungkan.
+if (!CONFIG.QSALES_PORTAL_URL) {
+  console.error('[QSystem] config.js tidak punya QSALES_PORTAL_URL (atau kosong)! Tombol "Buka Portal QSales" TIDAK akan berfungsi benar -- akan redirect balik ke QSystem sendiri, bukan ke Sales Portal.');
+}
+if (!CONFIG.QFIN_PORTAL_URL) {
+  console.error('[QSystem] config.js tidak punya QFIN_PORTAL_URL (atau kosong)! Tombol "Buka Portal QFinance" TIDAK akan berfungsi benar -- akan redirect balik ke QSystem sendiri, bukan ke QFinance Portal.');
+}
 
 function fmtRupiah(n){
   if (n === null || n === undefined || isNaN(n)) return 'Rp 0';
@@ -661,6 +679,18 @@ function testGASConnection(){
    ============================================================ */
 function openPortalWithToken(portal, baseUrl){
   const newTab = window.open('', '_blank');
+  // BARU (2026-09-10, FIX BUG NYATA): kalau baseUrl kosong (config.js
+  // belum diisi QSALES_PORTAL_URL/QFIN_PORTAL_URL), JANGAN lanjut ke
+  // issuePortalToken sama sekali -- sebelumnya ini lolos diam-diam dan
+  // newTab.location.href jadi URL RELATIF ("?t=<token>" tanpa domain),
+  // yang browser sering artikan balik ke domain QSystem sendiri --
+  // PERSIS gejala "langsung redirect ke login QSys" yang dilaporkan.
+  // Sekarang gagal SEGERA & JELAS lewat toast, bukan redirect membingungkan.
+  if (!baseUrl) {
+    newTab.close();
+    showToast('URL portal belum diatur di config.js (QSALES_PORTAL_URL/QFIN_PORTAL_URL kosong). Hubungi admin sistem.');
+    return;
+  }
   const emp = findEmp(state.currentUser);
   apiCall('issuePortalToken', { portal: portal, staffId: emp ? emp.name : state.currentUser }).then(result => {
     if (result && result.success && result.token) {
