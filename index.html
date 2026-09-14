@@ -7879,7 +7879,29 @@ async function init(){
   // bisa login dgn benar pakai draft render manapun yang sedang tampil;
   // begitu BERHASIL login, render() yang normal (lewat selectUser())
   // akan menampilkan data yang sudah termuat.
-  if (state.currentUser) render();
+  if (state.currentUser) {
+    render();
+  } else {
+    // FIX BUG NYATA (2026-09-11): SEBELUMNYA baris ini di-skip TOTAL kalau
+    // belum login -- niatnya BENAR (jaga dropdown/PIN tidak rusak di
+    // tengah interaksi user), TAPI efek sampingnya: staff BARU yang baru
+    // ditambahkan ke sheet Employees TIDAK PERNAH muncul di dropdown
+    // login, WALAU sudah reload berkali-kali -- karena dropdown awal
+    // dibangun dari EMPLOYEES hardcode (sebelum getData() selesai), dan
+    // TIDAK ADA update apa pun setelah data asli dari sheet datang.
+    // Sekarang: HANYA opsi <select> yang diperbarui langsung (targeted
+    // update), TANPA menyentuh field PIN atau elemen lain -- aman dari
+    // gangguan interaksi yang jadi alasan fix sebelumnya, TAPI staff baru
+    // tetap muncul begitu data asli selesai dimuat.
+    const loginSelect = document.getElementById('login-select');
+    if (loginSelect) {
+      const currentVal = loginSelect.value;
+      const emps = getEmployees();
+      const empOptions = emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
+      loginSelect.innerHTML = `<option value="">— Pilih nama —</option>` + empOptions;
+      if (currentVal) loginSelect.value = currentVal;
+    }
+  }
 }
 init();
 
