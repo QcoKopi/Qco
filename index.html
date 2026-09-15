@@ -490,25 +490,15 @@ function gsNative(fnName, ...args){
 }
 
 function gsJSONP(fnName, ...args){
-  // DIUBAH TOTAL (2026-09-15, per investigasi mendalam akar masalah
-  // "JSONP failed -- GAS tidak merespons JS valid" yang berulang kali
-  // muncul utk getData/validatePin): SEBELUMNYA mekanisme ini memakai
-  // JSONP klasik lewat tag <script src="...">, yang PUNYA KELEMAHAN
-  // NYATA: kalau gagal, browser HANYA memberi tahu "script gagal
-  // dieksekusi" (script.onerror) TANPA menunjukkan status HTTP atau isi
-  // respons SEBENARNYA yang dikirim server -- membuat diagnosis jadi
-  // sangat terbatas (persis kesulitan yg dialami sepanjang investigasi
-  // ini). Sales Portal (proyek TERPISAH, TERBUKTI BISA dibuka & bekerja
-  // normal) memakai fetch() BIASA ke backend-nya sendiri -- BUKAN JSONP.
-  // Backend QSystem (05_WebApp.gs) SUDAH mengirim header
-  // "Access-Control-Allow-Origin: *" (terlihat KONSISTEN di SEMUA
-  // screenshot Network tab sepanjang sesi ini) DAN SUDAH py jalur respons
-  // JSON MURNI tanpa callback (dipakai kalau parameter "callback" tidak
-  // dikirim) -- artinya fetch() BISA dipakai LANGSUNG tanpa perlu ubah
-  // apa pun di backend. Ini menghilangkan SELURUH kerapuhan JSONP
-  // (termasuk kerentanan U+2028/U+2029 yang sempat diduga, walau
-  // terbukti tidak relevan di mesin JS modern) DAN memberi pesan error
-  // yang JAUH lebih informatif kalau masih ada kegagalan setelah ini.
+  // DIKEMBALIKAN (2026-09-15): sempat diubah ke fetch() biasa, TAPI
+  // TERBUKTI justru memicu halaman "consent wall / bot-detection" dari
+  // Google (ppConfig/productName di isi respons) -- pola yang TIDAK
+  // PERNAH muncul dgn mekanisme JSONP script-tag asli, WALAU traffic
+  // request sebelumnya JAUH lebih tinggi drpd sekarang. fetch() ke
+  // script.google.com dari domain lain tampaknya diperlakukan BEDA oleh
+  // sistem deteksi Google drpd tag <script src>, yang sudah lama jadi
+  // pola BAKU & dikenali utk Apps Script web app. Dikembalikan ke
+  // mekanisme ASLI yang TERBUKTI aman.
   return new Promise((resolve, reject) => {
     const params = new URLSearchParams();
     params.set('action', fnName);
@@ -585,55 +575,52 @@ function gsJSONP(fnName, ...args){
       params.set('payload', JSON.stringify({ key: args[0], value: args[1] }));
     }
 
-    // TIDAK ADA LAGI parameter "callback" -- tanpa ini, backend otomatis
-    // mengirim JSON murni (ContentService.MimeType.JSON), bukan
-    // JavaScript yang perlu dieksekusi lewat <script>.
+    // Unique callback name -- URL SELALU unik tiap panggilan (natural
+    // cache-busting, dan pola BAKU yang dikenali Google utk Apps Script).
+    const cbName = '_qsjsonp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    params.set('callback', cbName);
+
     const url = CONFIG.GAS_URL + '?' + params.toString();
 
-    const FETCH_TIMEOUT_MS = 45000; // dipertahankan sama seperti timeout JSONP sebelumnya
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
 
-    fetch(url, { method: 'GET', signal: controller.signal })
-      .then(async (res) => {
-        clearTimeout(timeoutId);
-        // BARU: kalau status HTTP bukan 2xx, tangkap ISI RESPONS ASLINYA
-        // (bisa jadi halaman error Google, HTML, dll) SEBELUM mencoba
-        // parse sbg JSON -- supaya errornya JELAS ("dapat status 404,
-        // isinya: ...") bukan lagi cuma "script gagal" tanpa info.
-        if (!res.ok) {
-          const bodyText = await res.text().catch(() => '(gagal membaca isi respons)');
-          console.error('[QSystem] Fetch GAGAL:', fnName, '— HTTP', res.status);
-          console.error('  URL:', url);
-          console.error('  Isi respons (200 karakter pertama):', bodyText.slice(0, 200));
-          throw new Error('HTTP ' + res.status + ' dari GAS. Isi: ' + bodyText.slice(0, 150));
-        }
-        let resp;
-        try {
-          resp = await res.json();
-        } catch (parseErr) {
-          const bodyText = await res.clone().text().catch(() => '(gagal membaca ulang)');
-          console.error('[QSystem] Respons BUKAN JSON valid:', fnName);
-          console.error('  Isi respons (200 karakter pertama):', bodyText.slice(0, 200));
-          throw new Error('Respons GAS bukan JSON valid. Isi: ' + bodyText.slice(0, 150));
-        }
-        if (resp && resp.success) {
-          console.log('[QSystem] API Response OK:', fnName, resp.data);
-          resolve(resp.data);
-        } else {
-          console.error('[QSystem] API Response ERROR:', fnName, resp);
-          reject(new Error((resp && resp.error) || 'API Error'));
-        }
-      })
-      .catch((err) => {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') {
-          console.error('[QSystem] Fetch TIMEOUT:', fnName, '— tidak ada respons dalam', FETCH_TIMEOUT_MS/1000, 'detik. URL:', url);
-          reject(new Error('Timeout — GAS tidak merespons dalam ' + (FETCH_TIMEOUT_MS/1000) + ' detik'));
-        } else {
-          reject(err);
-        }
-      });
+    const JSONP_TIMEOUT_MS = 45000;
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      console.error('[QSystem] JSONP TIMEOUT:', fnName, '— tidak ada respons dalam', JSONP_TIMEOUT_MS/1000, 'detik. URL:', url);
+      reject(new Error('JSONP timeout — GAS tidak merespons dalam ' + (JSONP_TIMEOUT_MS/1000) + ' detik'));
+    }, JSONP_TIMEOUT_MS);
+
+    window[cbName] = function(resp) {
+      cleanup();
+      if (resp && resp.success) {
+        console.log('[QSystem] API Response OK:', fnName, resp.data);
+        resolve(resp.data);
+      } else {
+        console.error('[QSystem] API Response ERROR:', fnName, resp);
+        reject(new Error((resp && resp.error) || 'API Error'));
+      }
+    };
+
+    script.onerror = function(evt) {
+      cleanup();
+      console.error('[QSystem] JSONP script.onerror triggered');
+      console.error('  URL:', url);
+      console.error('  Action:', fnName);
+      console.error('  Event:', evt);
+      reject(new Error('JSONP failed — GAS tidak merespons JS valid. Penyebab: (1) URL GAS salah/sudah expired, (2) GAS belum deploy ulang setelah revisi, (3) Ada error di server GAS (cek Execution Log), (4) Script GAS return HTML error page bukan JavaScript'));
+    };
+
+    function cleanup() {
+      clearTimeout(timeoutId);
+      window[cbName] = function(){ /* respons datang setelah timeout, diabaikan */ };
+      setTimeout(() => { delete window[cbName]; }, 60000);
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    document.head.appendChild(script);
   });
 }
 
