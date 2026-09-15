@@ -729,16 +729,15 @@ function apiCall(fnName, ...args){
 /* ============================================================
    QSYSTEM — Konfigurasi & Data Master
    ============================================================ */
-// DIHAPUS (2026-09-11, per instruksi user "seharusnya tidak ada lagi
-// hardcode"): SEBELUMNYA array ini berisi daftar staff TETAP yang ditulis
-// langsung di kode -- dipakai sbg fallback/merge di getEmployees() &
-// findEmp(), yang jadi AKAR PENYEBAB staff baru yg ditambahkan ke sheet
-// tidak muncul sinkron. Sekarang dikosongkan total -- SATU-SATUNYA sumber
-// data staff adalah sheet Employees (via state.data.employees, hasil
-// getData()/qsystemGetAllEmployeesRaw_ di backend). Nama variabel
-// dipertahankan (bukan dihapus total) supaya tidak ada referensi lain yg
-// tidak sengaja tertinggal jadi error -- tapi isinya SENGAJA kosong.
-const EMPLOYEES = [];
+const EMPLOYEES = [
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task, Sales' },
+  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task dan Sales' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv',  jabatan:'Marketing & Sales', qcoSystem:'All' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'fahmi',  name:'Fahmi Maulana',  dept:'po', role:'spv',  jabatan:'Ops & Product Development', qcoSystem:'All' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director', qcoSystem:'All' },
+];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
   rizky: ['reza','rasya','nanda','rizky'],
@@ -822,10 +821,7 @@ const CONTENT_PLAN_ALLOWED_IDS = ['owner', 'Qco', 'rizky', 'nanda'];
 
 
 function findEmp(id){ 
-  // DIUBAH (2026-09-11): tidak ada lagi fallback ke EMPLOYEES hardcode --
-  // 100% dari state.data.employees (sheet asli). Array kosong sbg fallback
-  // paling aman kalau data belum termuat, BUKAN daftar yg bisa jadi basi.
-  const pool = (state.data && state.data.employees) ? state.data.employees : [];
+  const pool = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : EMPLOYEES;
   return pool.find(e=>e.id===id); 
 }
 function isSpv(id){ const e=findEmp(id); return !!e && e.role==='spv'; }
@@ -1563,9 +1559,7 @@ function applyFilter(tasks){
    ============================================================ */
 function loginScreenHTML(){
   const emps = getEmployees();
-  const empOptions = emps.length
-    ? emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('')
-    : `<option value="" disabled>Memuat daftar staff...</option>`;
+  const empOptions = emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
   return `
     <div class="login-wrap" style="position:relative;">
       <div class="login-brand">
@@ -5825,7 +5819,7 @@ function modalHTML(){
   }
 
   const myTeamIds = hasTeamView(state.currentUser) ? TEAM_OF[state.currentUser] : [state.currentUser];
-  const assignablePool = getEmployees().filter(e=>e.id===state.currentUser || e.role!=='owner');
+  const assignablePool = EMPLOYEES.filter(e=>e.id===state.currentUser || e.role!=='owner');
   const eligibleEmployees = hasTeamView(state.currentUser) ? assignablePool : assignablePool.filter(e=>e.id===state.currentUser);
   const defaultEmp = findEmp(state.currentUser);
   const taskOptionsFor = myTeamIds.flatMap(id => tasksOf(id).filter(t=>t.status==='aktif'))
@@ -7859,14 +7853,10 @@ async function init(){
   // diagnostik, sepenuhnya redundan dengan logging yang SUDAH otomatis ada
   // di apiCall/gsJSONP untuk request getData yang SUNGGUHAN di bawah ini.
   //
-  // render() sekarang dipanggil SEGERA -- layar login muncul INSTAN
-  // (dropdown nama masih kosong sesaat, lihat pesan "Memuat daftar staff..."
-  // di loginScreenHTML). DIUBAH (2026-09-11): SEBELUMNYA baris ini
-  // menyebut "EMPLOYEES hardcoded" sbg alasan dropdown bisa langsung
-  // terisi -- itu SUDAH TIDAK BERLAKU, EMPLOYEES sekarang sengaja
-  // dikosongkan (lihat komentar di deklarasinya). Dropdown terisi
-  // begitu getData() SELESAI, lewat update targeted di bawah (bukan
-  // lagi dari data hardcode apa pun).
+  // render() sekarang dipanggil SEGERA -- daftar user (EMPLOYEES hardcoded)
+  // sudah tersedia tanpa perlu tunggu server sama sekali, jadi layar
+  // pilih-user muncul INSTAN. Data dinamis dari getData() menyusul betul-
+  // betul di belakang layar, render ulang begitu selesai.
   render();
 
   try {
@@ -7907,9 +7897,7 @@ async function init(){
     if (loginSelect) {
       const currentVal = loginSelect.value;
       const emps = getEmployees();
-      const empOptions = emps.length
-        ? emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('')
-        : `<option value="" disabled>Gagal memuat daftar staff -- coba muat ulang halaman</option>`;
+      const empOptions = emps.map(e => `<option value="${e.id}">${e.name} — ${e.jabatan}</option>`).join('');
       loginSelect.innerHTML = `<option value="">— Pilih nama —</option>` + empOptions;
       if (currentVal) loginSelect.value = currentVal;
     }
@@ -7917,20 +7905,41 @@ async function init(){
 }
 init();
 
-// Helper: get active employees -- 100% dari sheet Employees (via getData()),
-// TIDAK ADA LAGI fallback/merge ke data hardcode apa pun.
-// DIUBAH (2026-09-11, per instruksi user "seharusnya tidak ada lagi
-// hardcode"): SEBELUMNYA fungsi ini MENGGABUNGKAN data sheet dgn array
-// EMPLOYEES yg tertulis tetap di kode -- inilah akar penyebab staff baru
-// yg ditambahkan ke sheet tidak sinkron dgn apa yg sebenarnya ada di kode.
-// Sekarang SATU-SATUNYA sumber kebenaran adalah state.data.employees
-// (asli dari sheet, via qsystemGetAllEmployeesRaw_ di backend) -- kalau
-// data belum termuat (mis. sesaat sebelum getData() selesai), fungsi ini
-// mengembalikan array KOSONG apa adanya, BUKAN daftar hardcode yg bisa
-// jadi sudah tidak sesuai isi sheet sungguhan.
+// Helper: get active employees (from GAS data or fallback)
 function getEmployees(){
-  const dynamic = (state.data && state.data.employees) ? state.data.employees : [];
-  return [...dynamic].sort((a, b) => a.name.localeCompare(b.name));
+  // Merge hardcoded + dynamic, preserve qcoSystem from either source
+  const dynamic = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : [];
+  // BARU (2026-08-13, FIX BUG DROPDOWN LOGIN): SEBELUMNYA fungsi ini
+  // mengembalikan urutan yang BERBEDA tergantung sumber datanya -- fallback
+  // EMPLOYEES (urutan tetap sesuai array di kode) SEBELUM getData() selesai,
+  // lalu urutan BARIS SHEET (bisa beda total) SETELAH getData() selesai dan
+  // render ulang. User melaporkan dropdown login TERLIHAT BERUBAH URUTAN
+  // (mis. "Owner" pindah dari bawah ke tengah) tepat di seputar momen ini.
+  // Sekarang KEDUA jalur diurutkan SAMA PERSIS (alfabetis nama) supaya
+  // dropdown TIDAK PERNAH terlihat berubah urutan sama sekali, dari fallback
+  // maupun sesudah data live masuk.
+  if (!dynamic.length) return [...EMPLOYEES].sort((a, b) => a.name.localeCompare(b.name));
+  const merged = [];
+  const seen = new Set();
+  // Dynamic first (from GAS), preserve qcoSystem
+  dynamic.forEach(d => {
+    const hard = EMPLOYEES.find(e => e.id === d.id);
+    merged.push({
+      id: d.id || hard?.id || '',
+      name: d.name || hard?.name || '',
+      dept: d.dept || hard?.dept || 'sm',
+      role: d.role || hard?.role || 'staff',
+      jabatan: d.jabatan || hard?.jabatan || '',
+      qcoSystem: d.qcoSystem || d.QcoSystem || hard?.qcoSystem || ''
+    });
+    seen.add(d.id);
+  });
+  // Add hardcoded yang belum ada di dynamic
+  EMPLOYEES.forEach(e => {
+    if (!seen.has(e.id)) merged.push(e);
+  });
+  merged.sort((a, b) => a.name.localeCompare(b.name));
+  return merged;
 }
 function findEmpDynamic(id){ 
   return getEmployees().find(e=>e.id===id); 
