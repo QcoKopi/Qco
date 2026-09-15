@@ -729,16 +729,29 @@ function apiCall(fnName, ...args){
 /* ============================================================
    QSYSTEM — Konfigurasi & Data Master
    ============================================================ */
-// DIHAPUS (2026-09-11, per instruksi user "seharusnya tidak ada lagi
-// hardcode"): SEBELUMNYA array ini berisi daftar staff TETAP yang ditulis
-// langsung di kode -- dipakai sbg fallback/merge di getEmployees() &
-// findEmp(), yang jadi AKAR PENYEBAB staff baru yg ditambahkan ke sheet
-// tidak muncul sinkron. Sekarang dikosongkan total -- SATU-SATUNYA sumber
-// data staff adalah sheet Employees (via state.data.employees, hasil
-// getData()/qsystemGetAllEmployeesRaw_ di backend). Nama variabel
-// dipertahankan (bukan dihapus total) supaya tidak ada referensi lain yg
-// tidak sengaja tertinggal jadi error -- tapi isinya SENGAJA kosong.
-const EMPLOYEES = [];
+// DIUBAH LAGI (2026-09-15, DARURAT): array ini SEMPAT dikosongkan total
+// (2026-09-11) supaya sumber data staff 100% dari sheet -- niatnya BENAR
+// (staff baru langsung sinkron). TAPI efek sampingnya BARU KELIHATAN
+// sekarang: kalau getData() gagal total di server (masalah GAS yang
+// TERPISAH, SUDAH ADA sebelum perubahan ini -- lihat riwayat error JSONP
+// utk getData/validatePin jauh sebelum tanggal ini), dropdown login jadi
+// KOSONG SAMA SEKALI dan TIDAK ADA SATU ORANG PUN bisa login -- sistem
+// terkunci total, jauh lebih parah drpd bug asal (staff baru telat
+// muncul). Sekarang dikembalikan sbg JARING PENGAMAN DARURAT SAJA:
+// getEmployees() di bawah TETAP mengutamakan data ASLI dari sheet kalau
+// berhasil dimuat (staff baru tetap sinkron persis seperti sebelumnya) --
+// daftar di bawah ini HANYA dipakai kalau getData() gagal total, supaya
+// org masih bisa login walau server sedang bermasalah. WAJIB diupdate
+// manual di sini kalau ada staff baru yg PERLU bisa login SAAT server
+// sedang down (jarang, tapi lebih baik daripada sistem terkunci total).
+const EMPLOYEES = [
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design' },
+  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv', jabatan:'Marketing & Sales' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development' },
+  { id:'fahmi', name:'Fahmi Maulana', dept:'po', role:'spv', jabatan:'Ops & Product Development' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Director' },
+];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
   rizky: ['reza','rasya','nanda','rizky'],
@@ -822,10 +835,10 @@ const CONTENT_PLAN_ALLOWED_IDS = ['owner', 'Qco', 'rizky', 'nanda'];
 
 
 function findEmp(id){ 
-  // DIUBAH (2026-09-11): tidak ada lagi fallback ke EMPLOYEES hardcode --
-  // 100% dari state.data.employees (sheet asli). Array kosong sbg fallback
-  // paling aman kalau data belum termuat, BUKAN daftar yg bisa jadi basi.
-  const pool = (state.data && state.data.employees) ? state.data.employees : [];
+  // DIUBAH (2026-09-15): konsisten dengan getEmployees() -- utamakan data
+  // sheet, fallback ke jaring pengaman EMPLOYEES hanya kalau data sheet
+  // gagal total (bukan cuma belum sempat dimuat sesaat).
+  const pool = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : EMPLOYEES;
   return pool.find(e=>e.id===id); 
 }
 function isSpv(id){ const e=findEmp(id); return !!e && e.role==='spv'; }
@@ -7928,9 +7941,16 @@ init();
 // data belum termuat (mis. sesaat sebelum getData() selesai), fungsi ini
 // mengembalikan array KOSONG apa adanya, BUKAN daftar hardcode yg bisa
 // jadi sudah tidak sesuai isi sheet sungguhan.
+// Helper: daftar staff -- UTAMAKAN data asli dari sheet (via getData()),
+// TAPI kalau itu gagal total (server error, BUKAN cuma "belum sempat
+// dimuat"), pakai jaring pengaman EMPLOYEES supaya login tidak terkunci
+// total. DIUBAH (2026-09-15): staff baru di sheet TETAP langsung muncul
+// begitu getData() berhasil -- jaring pengaman HANYA aktif kalau server
+// benar-benar gagal merespons.
 function getEmployees(){
-  const dynamic = (state.data && state.data.employees) ? state.data.employees : [];
-  return [...dynamic].sort((a, b) => a.name.localeCompare(b.name));
+  const dynamic = (state.data && state.data.employees && state.data.employees.length) ? state.data.employees : [];
+  if (dynamic.length) return [...dynamic].sort((a, b) => a.name.localeCompare(b.name));
+  return [...EMPLOYEES].sort((a, b) => a.name.localeCompare(b.name));
 }
 function findEmpDynamic(id){ 
   return getEmployees().find(e=>e.id===id); 
