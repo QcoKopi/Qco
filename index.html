@@ -1253,7 +1253,14 @@ function qsystemDoLoginWithRetry_(empId, pin, pinInput, attempt){
   }).catch(err => {
     console.error('validatePin error (percobaan ' + attempt + '):', err);
     if (attempt < maxAttempt) {
-      setTimeout(() => qsystemDoLoginWithRetry_(empId, pin, pinInput, attempt + 1), 3000);
+      // DIUBAH (2026-09-15): jeda BERTAHAP (5s, lalu 10s) -- bukan 3 detik
+      // tetap. Kalau BANYAK staff mencoba login BERSAMAAN saat backend
+      // sedang tertekan, retry cepat & seragam dari SEMUA sesi justru
+      // menumpuk lagi persis di waktu yang sama, memperberat kondisi yang
+      // sedang coba diatasi. Jeda lebih panjang & bertahap memberi ruang
+      // lebih besar utk backend pulih di antara percobaan.
+      const delayMs = attempt === 1 ? 5000 : 10000;
+      setTimeout(() => qsystemDoLoginWithRetry_(empId, pin, pinInput, attempt + 1), delayMs);
     } else {
       showToast('Gagal memverifikasi setelah ' + maxAttempt + 'x percobaan: ' + (err.message || 'server GAS tidak merespons. Coba lagi beberapa saat lagi.'));
       if (pinInput) { pinInput.value = ''; pinInput.focus(); }
@@ -1285,6 +1292,13 @@ async function refreshData(){
       gotData = true;
     } catch(e){
       if (attempt === 2) state.syncStatus = 'offline';
+      // BARU (2026-09-15): jeda kecil sebelum retry ke-2 -- SEBELUMNYA
+      // kalau kegagalan CEPAT (mis. respons error dalam hitungan detik,
+      // bukan nunggu penuh timeout 45 detik), retry ke-2 langsung nembak
+      // lagi TANPA jeda sama sekali. Jeda singkat ini memberi sedikit
+      // ruang, terutama kalau BANYAK sesi staff mengalami hal yang sama
+      // bersamaan.
+      else await new Promise(r => setTimeout(r, 2000));
     }
   }
   if (!state.modal.open && !state.mnModalOpen) render();
