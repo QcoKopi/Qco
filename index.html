@@ -734,15 +734,15 @@ function apiCall(fnName, ...args){
 // manual di sini kalau ada staff baru yg PERLU bisa login SAAT server
 // sedang down (jarang, tapi lebih baik daripada sistem terkunci total).
 const EMPLOYEES = [
-  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser' },
-  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design' },
-  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv', jabatan:'Marketing & Sales' },
-  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development' },
-  { id:'fahmi', name:'Fahmi Maulana', dept:'po', role:'spv', jabatan:'Ops & Product Development' },
-  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Directror' },
-  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Canvaser' },
-  { id:'Qco',   name:'Admin Qco', dept:'sm', role:'spv', jabatan:'Marketing & Sales' },
-  { id:'vino',  name:'Vino', dept:'sm', role:'staff', jabatan:'Canvaser' },
+  { id:'reza',  name:'Reza',  dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task, Sales' },
+  { id:'nanda', name:'Nanda', dept:'sm', role:'staff', jabatan:'Media & Design', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'rizky', name:'Rizky Syahdinar', dept:'sm', role:'spv', jabatan:'Marketing & Sales', qcoSystem:'All' },
+  { id:'razak', name:'Razak', dept:'po', role:'staff', jabatan:'Ass Ops & Product Development', qcoSystem:'Hanya bisa membuka Dashboard, Task' },
+  { id:'fahmi', name:'Fahmi Maulana', dept:'po', role:'spv', jabatan:'Ops & Product Development', qcoSystem:'All' },
+  { id:'owner', name:'Owner', dept:'mgmt', role:'owner', jabatan:'Directror', qcoSystem:'All' },
+  { id:'rasya', name:'Rasya', dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task, Sales' },
+  { id:'Qco',   name:'Admin Qco', dept:'sm', role:'spv', jabatan:'Marketing & Sales', qcoSystem:'All' },
+  { id:'vino',  name:'Vino', dept:'sm', role:'staff', jabatan:'Canvaser', qcoSystem:'Hanya bisa membuka Dashboard, Task, Sales' },
 ];
 const DEPT_NAMES = { sm:'Sales & Marketing', po:'Produk Development & Operasional', mgmt:'Manajemen' };
 const TEAM_OF = {
