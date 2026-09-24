@@ -984,6 +984,15 @@ let state = {
   mnModalOpen: false,
   mnEditingId: null,
   mnMyResponses: {},
+  penagihanModal: { open: false, customerName: null, salesName: null },
+  penagihanHistory: {},
+  penagihanSaving: false,
+  followupData: null,
+  followupLoading: false,
+  followupError: null,
+  followupModal: { open: false, customerName: null, salesName: null },
+  followupHistory: {},
+  followupSaving: false,
   mnExpandedIds: [], // id notes yang lagi di-expand (baca selengkapnya)
 };
 
@@ -2532,6 +2541,30 @@ async function fetchQSalesData(){
   render();
 }
 
+async function fetchFollowupData(){
+  if (state.followupLoading) return;
+  state.followupLoading = true;
+  state.followupError = null;
+  render();
+  try {
+    const emp = findEmp(state.currentUser);
+    const isStaff = emp && String(emp.role || '').trim().toLowerCase() === 'staff';
+    const salesName = isStaff ? '' : (state.qsalesFilterSales !== 'all' ? state.qsalesFilterSales : '');
+    const result = await apiCall('getFollowupStats', { requestingUserId: state.currentUser, salesName });
+    if (result && result.success) {
+      state.followupData = result;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid dari server');
+    }
+  } catch(e) {
+    console.error('[Followup] Fetch error:', e);
+    state.followupError = e.message || 'Gagal memuat data follow up';
+    showToast('Follow Up: ' + state.followupError);
+  }
+  state.followupLoading = false;
+  render();
+}
+
 
 
 /* ============================================================
@@ -3130,6 +3163,56 @@ function qsalesDashboardHTML(){
       <span class="faint" style="font-size:11px; font-weight:400;">(50 data terakhir${d.filteredBy && d.filteredBy !== 'all' ? ' · Filter: ' + escapeHTML(d.filteredBy) : ''})</span>
     </div>
     ${qsalesShopListHTML(d.shops || [])}
+
+    <div class="section-title">📞 Follow Up Customer</div>
+    ${followupSectionHTML()}
+  `;
+}
+
+function followupSectionHTML(){
+  if (!state.followupData) {
+    fetchFollowupData();
+    return `<div class="card"><div class="faint" style="font-size:12px;">Memuat data follow up...</div></div>`;
+  }
+  if (state.followupError) {
+    return `
+      <div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);">
+        <div style="font-size:12px; color:var(--danger); margin-bottom:8px;"><b>⚠ Error:</b> ${escapeHTML(state.followupError)}</div>
+        <button class="btn btn-primary btn-sm" data-action="followup-refresh">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+  const f = state.followupData;
+  return `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex; gap:16px; margin-bottom:4px;">
+        <div>
+          <div style="font-size:20px; font-weight:800;">${f.totalCustomer}</div>
+          <div class="faint" style="font-size:10.5px;">Total Customer</div>
+        </div>
+        <div>
+          <div style="font-size:20px; font-weight:800; color:var(--success, #2e7d32);">${f.sudahFollowupCount}</div>
+          <div class="faint" style="font-size:10.5px;">Sudah Follow Up</div>
+        </div>
+        <div>
+          <div style="font-size:20px; font-weight:800; color:var(--danger);">${f.belumFollowupCount}</div>
+          <div class="faint" style="font-size:10.5px;">Belum Follow Up</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      ${f.customers.length === 0 ? `<div class="faint" style="font-size:12px;">Belum ada data customer.</div>` : f.customers.map(c => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+          <div>
+            <div style="font-size:12.5px; font-weight:600;">${escapeHTML(c.customerName)}</div>
+            <div class="faint" style="font-size:10.5px;">${c.sudahFollowup ? '✅ Terakhir: ' + escapeHTML(String(c.lastFollowupDate)) : '⚠ Belum pernah di-follow up'}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-action="open-followup-modal" data-customer="${escapeHTML(c.customerName)}" data-sales="${escapeHTML(c.salesName)}" style="padding:3px 10px; font-size:10.5px;">
+            📞 Follow Up
+          </button>
+        </div>
+      `).join('')}
+    </div>
   `;
 }
 
@@ -4472,6 +4555,9 @@ function qfinDashboardHTML(){
                         <div style="font-weight:600;">${fmtRupiah(c.total)}</div>
                         <button class="btn btn-ghost btn-sm" data-action="download-rekap-piutang" data-customer="${escapeHTML(c.customerName)}" style="padding:3px 8px; font-size:10.5px;" ${state.rekapPiutangLoading === c.customerName ? 'disabled' : ''}>
                           ${state.rekapPiutangLoading === c.customerName ? '⏳' : '📄 PDF'}
+                        </button>
+                        <button class="btn btn-ghost btn-sm" data-action="open-penagihan-modal" data-customer="${escapeHTML(c.customerName)}" data-sales="${escapeHTML(s.salesName)}" style="padding:3px 8px; font-size:10.5px;">
+                          📝 Catat Penagihan
                         </button>
                         <button class="btn btn-ghost btn-sm" data-action="send-piutang-reminder" data-customer="${escapeHTML(c.customerName)}" style="padding:3px 8px; font-size:10.5px;" ${state.piutangReminderLoading === c.customerName ? 'disabled' : ''} title="Kirim reminder ke dashboard sales -- HANYA jika ada invoice yang sudah jatuh tempo">
                           ${state.piutangReminderLoading === c.customerName ? '⏳' : '⏰ Reminder'}
@@ -6046,6 +6132,92 @@ function restoreFocusedTextInput_(saved){
   } catch(e) { /* sebagian tipe input tidak dukung setSelectionRange -- aman diabaikan */ }
 }
 
+function penagihanModalHTML(){
+  if (!state.penagihanModal.open) return '';
+  const cust = state.penagihanModal.customerName;
+  const today = new Date().toISOString().split('T')[0];
+  const history = state.penagihanHistory[cust] || [];
+  return `
+    <div class="modal-overlay" data-action="close-penagihan-modal" style="position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;">
+      <div style="background:var(--surface); border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px;" onclick="event.stopPropagation()">
+        <div style="font-weight:700; font-size:15px; margin-bottom:4px;">📝 Catat Penagihan</div>
+        <div class="faint" style="font-size:12px; margin-bottom:14px;">${escapeHTML(cust)}</div>
+
+        <div style="margin-bottom:10px;">
+          <label class="label-field">Tanggal Penagihan</label>
+          <input type="date" id="penagihan-tanggal" class="input-field" value="${today}">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label class="label-field">Nama PIC yang Dikontak</label>
+          <input type="text" id="penagihan-pic" class="input-field" placeholder="Nama PIC">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label class="label-field">No. yang Dikontak</label>
+          <input type="text" id="penagihan-no" class="input-field" placeholder="08xx...">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="label-field">Hasil Penagihan</label>
+          <textarea id="penagihan-hasil" class="input-field" rows="3" placeholder="Mis. Janji bayar tanggal 20, belum bisa dihubungi, dll."></textarea>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" data-action="submit-penagihan" ${state.penagihanSaving ? 'disabled' : ''}>
+          ${state.penagihanSaving ? 'Menyimpan...' : 'Simpan'}
+        </button>
+
+        ${history.length ? `
+          <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:12px;">
+            <div style="font-weight:600; font-size:12px; margin-bottom:8px;">Riwayat Penagihan</div>
+            ${history.map(h => `
+              <div style="font-size:11px; padding:6px 0; border-bottom:1px dashed var(--line);">
+                <b>${escapeHTML(String(h.tanggalPenagihan))}</b> — PIC: ${escapeHTML(h.namaPIC || '-')} (${escapeHTML(h.noKontak || '-')})<br>
+                <span class="faint">${escapeHTML(h.hasilPenagihan)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : (history.length === 0 && cust ? `<div class="faint" style="font-size:11px; margin-top:14px;">Belum ada riwayat penagihan untuk customer ini.</div>` : '')}
+      </div>
+    </div>
+  `;
+}
+
+function followupModalHTML(){
+  if (!state.followupModal.open) return '';
+  const cust = state.followupModal.customerName;
+  const today = new Date().toISOString().split('T')[0];
+  const history = state.followupHistory[cust] || [];
+  return `
+    <div class="modal-overlay" data-action="close-followup-modal" style="position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;">
+      <div style="background:var(--surface); border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px;" onclick="event.stopPropagation()">
+        <div style="font-weight:700; font-size:15px; margin-bottom:4px;">📞 Follow Up Customer</div>
+        <div class="faint" style="font-size:12px; margin-bottom:14px;">${escapeHTML(cust)}</div>
+
+        <div style="margin-bottom:10px;">
+          <label class="label-field">Tanggal Kontak</label>
+          <input type="date" id="followup-tanggal" class="input-field" value="${today}">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="label-field">Hasil Kontak</label>
+          <textarea id="followup-hasil" class="input-field" rows="3" placeholder="Mis. Tertarik order, minta dihubungi lagi minggu depan, tidak diangkat, dll."></textarea>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" data-action="submit-followup" ${state.followupSaving ? 'disabled' : ''}>
+          ${state.followupSaving ? 'Menyimpan...' : 'Simpan'}
+        </button>
+
+        ${history.length ? `
+          <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:12px;">
+            <div style="font-weight:600; font-size:12px; margin-bottom:8px;">Riwayat Follow Up</div>
+            ${history.map(h => `
+              <div style="font-size:11px; padding:6px 0; border-bottom:1px dashed var(--line);">
+                <b>${escapeHTML(String(h.tanggalKontak))}</b><br>
+                <span class="faint">${escapeHTML(h.hasilKontak)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : `<div class="faint" style="font-size:11px; margin-top:14px;">Belum ada riwayat follow up untuk customer ini.</div>`}
+      </div>
+    </div>
+  `;
+}
+
 function renderModal(){
   const __savedFocus = captureFocusedTextInput_();
 
@@ -6074,6 +6246,34 @@ function renderModal(){
       const mnOverlay = mnWrapper.firstElementChild;
       mnOverlay.id = 'mn-modal-overlay';
       document.body.appendChild(mnOverlay);
+    }
+  }
+
+  // Modal Penagihan
+  const existingPN = document.getElementById('penagihan-modal-overlay');
+  if (existingPN) existingPN.remove();
+  if (state.penagihanModal.open) {
+    const pnHtml = penagihanModalHTML();
+    if (pnHtml) {
+      const pnWrapper = document.createElement('div');
+      pnWrapper.innerHTML = pnHtml;
+      const pnOverlay = pnWrapper.firstElementChild;
+      pnOverlay.id = 'penagihan-modal-overlay';
+      document.body.appendChild(pnOverlay);
+    }
+  }
+
+  // Modal Follow Up
+  const existingFU = document.getElementById('followup-modal-overlay');
+  if (existingFU) existingFU.remove();
+  if (state.followupModal.open) {
+    const fuHtml = followupModalHTML();
+    if (fuHtml) {
+      const fuWrapper = document.createElement('div');
+      fuWrapper.innerHTML = fuHtml;
+      const fuOverlay = fuWrapper.firstElementChild;
+      fuOverlay.id = 'followup-modal-overlay';
+      document.body.appendChild(fuOverlay);
     }
   }
 
@@ -6562,6 +6762,11 @@ document.addEventListener('click', function(e){
     fetchQSalesData();
     if (state.qsalesTab === 'kpi') fetchQSalesKPI();
   }
+  else if (el.dataset.action === 'followup-refresh'){
+    state.followupError = null;
+    state.followupData = null;
+    fetchFollowupData();
+  }
   else if (el.dataset.action === 'qfin-refresh'){
     state.qfinError = null;
     state.qfinData = null;
@@ -6614,6 +6819,94 @@ document.addEventListener('click', function(e){
       state.rekapPiutangLoading = null;
       showToast('Gagal membuat PDF: ' + (err.message || 'coba lagi'));
       render();
+    });
+  }
+  else if (el.dataset.action === 'open-penagihan-modal'){
+    const customerName = el.dataset.customer;
+    const salesName = el.dataset.sales;
+    state.penagihanModal = { open: true, customerName, salesName };
+    renderModal();
+    if (!state.penagihanHistory[customerName]) {
+      apiCall('getPenagihanHistory', { customerName }).then(result => {
+        if (result && result.success) {
+          state.penagihanHistory[customerName] = result.data || [];
+          renderModal();
+        }
+      }).catch(() => {});
+    }
+  }
+  else if (el.dataset.action === 'close-penagihan-modal'){
+    state.penagihanModal = { open: false, customerName: null, salesName: null };
+    renderModal();
+  }
+  else if (el.dataset.action === 'submit-penagihan'){
+    const { customerName, salesName } = state.penagihanModal;
+    const tanggalPenagihan = document.getElementById('penagihan-tanggal').value;
+    const namaPIC = document.getElementById('penagihan-pic').value.trim();
+    const noKontak = document.getElementById('penagihan-no').value.trim();
+    const hasilPenagihan = document.getElementById('penagihan-hasil').value.trim();
+    if (!tanggalPenagihan) { showToast('Tanggal penagihan wajib diisi'); return; }
+    if (!hasilPenagihan) { showToast('Hasil penagihan wajib diisi'); return; }
+    state.penagihanSaving = true;
+    renderModal();
+    apiCall('savePenagihanLog', { customerName, salesName, tanggalPenagihan, namaPIC, noKontak, hasilPenagihan, requestingUserId: state.currentUser }).then(result => {
+      state.penagihanSaving = false;
+      if (result && result.success) {
+        showToast('Catatan penagihan tersimpan');
+        state.penagihanModal = { open: false, customerName: null, salesName: null };
+        delete state.penagihanHistory[customerName]; // paksa reload riwayat kali berikutnya dibuka
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+      }
+      renderModal();
+    }).catch(err => {
+      state.penagihanSaving = false;
+      showToast('Gagal menyimpan: ' + (err.message || 'coba lagi'));
+      renderModal();
+    });
+  }
+  else if (el.dataset.action === 'open-followup-modal'){
+    const customerName = el.dataset.customer;
+    const salesName = el.dataset.sales;
+    state.followupModal = { open: true, customerName, salesName };
+    renderModal();
+    if (!state.followupHistory[customerName]) {
+      apiCall('getFollowupHistory', { customerName }).then(result => {
+        if (result && result.success) {
+          state.followupHistory[customerName] = result.data || [];
+          renderModal();
+        }
+      }).catch(() => {});
+    }
+  }
+  else if (el.dataset.action === 'close-followup-modal'){
+    state.followupModal = { open: false, customerName: null, salesName: null };
+    renderModal();
+  }
+  else if (el.dataset.action === 'submit-followup'){
+    const { customerName, salesName } = state.followupModal;
+    const tanggalKontak = document.getElementById('followup-tanggal').value;
+    const hasilKontak = document.getElementById('followup-hasil').value.trim();
+    if (!tanggalKontak) { showToast('Tanggal kontak wajib diisi'); return; }
+    if (!hasilKontak) { showToast('Hasil kontak wajib diisi'); return; }
+    state.followupSaving = true;
+    renderModal();
+    apiCall('saveFollowupLog', { customerName, salesName, tanggalKontak, hasilKontak, requestingUserId: state.currentUser }).then(result => {
+      state.followupSaving = false;
+      if (result && result.success) {
+        showToast('Catatan follow up tersimpan');
+        state.followupModal = { open: false, customerName: null, salesName: null };
+        delete state.followupHistory[customerName];
+        state.followupData = null; // paksa reload statistik
+        fetchFollowupData();
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+      }
+      renderModal();
+    }).catch(err => {
+      state.followupSaving = false;
+      showToast('Gagal menyimpan: ' + (err.message || 'coba lagi'));
+      renderModal();
     });
   }
   else if (el.dataset.action === 'send-piutang-reminder'){
