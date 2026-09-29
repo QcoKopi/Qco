@@ -6146,7 +6146,7 @@ function penagihanModalHTML(){
   const history = state.penagihanHistory[cust] || [];
   return `
     <div class="modal-overlay" data-action="close-penagihan-modal" style="position:fixed !important; inset:0 !important; background:rgba(20,20,20,0.75) !important; z-index:9999 !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:16px !important;">
-      <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">
+      <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);">
         <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">📝 Catat Penagihan</div>
         <div style="font-size:12px; margin-bottom:14px; color:#666666;">${escapeHTML(cust)}</div>
 
@@ -6193,7 +6193,7 @@ function followupModalHTML(){
   const history = state.followupHistory[cust] || [];
   return `
     <div class="modal-overlay" data-action="close-followup-modal" style="position:fixed !important; inset:0 !important; background:rgba(20,20,20,0.75) !important; z-index:9999 !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:16px !important;">
-      <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">
+      <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);">
         <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">📞 Follow Up Customer</div>
         <div style="font-size:12px; margin-bottom:14px; color:#666666;">${escapeHTML(cust)}</div>
 
@@ -6848,6 +6848,7 @@ document.addEventListener('click', function(e){
     }
   }
   else if (el.dataset.action === 'close-penagihan-modal'){
+    if (e.target !== el) return; // klik di dalam kotak form (bukan langsung di backdrop) -- jangan tutup
     state.penagihanModal = { open: false, customerName: null, salesName: null };
     renderModal();
   }
@@ -6892,6 +6893,7 @@ document.addEventListener('click', function(e){
     }
   }
   else if (el.dataset.action === 'close-followup-modal'){
+    if (e.target !== el) return; // klik di dalam kotak form (bukan langsung di backdrop) -- jangan tutup
     state.followupModal = { open: false, customerName: null, salesName: null };
     renderModal();
   }
