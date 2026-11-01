@@ -286,6 +286,23 @@
     font-family:inherit; font-size:14.5px; background:var(--surface); color:var(--ink);
   }
   .field textarea{resize:vertical; min-height:76px;}
+  .konf-form input[type=number],.konf-form input[type=url]{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px;
+    font-family:inherit; font-size:14.5px; background:var(--surface); color:var(--ink);
+  }
+  .konf-stats{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .konf-stat{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center;}
+  .konf-stat .n{font-family:var(--font-mono); font-size:22px; font-weight:500;}
+  .konf-stat .n-rp{font-size:15px; padding-top:4px;}
+  .konf-stat .l{font-size:10.5px; color:var(--ink-soft); margin-top:2px;}
+  .konf-badge{display:inline-block; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap;}
+  .konf-flag{margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--warning-soft); color:var(--warning); font-size:11.5px;}
+  .konf-note{margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--surface-alt); font-size:12px; color:var(--ink-soft);}
+  .konf-box{margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface); font-size:12.5px; line-height:1.5;}
+  .konf-box a{color:var(--accent-dark);}
+  .konf-hist{margin-top:10px; font-size:11.5px; color:var(--ink-soft);}
+  .konf-hist summary{cursor:pointer; font-weight:600;}
+  .konf-card{margin-bottom:12px;}
   .hint{font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
   .segmented{display:flex; gap:8px;}
   .segmented input{position:absolute; opacity:0; pointer-events:none;}
@@ -879,6 +896,14 @@ let state = {
   slipGajiGenerating: false,
   koreksiGajiContext: null,
   koreksiGajiSaving: false,
+  konfData: null,
+  konfLoading: false,
+  konfError: null,
+  konfMonth: 0,
+  konfYear: 0,
+  konfSaving: false,
+  konfContext: null,
+  sopDownloading: false,
   feeReconData: null,
   feeReconLoading: false,
   feeReconError: null,
@@ -2148,7 +2173,7 @@ function qtaskSettingsHTML(){
 
       ${state.payrollData ? `
         <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${escapeHTML(state.payrollData.monthName)}</div>
-        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-slip-klien-revenue' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
+        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-konfirmasi-bulanan' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
         <div class="faint" style="font-size:11px; margin-bottom:8px;">Komisi Penjualan Canvaser = tagihan akhir invoice bulan ini saja, dibayar maupun belum (tidak ada sisa dari bulan lalu). Komisi Rizky Syahdinar &amp; Fahmi Maulana bersifat KUMULATIF (Fee Marketing + Fee Roasting yang belum dibayar dari bulan-bulan sebelumnya ikut terbawa) -- Gaji dibayar penuh tiap bulan, tidak menunggak.</div>
         ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Komisi Penjualan tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
         ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Komisi Penjualan tidak bisa dihitung per orang.</div>` : ''}
@@ -2180,6 +2205,9 @@ function qtaskSettingsHTML(){
                     ${pe.bonusBulananRate > 0 ? `<div style="margin-bottom:6px;"><b>Bonus Bulanan (rate ${fmtRupiah(pe.bonusBulananRate)}):</b> Gross margin bulan ini ${fmtRupiah(pe.grossMarginBulanIni)} (revenue ${fmtRupiah(pe.revenueBulanIni)} − HPP ${fmtRupiah(pe.hppBulanIni)}) dibanding 2x cost bulan ini (2 x ${fmtRupiah(pe.costSebelumBonus)} = ${fmtRupiah(2 * pe.costSebelumBonus)}) -- ${pe.bonusBulananTriggered ? `<span style="color:var(--success); font-weight:700;">TERPENUHI, bonus ${fmtRupiah(pe.bonusBulanan)} ditambahkan</span>` : `<span class="faint">belum terpenuhi, bonus tidak ditambahkan</span>`}</div>` : ''}
                     ${pe.paymentHistory && pe.paymentHistory.length > 0 ? `<div><b>Riwayat pembayaran Komisi (${pe.paymentHistory.length}):</b><br>${pe.paymentHistory.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}</div>` : ''}
                     ${pe.visitDates.length === 0 && !pe.feeMarketingPct && !pe.feeRoastRate && !pe.bonusBulananRate ? '<span class="faint">Tidak ada aktivitas tercatat.</span>' : ''}
+                    ${(pe.konfirmasi && pe.konfirmasi.berlaku) ? (pe.konfirmasi.siap
+                      ? `<div style="margin-top:8px; color:var(--success);"><b>Konfirmasi bulanan:</b> ✓ ${escapeHTML(pe.konfirmasi.status)} — Visit, Kunjungan &amp; Revenue sudah divalidasi.</div>`
+                      : `<div style="margin-top:8px; padding:6px 8px; border-radius:6px; background:var(--warning-soft); color:var(--warning);"><b>Konfirmasi bulanan:</b> ⚠ ${escapeHTML(pe.konfirmasi.status)} — ${escapeHTML(pe.konfirmasi.alasan)} Slip diblokir kecuali Owner mengisi alasan.</div>`) : ''}
                     <button class="btn btn-primary btn-sm" data-action="open-slip-gaji" data-id="${pe.id}" style="margin-top:10px;">🖨️ Cetak Slip Gaji</button>
                   </td>
                 </tr>
@@ -2853,6 +2881,275 @@ async function savePurchaseOrder(){
   render();
 }
 
+/* ============================================================
+   BARU (2026-11-01): Konfirmasi Bulanan Canvaser <-> Rizky Syahdinar
+   Canvaser mengonfirmasi Visit, Kunjungan, Revenue tiap bulan (mulai Okt 2026).
+   Revisi wajib alasan + bukti dan disetujui Rizky/Owner. Payroll memakai data
+   yang sudah terkonfirmasi (gerbang slip ada di backend, 13_Payroll.gs).
+   ============================================================ */
+const KONF_START_ = { year: 2026, month: 10 };
+const KONF_AKSI_LABEL_ = {
+  KONFIRMASI_SESUAI: 'Konfirmasi sesuai', AJUKAN_REVISI: 'Ajukan revisi', SETUJUI: 'Revisi disetujui',
+  TOLAK: 'Revisi ditolak', BUKA_KEMBALI: 'Dibuka kembali', REVENUE_SELESAI: 'Masalah Revenue selesai',
+  OVERRIDE_SLIP: 'Slip dicetak tanpa konfirmasi (Owner)'
+};
+function konfIsCanvaser_(emp){ return !!emp && String(emp.jabatan || '').toLowerCase().indexOf('canvas') >= 0; }
+function konfIsApprover_(emp){ return !!emp && (emp.id === 'rizky' || emp.id === 'owner'); }
+function konfCanSee_(){ const emp = findEmp(state.currentUser); return konfIsCanvaser_(emp) || konfIsApprover_(emp); }
+
+// Bulan default = bulan yang sedang menunggu payroll: tanggal 1-10 -> bulan lalu, selebihnya bulan ini (minimal Okt 2026).
+function konfDefaultPeriod_(){
+  const now = new Date();
+  let y = now.getFullYear(), m = now.getMonth() + 1;
+  if (now.getDate() <= 10) { m -= 1; if (m < 1) { m = 12; y -= 1; } }
+  if (y * 12 + m < KONF_START_.year * 12 + KONF_START_.month) { y = KONF_START_.year; m = KONF_START_.month; }
+  return { month: m, year: y };
+}
+function konfEnsurePeriod_(){
+  if (!state.konfMonth || !state.konfYear) {
+    const p = konfDefaultPeriod_();
+    state.konfMonth = p.month; state.konfYear = p.year;
+  }
+}
+function konfPeriodOptions_(){
+  const now = new Date();
+  const endIdx = Math.max(now.getFullYear() * 12 + now.getMonth(), KONF_START_.year * 12 + KONF_START_.month - 1);
+  const out = [];
+  for (let idx = KONF_START_.year * 12 + KONF_START_.month - 1; idx <= endIdx; idx++) {
+    out.push({ month: (idx % 12) + 1, year: Math.floor(idx / 12) });
+  }
+  return out;
+}
+function konfFindItem_(empId){
+  const items = (state.konfData && state.konfData.items) || [];
+  return items.find(function(i){ return i.employeeId === empId; }) || null;
+}
+function konfSafeLink_(u){ return /^https?:\/\/\S+$/i.test(String(u || '')) ? String(u) : ''; }
+function konfSigned_(n){ n = Number(n) || 0; return (n > 0 ? '+' : '') + n; }
+
+async function fetchKonfirmasi(){
+  konfEnsurePeriod_();
+  if (state.konfLoading) return;
+  state.konfLoading = true;
+  state.konfError = null;
+  render();
+  const m = state.konfMonth, y = state.konfYear;
+  let again = false;
+  try {
+    const result = await apiCall('getKonfirmasiBulanan', { month: m, year: y, requestingUserId: state.currentUser });
+    if (m !== state.konfMonth || y !== state.konfYear) {
+      again = true; // bulan diganti selagi memuat -> muat ulang untuk bulan yang baru
+    } else if (result && result.success) {
+      state.konfData = result;
+    } else {
+      throw new Error((result && result.error) || 'Response tidak valid');
+    }
+  } catch(e) {
+    state.konfData = null;
+    state.konfError = e.message || 'Gagal memuat data konfirmasi';
+  }
+  state.konfLoading = false;
+  if (again) { fetchKonfirmasi(); return; }
+  render();
+}
+
+function downloadPdfBase64_(b64, fileName){
+  const byteChars = atob(b64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName || 'dokumen.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function konfBadgeHTML_(it){
+  let label = it.status, tone = 'warn';
+  if (it.siap && it.status === 'Terkonfirmasi') { label = '✓ Terkonfirmasi'; tone = 'ok'; }
+  else if (it.siap && it.status === 'Disetujui') { label = '✓ Disetujui'; tone = 'ok'; }
+  else if (it.revenueTerbuka) { label = '🧾 Menunggu perbaikan invoice'; tone = 'warn'; }
+  else if (it.status === 'Menunggu Rizky') { label = '🕒 Menunggu Rizky'; tone = 'warn'; }
+  else if (it.status === 'Ditolak' || it.status === 'Data Berubah') { label = '⚠ ' + it.status; tone = 'danger'; }
+  else if (it.status === 'Belum Dikonfirmasi') { label = '⏳ Belum dikonfirmasi'; tone = 'warn'; }
+  else if (it.status === 'Dibuka Kembali') { label = '↩ Dibuka kembali'; tone = 'warn'; }
+  const col = tone === 'ok' ? 'var(--success)' : (tone === 'danger' ? 'var(--danger)' : 'var(--warning)');
+  const bg = tone === 'ok' ? 'var(--success-soft)' : (tone === 'danger' ? 'var(--danger-soft)' : 'var(--warning-soft)');
+  return '<span class="konf-badge" style="background:' + bg + '; color:' + col + ';">' + escapeHTML(label) + '</span>';
+}
+
+function konfStatsHTML_(live, title){
+  return '<div class="konf-stats">'
+    + '<div class="konf-stat"><div class="n">' + (Number(live.visit) || 0) + '</div><div class="l">Visit</div></div>'
+    + '<div class="konf-stat"><div class="n">' + (Number(live.kunjungan) || 0) + '</div><div class="l">Kunjungan</div></div>'
+    + '<div class="konf-stat"><div class="n">' + (Number(live.klien) || 0) + '</div><div class="l">Klien bertransaksi</div></div>'
+    + '<div class="konf-stat"><div class="n n-rp">' + escapeHTML(fmtRupiah(live.revenue || 0)) + '</div><div class="l">Revenue sesuai invoice (' + (Number(live.invoice) || 0) + ' invoice)</div></div>'
+    + '</div>';
+}
+function konfFlagsHTML_(f){
+  if (!f) return '';
+  const parts = [];
+  if (f.tanpaGps > 0) parts.push(f.tanpaGps + ' visit tercatat tanpa GPS');
+  if (f.tokoDobel > 0) parts.push(f.tokoDobel + ' visit dobel (toko & tanggal sama)');
+  if (f.kunjunganTanpaVisit > 0) parts.push(f.kunjunganTanpaVisit + ' kunjungan tanpa visit ENTRY di toko & tanggal yang sama');
+  if (!parts.length) return '';
+  return '<div class="konf-flag">⚠ Perhatian: ' + parts.map(escapeHTML).join(' · ') + '. Rizky memeriksa hal ini saat validasi.</div>';
+}
+function konfHistoryHTML_(it){
+  const h = it.history || [];
+  if (!h.length) return '';
+  return '<details class="konf-hist"><summary>Riwayat (' + h.length + ')</summary>'
+    + h.map(function(x){
+        return '<div>' + escapeHTML(x.tanggal) + ' · <b>' + escapeHTML(KONF_AKSI_LABEL_[x.aksi] || x.aksi) + '</b> · ' + escapeHTML(x.oleh)
+          + (x.catatan ? ' <span class="faint">— ' + escapeHTML(x.catatan) + '</span>' : '') + '</div>';
+      }).join('')
+    + '</details>';
+}
+function konfProposalHTML_(it){
+  const r = it.record; if (!r) return '';
+  const link = konfSafeLink_(r.linkBukti);
+  const stale = it.live && (it.live.visit !== r.visitAwal || it.live.kunjungan !== r.kunjunganAwal);
+  return '<div class="konf-box">'
+    + '<div><b>Usul revisi</b> <span class="faint">(diajukan ' + escapeHTML(r.dibuatOleh) + ', ' + escapeHTML(r.dibuatPada) + ')</span></div>'
+    + '<div>Visit: System ' + (r.visitAwal == null ? '-' : r.visitAwal) + ' → <b>' + r.visit + '</b> (' + konfSigned_(r.visit - (r.visitAwal || 0)) + ')'
+    + ' · Kunjungan: System ' + (r.kunjunganAwal == null ? '-' : r.kunjunganAwal) + ' → <b>' + r.kunjungan + '</b> (' + konfSigned_(r.kunjungan - (r.kunjunganAwal || 0)) + ')</div>'
+    + (r.revenueBermasalah === 'Ya' ? '<div style="color:var(--danger);">🧾 Canvaser melaporkan <b>Revenue tidak sesuai</b> (invoice harus diperbaiki Owner dulu).</div>' : '')
+    + '<div><b>Alasan:</b> ' + escapeHTML(r.catatan) + '</div>'
+    + '<div><b>Bukti:</b> ' + escapeHTML(r.bukti) + (link ? ' · <a href="' + escapeHTML(link) + '" target="_blank" rel="noopener noreferrer">Buka link bukti ↗</a>' : '') + '</div>'
+    + (stale ? '<div style="color:var(--danger);">⚠ Data System berubah sejak revisi diajukan (Visit ' + it.live.visit + ', Kunjungan ' + it.live.kunjungan + '). Tidak bisa disetujui; tolak dengan alasan lalu minta Canvaser mengajukan ulang.</div>' : '')
+    + '</div>';
+}
+function konfDecisionInfoHTML_(it){
+  const r = it.record; if (!r) return '';
+  if (r.status === 'Disetujui') {
+    return '<div class="konf-box"><div>✓ Revisi <b>disetujui</b> ' + escapeHTML(r.dibuatOleh) + ' (' + escapeHTML(r.dibuatPada) + '): Visit ' + r.visit + ', Kunjungan ' + r.kunjungan
+      + (r.koreksiId ? ' · tercatat sebagai Koreksi' : '') + '</div>'
+      + (r.catatanKeputusan ? '<div class="faint">Catatan: ' + escapeHTML(r.catatanKeputusan) + '</div>' : '')
+      + '<div class="faint">Alasan Canvaser: ' + escapeHTML(r.catatan) + '</div></div>';
+  }
+  if (r.status === 'Ditolak') {
+    return '<div class="konf-box"><div style="color:var(--danger);">✕ Revisi <b>ditolak</b> ' + escapeHTML(r.dibuatOleh) + ' (' + escapeHTML(r.dibuatPada) + ')</div>'
+      + '<div><b>Alasan penolakan:</b> ' + escapeHTML(r.catatanKeputusan || '-') + '</div></div>';
+  }
+  if (r.status === 'Dibuka Kembali') {
+    return '<div class="konf-box"><div>↩ Dibuka kembali oleh ' + escapeHTML(r.dibuatOleh) + ' (' + escapeHTML(r.dibuatPada) + ')</div>'
+      + (r.catatanKeputusan ? '<div><b>Alasan:</b> ' + escapeHTML(r.catatanKeputusan) + '</div>' : '') + '</div>';
+  }
+  if (r.status === 'Terkonfirmasi') {
+    return '<div class="konf-box"><div>✓ Dikonfirmasi sesuai ' + escapeHTML(r.dibuatOleh) + ' pada ' + escapeHTML(r.dibuatPada) + '</div></div>';
+  }
+  return '';
+}
+
+function konfCanvaserCardHTML_(it, d){
+  const live = it.live, r = it.record;
+  const poin = (live.visit || 0) + (live.kunjungan || 0) * 2;
+  const bisaAksi = !it.siap && it.status !== 'Menunggu Rizky' && !it.revenueTerbuka;
+  let html = '<div class="card konf-card">'
+    + '<div class="row" style="justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">'
+    + '<div style="font-weight:700;">' + escapeHTML(d.monthName) + '</div>' + konfBadgeHTML_(it) + '</div>'
+    + '<div class="faint" style="font-size:11.5px; margin-bottom:8px;">Angka di bawah adalah <b>data System</b> untuk bulan ini. Cek apakah sudah benar sebelum payroll diproses.</div>'
+    + konfStatsHTML_(live)
+    + '<div class="faint" style="font-size:11px; margin-top:6px;">Poin Fee Harian = ' + live.visit + ' visit × 1 + ' + live.kunjungan + ' kunjungan × 2 = ' + poin + ' poin → ' + (poin / 5).toFixed(2) + ' hari setara. Komisi = 3% dari revenue sesuai invoice.</div>'
+    + konfFlagsHTML_(live.flags);
+  if (it.alasan && !it.siap) html += '<div class="konf-note">' + escapeHTML(it.alasan) + '</div>';
+  if (it.status === 'Menunggu Rizky') html += konfProposalHTML_(it);
+  else html += konfDecisionInfoHTML_(it);
+  if (bisaAksi) {
+    html += '<div class="row gap-8 wrap" style="margin-top:12px;">'
+      + '<button class="btn btn-primary" data-action="konf-sesuai" data-emp="' + escapeHTML(it.employeeId) + '"' + (state.konfSaving ? ' disabled' : '') + '>✅ Semua sesuai</button>'
+      + '<button class="btn btn-ghost" data-action="konf-open" data-type="revisi" data-emp="' + escapeHTML(it.employeeId) + '">✏️ Ada yang tidak sesuai</button>'
+      + '</div>'
+      + '<div class="faint" style="font-size:11px; margin-top:6px;">"Semua sesuai" bersifat final. Kalau ada yang salah, ajukan revisi dengan alasan dan bukti; Rizky Syahdinar yang menyetujui.</div>';
+  } else if (it.siap) {
+    html += '<div class="faint" style="font-size:11.5px; margin-top:10px;">Sudah final dan dipakai untuk payroll. Kalau ada yang perlu diubah, minta Rizky Syahdinar membuka kembali.</div>';
+  }
+  html += konfHistoryHTML_(it) + '</div>';
+  return html;
+}
+
+function konfApproverCardHTML_(it, d){
+  const live = it.live, r = it.record;
+  let html = '<div class="card konf-card">'
+    + '<div class="row" style="justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">'
+    + '<div style="font-weight:700;">' + escapeHTML(it.name) + '</div>' + konfBadgeHTML_(it) + '</div>'
+    + konfStatsHTML_(live)
+    + konfFlagsHTML_(live.flags);
+  if (it.alasan && !it.siap && it.status !== 'Menunggu Rizky') html += '<div class="konf-note">' + escapeHTML(it.alasan) + '</div>';
+  if (it.status === 'Menunggu Rizky') html += konfProposalHTML_(it);
+  else html += konfDecisionInfoHTML_(it);
+  const stale = r && it.status === 'Menunggu Rizky' && (live.visit !== r.visitAwal || live.kunjungan !== r.kunjunganAwal);
+  const btns = [];
+  if (it.status === 'Menunggu Rizky') {
+    if (!stale) btns.push('<button class="btn btn-primary btn-sm" data-action="konf-open" data-type="setujui" data-emp="' + escapeHTML(it.employeeId) + '">✅ Setujui</button>');
+    btns.push('<button class="btn btn-danger-ghost btn-sm" data-action="konf-open" data-type="tolak" data-emp="' + escapeHTML(it.employeeId) + '">✕ Tolak</button>');
+  }
+  if (it.revenueTerbuka && d.isOwner) {
+    btns.push('<button class="btn btn-primary btn-sm" data-action="konf-open" data-type="revenue" data-emp="' + escapeHTML(it.employeeId) + '">🧾 Invoice sudah diperbaiki / dicek</button>');
+  }
+  if (it.revenueTerbuka && !d.isOwner) {
+    html += '<div class="konf-note">Laporan Revenue disetujui. Menunggu Owner memperbaiki invoice di System, lalu Canvaser mengonfirmasi ulang.</div>';
+  }
+  if (it.siap && r && (r.status === 'Terkonfirmasi' || (r.status === 'Disetujui' && !r.koreksiId))) {
+    btns.push('<button class="btn btn-ghost btn-sm" data-action="konf-open" data-type="reopen" data-emp="' + escapeHTML(it.employeeId) + '">↩️ Buka kembali</button>');
+  }
+  if (btns.length) html += '<div class="row gap-8 wrap" style="margin-top:12px;">' + btns.join('') + '</div>';
+  html += konfHistoryHTML_(it) + '</div>';
+  return html;
+}
+
+function qsalesKonfirmasiHTML(){
+  if (!konfCanSee_()) {
+    return '<div class="empty-state"><span class="icon">🔒</span><p>Halaman Konfirmasi hanya untuk Canvaser, Rizky Syahdinar, dan Owner.</p></div>';
+  }
+  konfEnsurePeriod_();
+  const d = state.konfData;
+  const opts = konfPeriodOptions_();
+  const head = '<div class="greeting">Konfirmasi Bulanan ✅</div>'
+    + '<div class="greeting-sub">Visit, Kunjungan &amp; Revenue sebelum payroll</div>'
+    + qsalesSubNavHTML()
+    + '<div class="row gap-8 wrap" style="margin-bottom:12px; align-items:center;">'
+    + '<select class="inline-select" data-action="konf-set-period" style="flex:1; min-width:140px;">'
+    + opts.map(function(o){ return '<option value="' + o.year + '-' + o.month + '" ' + (o.month === state.konfMonth && o.year === state.konfYear ? 'selected' : '') + '>' + MONTH_NAMES_ID[o.month - 1] + ' ' + o.year + '</option>'; }).join('')
+    + '</select>'
+    + '<button class="btn btn-ghost btn-sm" data-action="konf-refresh">🔄 Muat Ulang</button>'
+    + '<button class="btn btn-ghost btn-sm" data-action="konf-sop"' + (state.sopDownloading ? ' disabled' : '') + '>' + (state.sopDownloading ? 'Menyiapkan PDF...' : '📄 Unduh SOP') + '</button>'
+    + '</div>';
+  if (state.konfLoading) return head + '<div class="empty-state"><span class="icon">☕</span><p>Memuat data konfirmasi...</p></div>';
+  if (state.konfError) {
+    return head + '<div class="card" style="background:var(--danger-soft); border-color:var(--danger-soft);"><div style="font-size:13px; color:var(--danger);"><b>⚠</b> ' + escapeHTML(state.konfError) + '</div></div>';
+  }
+  if (!d) { fetchKonfirmasi(); return head + '<div class="empty-state"><p>Memuat data konfirmasi...</p></div>'; }
+  const items = d.items || [];
+  if (d.mode === 'canvaser') {
+    return head + (items[0] ? konfCanvaserCardHTML_(items[0], d) : '<div class="empty-state"><p>Data tidak ditemukan.</p></div>');
+  }
+  // Rizky / Owner: rekap semua Canvaser
+  const cnt = { menunggu: 0, belum: 0, siap: 0 };
+  const tot = { visit: 0, kunjungan: 0, klien: 0, revenue: 0 };
+  items.forEach(function(it){
+    if (it.status === 'Menunggu Rizky') cnt.menunggu++; else if (it.siap) cnt.siap++; else cnt.belum++;
+    tot.visit += it.live.visit || 0; tot.kunjungan += it.live.kunjungan || 0; tot.klien += it.live.klien || 0; tot.revenue += it.live.revenue || 0;
+  });
+  const summary = '<div class="team-summary">'
+    + '<div class="stat"><div class="num">' + cnt.menunggu + '</div><div class="lbl">Menunggu persetujuan</div></div>'
+    + '<div class="stat"><div class="num">' + cnt.belum + '</div><div class="lbl">Belum final</div></div>'
+    + '<div class="stat"><div class="num">' + cnt.siap + '</div><div class="lbl">Siap payroll</div></div>'
+    + '</div>';
+  const recap = '<div class="table-wrap"><table class="task-table" style="min-width:0;"><thead><tr><th>Canvaser</th><th>Visit</th><th>Kunj.</th><th>Klien</th><th>Revenue</th></tr></thead><tbody>'
+    + items.map(function(it){
+        return '<tr><td style="font-weight:600;">' + escapeHTML(it.name) + '<div style="margin-top:3px; font-weight:400;">' + konfBadgeHTML_(it) + '</div></td><td>' + it.live.visit + '</td><td>' + it.live.kunjungan + '</td><td>' + it.live.klien + '</td><td style="white-space:nowrap;">' + escapeHTML(fmtRupiah(it.live.revenue)) + '</td></tr>';
+      }).join('')
+    + '<tr style="font-weight:700;"><td>Total</td><td>' + tot.visit + '</td><td>' + tot.kunjungan + '</td><td>' + tot.klien + '</td><td style="white-space:nowrap;">' + escapeHTML(fmtRupiah(tot.revenue)) + '</td></tr>'
+    + '</tbody></table></div>'
+    + '<div class="faint" style="font-size:11px; margin-bottom:6px;">Angka = data System (sudah termasuk koreksi yang Anda setujui). Payroll Canvaser hanya bisa dicetak setelah statusnya ✓ Terkonfirmasi / ✓ Disetujui.</div>';
+  return head + summary + recap + items.map(function(it){ return konfApproverCardHTML_(it, d); }).join('');
+}
+
 function qsalesSubNavHTML(){
   const tabBtn = (tab, label) => `
     <button class="btn btn-sm ${state.qsalesTab===tab?'btn-primary':'btn-ghost'}" data-action="switch-qsales-tab" data-tab="${tab}">${label}</button>
@@ -2868,6 +3165,9 @@ function qsalesSubNavHTML(){
   // (findEmp berhasil), tidak dibatasi jabatan/role apa pun lagi.
   const emp = findEmp(state.currentUser);
   const canSeePO = !!emp;
+  const canSeeKonf = konfIsCanvaser_(emp) || konfIsApprover_(emp);
+  const konfPending = (state.konfData && state.konfData.mode === 'approver')
+    ? (state.konfData.items || []).filter(i => i.status === 'Menunggu Rizky').length : 0;
   return `
     <div class="row gap-6 wrap" style="margin-bottom:14px;">
       ${tabBtn('dashboard','📊 Dashboard')}
@@ -2875,6 +3175,7 @@ function qsalesSubNavHTML(){
       ${tabBtn('kpi','📈 KPI')}
       ${tabBtn('kunjungan','📅 Kunjungan')}
       ${tabBtn('followup','📞 Follow Up Klien')}
+      ${canSeeKonf ? tabBtn('konfirmasi','✅ Konfirmasi' + (konfPending ? ' (' + konfPending + ')' : '')) : ''}
       ${canSeePO ? tabBtn('po','📦 Purchase Order') : ''}
     </div>
   `;
@@ -5913,7 +6214,86 @@ function modalHTML(){
             <input type="number" name="sg-bonus-bulanan" placeholder="${Math.round(ctx.bonusBulanan || 0)}" step="1">
           </div>
           <div class="hint" style="margin-bottom:14px;">Total di slip akan dihitung otomatis dari 4 angka di atas.</div>
+          ${(ctx.konfirmasi && ctx.konfirmasi.berlaku && !ctx.konfirmasi.siap) ? `
+          <div class="field" style="border:1px solid var(--warning); border-radius:10px; padding:10px; background:var(--warning-soft);">
+            <label style="color:var(--warning);">⚠ Belum terkonfirmasi: ${escapeHTML(ctx.konfirmasi.status || '')}</label>
+            <div class="hint" style="margin:0 0 8px 0;">${escapeHTML(ctx.konfirmasi.alasan || '')} Slip hanya bisa dicetak kalau Owner mengisi alasan di bawah (tersimpan di log).</div>
+            <textarea name="sg-override-alasan" rows="2" required minlength="5" maxlength="300" placeholder="Contoh: Dicetak sementara untuk arsip, konfirmasi Canvaser menyusul"></textarea>
+          </div>` : ''}
           <button type="submit" class="btn btn-primary btn-block" ${state.slipGajiGenerating ? 'disabled' : ''}>${state.slipGajiGenerating ? 'Membuat PDF...' : 'Konfirmasi & Unduh Slip'}</button>
+        </form>
+      </div>
+    </div>`;
+  }
+
+  // BARU (2026-11-01): modal Konfirmasi Bulanan (revisi Canvaser, keputusan Rizky/Owner, buka kembali, revenue selesai)
+  if (mode === 'konf') {
+    const kc = state.konfContext || {};
+    const it = kc.item || {};
+    const live = it.live || {};
+    const rec = it.record || {};
+    const dr = kc.draft || {};
+    const titles = { revisi: '✏️ Ada yang tidak sesuai', setujui: '✅ Setujui revisi', tolak: '✕ Tolak revisi', reopen: '↩️ Buka kembali konfirmasi', revenue: '🧾 Invoice sudah diperbaiki / dicek' };
+    let fields = '';
+    let submitLabel = 'Kirim';
+    if (kc.type === 'revisi') {
+      submitLabel = 'Kirim ke Rizky untuk disetujui';
+      fields = `
+        <div class="faint" style="font-size:11.5px; margin-bottom:10px;">Data System: Visit <b>${live.visit || 0}</b>, Kunjungan <b>${live.kunjungan || 0}</b>, Revenue <b>${escapeHTML(fmtRupiah(live.revenue || 0))}</b>. Isi <b>angka yang menurut Anda benar</b>. Revisi baru berlaku setelah disetujui Rizky Syahdinar.</div>
+        <div class="field"><label>Jumlah Visit yang benar</label>
+          <input type="number" name="kf-visit" value="${dr.visit != null ? dr.visit : (live.visit || 0)}" min="0" step="1" inputmode="numeric" required></div>
+        <div class="field"><label>Jumlah Kunjungan yang benar</label>
+          <input type="number" name="kf-kunjungan" value="${dr.kunjungan != null ? dr.kunjungan : (live.kunjungan || 0)}" min="0" step="1" inputmode="numeric" required></div>
+        <div class="field"><label style="display:flex; gap:8px; align-items:flex-start; font-weight:500;">
+          <input type="checkbox" name="kf-revenue-masalah" value="1" ${dr.revenueMasalah ? 'checked' : ''} style="margin-top:3px;">
+          <span>Revenue tidak sesuai (invoice belum tercatat atas nama saya / salah). Revenue tidak diubah dengan mengetik angka; Owner memperbaiki invoice setelah Rizky menyetujui laporan ini.</span></label></div>
+        <div class="field"><label>Alasan revisi (wajib)</label>
+          <textarea name="kf-catatan" rows="3" required minlength="10" maxlength="500" placeholder="Contoh: Lupa isi kunjungan Kopi X tgl 12 Okt dan Cafe Y tgl 14 Okt">${escapeHTML(dr.catatan || '')}</textarea></div>
+        <div class="field"><label>Bukti (wajib)</label>
+          <textarea name="kf-bukti" rows="2" required minlength="5" maxlength="300" placeholder="Contoh: Foto di depan toko + tangkapan layar GPS + chat WA dengan pemilik">${escapeHTML(dr.bukti || '')}</textarea>
+          <div class="hint">Jelaskan buktinya (foto lokasi, tangkapan layar GPS, chat dengan toko, dll).</div></div>
+        <div class="field"><label>Link bukti (opsional)</label>
+          <input type="url" name="kf-link" value="${escapeHTML(dr.link || '')}" maxlength="300" placeholder="https://drive.google.com/...">
+          <div class="hint">Tempel link foto atau tangkapan layar (misalnya Google Drive) supaya Rizky bisa membukanya.</div></div>`;
+    } else if (kc.type === 'setujui' || kc.type === 'tolak') {
+      const isTolak = kc.type === 'tolak';
+      submitLabel = isTolak ? 'Tolak revisi' : 'Setujui revisi';
+      fields = `
+        <div class="konf-box" style="margin-bottom:12px;">
+          <div>Visit: System ${rec.visitAwal == null ? '-' : rec.visitAwal} → <b>${rec.visit}</b> (${konfSigned_((rec.visit || 0) - (rec.visitAwal || 0))})</div>
+          <div>Kunjungan: System ${rec.kunjunganAwal == null ? '-' : rec.kunjunganAwal} → <b>${rec.kunjungan}</b> (${konfSigned_((rec.kunjungan || 0) - (rec.kunjunganAwal || 0))})</div>
+          ${rec.revenueBermasalah === 'Ya' ? '<div style="color:var(--danger);">Canvaser juga melaporkan Revenue tidak sesuai.</div>' : ''}
+          <div><b>Alasan:</b> ${escapeHTML(rec.catatan || '')}</div>
+          <div><b>Bukti:</b> ${escapeHTML(rec.bukti || '')}${konfSafeLink_(rec.linkBukti) ? ` · <a href="${escapeHTML(konfSafeLink_(rec.linkBukti))}" target="_blank" rel="noopener noreferrer">Buka link ↗</a>` : ''}</div>
+        </div>
+        ${isTolak ? '' : '<div class="hint" style="margin-bottom:10px;">Setelah disetujui, selisih Visit/Kunjungan dicatat otomatis sebagai Koreksi dan dipakai di payroll.</div>'}
+        <div class="field"><label>${isTolak ? 'Alasan penolakan (wajib)' : 'Catatan (opsional)'}</label>
+          <textarea name="kf-catatan-kep" rows="3" maxlength="300" ${isTolak ? 'required minlength="5"' : ''} placeholder="${isTolak ? 'Contoh: Bukti belum menunjukkan tanggal kunjungan' : 'Boleh dikosongkan'}">${escapeHTML(dr.catatanKeputusan || '')}</textarea></div>`;
+    } else if (kc.type === 'reopen') {
+      submitLabel = 'Buka kembali';
+      fields = `
+        <div class="hint" style="margin-bottom:10px;">Canvaser akan diminta mengonfirmasi ulang bulan ini. Slip gaji Canvaser diblokir sampai dikonfirmasi lagi.</div>
+        <div class="field"><label>Alasan (wajib)</label>
+          <textarea name="kf-catatan-kep" rows="3" required minlength="5" maxlength="300" placeholder="Contoh: Ada visit yang belum masuk, perlu dicek ulang">${escapeHTML(dr.catatanKeputusan || '')}</textarea></div>`;
+    } else if (kc.type === 'revenue') {
+      submitLabel = 'Tandai selesai';
+      fields = `
+        <div class="hint" style="margin-bottom:10px;">Pastikan invoice sudah diperbaiki di System (atau sudah dicek dan memang benar). Setelah ini Canvaser diminta mengonfirmasi ulang angka yang baru. Komisi tetap dihitung dari invoice.</div>
+        <div class="field"><label>Catatan (wajib)</label>
+          <textarea name="kf-catatan-kep" rows="3" required minlength="5" maxlength="300" placeholder="Contoh: Invoice INV-123 dipindahkan ke atas nama Reza">${escapeHTML(dr.catatanKeputusan || '')}</textarea></div>`;
+    }
+    return `
+    <div class="sheet-overlay" data-action="overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>${titles[kc.type] || 'Konfirmasi'}</h3>
+          <button class="sheet-close" data-action="close-modal">✕</button>
+        </div>
+        <div class="faint" style="font-size:11.5px; margin-bottom:10px;">${escapeHTML(kc.name || '')} · ${escapeHTML(kc.monthName || '')}</div>
+        <form id="form-konf" class="konf-form">
+          ${fields}
+          <button type="submit" class="btn btn-primary btn-block" ${state.konfSaving ? 'disabled' : ''}>${state.konfSaving ? 'Menyimpan...' : submitLabel}</button>
         </form>
       </div>
     </div>`;
@@ -6436,6 +6816,7 @@ function render(){
       else if (state.qsalesTab === 'kunjungan') body = qsalesKunjunganHTML();
       else if (state.qsalesTab === 'followup') body = qsalesFollowupHTML();
       else if (state.qsalesTab === 'po') body = qsalesPurchaseOrderHTML();
+      else if (state.qsalesTab === 'konfirmasi') body = qsalesKonfirmasiHTML();
       else { state.qsalesTab = 'dashboard'; body = qsalesDashboardHTML(); }
     } else if (state.appTab === 'qaff'){
       body = qaffDashboardHTML();
@@ -6813,6 +7194,10 @@ document.addEventListener('click', function(e){
     if (state.qsalesTab === 'followup' && !state.followupData && !state.followupLoading) {
       fetchFollowupData();
     }
+    if (state.qsalesTab === 'konfirmasi' && !state.konfData && !state.konfLoading && konfCanSee_()) {
+      fetchKonfirmasi();
+      return;
+    }
     render();
   }
   else if (el.dataset.action === 'switch-qfin-tab'){
@@ -7032,6 +7417,62 @@ document.addEventListener('click', function(e){
       render();
     });
   }
+  else if (el.dataset.action === 'konf-refresh'){
+    state.konfData = null;
+    fetchKonfirmasi();
+  }
+  else if (el.dataset.action === 'konf-sop'){
+    if (state.sopDownloading) return;
+    state.sopDownloading = true;
+    render();
+    apiCall('getSopCanvaserPDF', { requestingUserId: state.currentUser }).then(result => {
+      state.sopDownloading = false;
+      render();
+      if (result && result.success && result.pdfBase64) {
+        downloadPdfBase64_(result.pdfBase64, result.fileName || 'SOP Visit Kunjungan dan Gaji Canvaser.pdf');
+        showToast('SOP berhasil diunduh');
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+      }
+    }).catch(err => {
+      state.sopDownloading = false;
+      render();
+      showToast('Gagal mengunduh SOP: ' + (err.message || 'coba lagi'));
+    });
+  }
+  else if (el.dataset.action === 'konf-sesuai'){
+    if (state.konfSaving) return;
+    const it = konfFindItem_(el.dataset.emp);
+    const dd = state.konfData;
+    if (!it || !dd) { showToast('Data belum dimuat, tekan Muat Ulang.'); return; }
+    const l = it.live;
+    if (!confirm('Konfirmasi bahwa data ' + dd.monthName + ' sudah SESUAI?\n\nVisit ' + l.visit + ' · Kunjungan ' + l.kunjungan + ' · Klien ' + l.klien + ' · Revenue ' + fmtRupiah(l.revenue) + '\n\nSetelah dikonfirmasi, angka ini final dan dipakai untuk payroll.')) return;
+    state.konfSaving = true;
+    render();
+    apiCall('submitKonfirmasiBulanan', {
+      requestingUserId: state.currentUser, month: dd.month, year: dd.year, mode: 'sesuai',
+      visit: l.visit, kunjungan: l.kunjungan, revenue: l.revenue
+    }).then(result => {
+      state.konfSaving = false;
+      showToast(result && result.success ? (result.message || 'Terkonfirmasi') : ('Gagal: ' + ((result && result.error) || 'coba lagi')));
+      state.konfData = null;
+      fetchKonfirmasi();
+    }).catch(err => {
+      state.konfSaving = false;
+      showToast('Gagal mengonfirmasi: ' + (err.message || 'coba lagi'));
+      render();
+    });
+  }
+  else if (el.dataset.action === 'konf-open'){
+    const it = konfFindItem_(el.dataset.emp);
+    const dd = state.konfData;
+    if (!it || !dd) { showToast('Data belum dimuat, tekan Muat Ulang.'); return; }
+    state.konfContext = {
+      type: el.dataset.type, employeeId: it.employeeId, name: it.name,
+      month: dd.month, year: dd.year, monthName: dd.monthName, item: it, draft: null
+    };
+    openModal('konf', null);
+  }
   else if (el.dataset.action === 'load-payroll'){
     fetchPayrollData();
   }
@@ -7071,7 +7512,8 @@ document.addEventListener('click', function(e){
       klienBertransaksi: pe.klienBertransaksi,
       jumlahInvoiceBulanIni: pe.jumlahInvoiceBulanIni,
       revenueInvoiceBulanIni: pe.revenueInvoiceBulanIni,
-      bonusBulanan: pe.bonusBulanan
+      bonusBulanan: pe.bonusBulanan,
+      konfirmasi: pe.konfirmasi || null
     };
     openModal('slipGaji', null);
   }
@@ -7873,6 +8315,13 @@ document.addEventListener('change', function(e){
     state.broadcastTargetDept = e.target.value;
     render();
   }
+  else if (e.target.dataset && e.target.dataset.action === 'konf-set-period'){
+    const parts = String(e.target.value).split('-');
+    state.konfYear = Number(parts[0]);
+    state.konfMonth = Number(parts[1]);
+    state.konfData = null;
+    fetchKonfirmasi();
+  }
   else if (e.target.dataset && e.target.dataset.action === 'set-payroll-month'){
     state.payrollMonth = Number(e.target.value);
     render();
@@ -8152,6 +8601,69 @@ document.addEventListener('submit', function(e){
       showToast('Gagal: ' + (err.message || 'ID mungkin sudah ada'));
     });
   }
+  else if (e.target.id === 'form-konf'){
+    e.preventDefault();
+    if (state.konfSaving) return;
+    const fd = new FormData(e.target);
+    const kc = state.konfContext || {};
+    const it = kc.item || {};
+    const rec = it.record || {};
+    const live = it.live || {};
+    const base = { requestingUserId: state.currentUser, month: kc.month, year: kc.year };
+    let fn = '', payload = null;
+    if (kc.type === 'revisi') {
+      const v = parseInt(String(fd.get('kf-visit') || '').trim(), 10);
+      const k = parseInt(String(fd.get('kf-kunjungan') || '').trim(), 10);
+      const catatan = String(fd.get('kf-catatan') || '').trim();
+      const bukti = String(fd.get('kf-bukti') || '').trim();
+      const link = String(fd.get('kf-link') || '').trim();
+      const rm = fd.get('kf-revenue-masalah') === '1';
+      kc.draft = { visit: isNaN(v) ? null : v, kunjungan: isNaN(k) ? null : k, catatan: catatan, bukti: bukti, link: link, revenueMasalah: rm };
+      if (isNaN(v) || isNaN(k) || v < 0 || k < 0) { showToast('Isi angka bulat 0 atau lebih untuk Visit dan Kunjungan.'); return; }
+      if (v === live.visit && k === live.kunjungan && !rm) { showToast('Angka sama dengan System. Ubah angkanya, atau tandai Revenue tidak sesuai. Kalau semuanya benar, tutup lalu tekan "Semua sesuai".'); return; }
+      if (catatan.length < 10) { showToast('Alasan revisi minimal 10 huruf: sebut toko/tanggal atau invoice yang bermasalah.'); return; }
+      if (bukti.length < 5) { showToast('Bukti wajib diisi: jelaskan foto/GPS/chat yang Anda punya.'); return; }
+      if (link && !/^https?:\/\/\S+$/i.test(link)) { showToast('Link bukti harus diawali http:// atau https://'); return; }
+      fn = 'submitKonfirmasiBulanan';
+      payload = Object.assign(base, { mode: 'revisi', visit: v, kunjungan: k, revenueMasalah: rm, catatan: catatan, bukti: bukti, linkBukti: link });
+    } else if (kc.type === 'setujui' || kc.type === 'tolak') {
+      const cat = String(fd.get('kf-catatan-kep') || '').trim();
+      kc.draft = { catatanKeputusan: cat };
+      if (kc.type === 'tolak' && cat.length < 5) { showToast('Alasan penolakan wajib diisi (minimal 5 huruf).'); return; }
+      fn = 'decideKonfirmasiBulanan';
+      payload = Object.assign(base, { employeeId: kc.employeeId, id: rec.id, keputusan: kc.type, catatanKeputusan: cat });
+    } else if (kc.type === 'reopen') {
+      const cat = String(fd.get('kf-catatan-kep') || '').trim();
+      kc.draft = { catatanKeputusan: cat };
+      if (cat.length < 5) { showToast('Alasan wajib diisi (minimal 5 huruf).'); return; }
+      fn = 'reopenKonfirmasiBulanan';
+      payload = Object.assign(base, { employeeId: kc.employeeId, id: rec.id, alasan: cat });
+    } else if (kc.type === 'revenue') {
+      const cat = String(fd.get('kf-catatan-kep') || '').trim();
+      kc.draft = { catatanKeputusan: cat };
+      if (cat.length < 5) { showToast('Catatan wajib diisi (minimal 5 huruf).'); return; }
+      fn = 'resolveRevenueKonfirmasi';
+      payload = Object.assign(base, { employeeId: kc.employeeId, id: rec.id, catatan: cat });
+    } else { return; }
+    state.konfSaving = true;
+    renderModal();
+    apiCall(fn, payload).then(result => {
+      state.konfSaving = false;
+      if (result && result.success) {
+        closeModal();
+        showToast(result.message || 'Tersimpan');
+        state.konfData = null;
+        fetchKonfirmasi();
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+        renderModal();
+      }
+    }).catch(err => {
+      state.konfSaving = false;
+      showToast('Gagal menyimpan: ' + (err.message || 'coba lagi'));
+      renderModal();
+    });
+  }
   else if (e.target.id === 'form-slip-gaji'){
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -8184,7 +8696,8 @@ document.addEventListener('submit', function(e){
       jumlahVisit: ctx.jumlahVisit, jumlahKunjungan: ctx.jumlahKunjungan,
       jumlahVisitENTRY: ctx.jumlahVisitENTRY, kunjunganDalamVisit: ctx.kunjunganDalamVisit,
       jumlahHari: ctx.jumlahHari, harianRate: ctx.harianRate,
-      komisiScope: ctx.feeScope
+      komisiScope: ctx.feeScope,
+      overrideAlasan: String(fd.get('sg-override-alasan') || '').trim()
     }).then(result => {
       state.slipGajiGenerating = false;
       if (result && result.success && result.pdfBase64) {
@@ -8203,6 +8716,9 @@ document.addEventListener('submit', function(e){
         closeModal();
         showToast('Slip Gaji ' + (ctx.name || '') + ' berhasil diunduh');
       } else {
+        if (result && result.code === 'KONFIRMASI_BELUM_SIAP') {
+          ctx.konfirmasi = { berlaku: true, siap: false, status: 'Belum terkonfirmasi', alasan: result.error || '' };
+        }
         showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
         renderModal();
       }
