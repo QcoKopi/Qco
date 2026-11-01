@@ -2147,7 +2147,8 @@ function qtaskSettingsHTML(){
       ${state.payrollError ? `<div style="font-size:12px; color:var(--danger);">⚠ ${escapeHTML(state.payrollError)}</div>` : ''}
 
       ${state.payrollData ? `
-        <div style="font-weight:700; font-size:13px; margin-bottom:8px;">${escapeHTML(state.payrollData.monthName)}</div>
+        <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${escapeHTML(state.payrollData.monthName)}</div>
+        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-fee-tagihan-akhir-koreksi-kunjungan' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
         <div class="faint" style="font-size:11px; margin-bottom:8px;">Komisi Penjualan Canvaser = tagihan akhir invoice bulan ini saja, dibayar maupun belum (tidak ada sisa dari bulan lalu). Komisi Rizky Syahdinar &amp; Fahmi Maulana bersifat KUMULATIF (Fee Marketing + Fee Roasting yang belum dibayar dari bulan-bulan sebelumnya ikut terbawa) -- Gaji dibayar penuh tiap bulan, tidak menunggak.</div>
         ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Komisi Penjualan tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
         ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Komisi Penjualan tidak bisa dihitung per orang.</div>` : ''}
