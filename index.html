@@ -2148,7 +2148,7 @@ function qtaskSettingsHTML(){
 
       ${state.payrollData ? `
         <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${escapeHTML(state.payrollData.monthName)}</div>
-        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-fee-tagihan-akhir-koreksi-kunjungan' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
+        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-visit-kunjungan-tidak-dobel' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
         <div class="faint" style="font-size:11px; margin-bottom:8px;">Komisi Penjualan Canvaser = tagihan akhir invoice bulan ini saja, dibayar maupun belum (tidak ada sisa dari bulan lalu). Komisi Rizky Syahdinar &amp; Fahmi Maulana bersifat KUMULATIF (Fee Marketing + Fee Roasting yang belum dibayar dari bulan-bulan sebelumnya ikut terbawa) -- Gaji dibayar penuh tiap bulan, tidak menunggak.</div>
         ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Komisi Penjualan tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
         ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Komisi Penjualan tidak bisa dihitung per orang.</div>` : ''}
@@ -2171,6 +2171,7 @@ function qtaskSettingsHTML(){
                 <tr>
                   <td colspan="5" style="background:var(--bg-soft); font-size:11px; padding:10px;">
                     <div style="margin-bottom:6px;"><b>Fee Harian:</b> ${pe.jumlahVisit} visit x 1 + ${pe.jumlahKunjungan} kunjungan x 2 = ${(pe.jumlahVisit*1 + pe.jumlahKunjungan*2)} ÷ 5 = ${pe.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(pe.harianRate)} = ${fmtRupiah(pe.feeHarian)}</div>
+                    ${pe.kunjunganDalamVisit > 0 ? `<div class="faint" style="font-size:11px; margin-bottom:6px;">Visit di ENTRY ${pe.jumlahVisitENTRY}; ${pe.kunjunganDalamVisit} di antaranya sudah punya kunjungan (toko &amp; tanggal sama) jadi dihitung 2x sebagai kunjungan, bukan 3x. Visit di atas = ${pe.jumlahVisitENTRY} &minus; ${pe.kunjunganDalamVisit}${pe.koreksiVisit ? ' + koreksi ' + pe.koreksiVisit : ''}.</div>` : ''}
                     ${renderKoreksiPayrollBlock(pe)}
                     ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;" class="faint"><b>Tanggal visit bulan ini:</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
                     ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;">${pe.feeScope === 'monthly' ? `<b>Fee Marketing bulan ini:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (tagihan akhir invoice bulan ini) = ${fmtRupiah(pe.feeMarketing)}` : `<b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (tagihan akhir invoice sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}`}</div>` : ''}
@@ -5898,6 +5899,7 @@ function modalHTML(){
             <label>Fee Harian</label>
             <input type="number" name="sg-fee-harian" placeholder="${Math.round(ctx.feeHarian || 0)}" step="1">
             ${(ctx.jumlahVisit != null && ctx.jumlahKunjungan != null && ctx.jumlahHari != null) ? `<div class="hint">${ctx.jumlahVisit} visit x 1 + ${ctx.jumlahKunjungan} kunjungan x 2 = ${(ctx.jumlahVisit*1 + ctx.jumlahKunjungan*2)} ÷ 5 = ${ctx.jumlahHari.toFixed(2)} hari setara × ${fmtRupiah(ctx.harianRate || 0)}</div>` : ''}
+            ${(ctx.kunjunganDalamVisit > 0) ? `<div class="hint">Visit di ENTRY ${ctx.jumlahVisitENTRY}; ${ctx.kunjunganDalamVisit} di antaranya sudah punya kunjungan (toko &amp; tanggal sama) → dihitung 2x, bukan 3x.</div>` : ''}
             ${(ctx.koreksiItems && ctx.koreksiItems.length) ? `<div class="hint" style="color:#8a5a00;">Termasuk koreksi (ikut tercetak di slip): ${ctx.koreksiItems.map(k => escapeHTML(koreksiLabelText(k)) + ' — ' + escapeHTML(k.catatan)).join(' · ')}</div>` : ''}
           </div>
           <div class="field">
@@ -5926,14 +5928,14 @@ function modalHTML(){
           <h3>✏️ Koreksi Kunjungan</h3>
           <button class="sheet-close" data-action="close-modal">✕</button>
         </div>
-        <div class="faint" style="font-size:11.5px; margin-bottom:12px;">${escapeHTML(kc.name || '')} · ${escapeHTML(kc.monthName || '')}<br>Pakai kalau ada kunjungan yang lupa diisi (isi angka positif) atau tercatat dobel (isi angka negatif, mis. -1). Koreksi langsung masuk ke Fee Harian dan slip gaji, dan catatannya ikut tercetak di slip. Tidak mengubah data ENTRY/Kunjungan asli.</div>
+        <div class="faint" style="font-size:11.5px; margin-bottom:12px;">${escapeHTML(kc.name || '')} · ${escapeHTML(kc.monthName || '')}<br>Pakai kalau ada kunjungan yang lupa diisi (isi angka positif) atau tercatat dobel (isi angka negatif, mis. -1). Kalau yang lupa diisi adalah visit yang ada kunjungannya, isi +1 di KUNJUNGAN saja (jangan di Visit juga), karena sudah bernilai 2x. Koreksi langsung masuk ke Fee Harian dan slip gaji, dan catatannya ikut tercetak di slip. Tidak mengubah data ENTRY/Kunjungan asli.</div>
         <form id="form-koreksi-gaji">
           <div class="field">
-            <label>Tambah / kurang Visit (bobot 1x)</label>
+            <label>Tambah / kurang Visit biasa (bobot 1x, tanpa kunjungan)</label>
             <input type="number" name="kg-visit" placeholder="0" step="1">
           </div>
           <div class="field">
-            <label>Tambah / kurang Kunjungan (bobot 2x)</label>
+            <label>Tambah / kurang Kunjungan (bobot 2x = visit + bukti kunjungan)</label>
             <input type="number" name="kg-kunjungan" placeholder="0" step="1">
           </div>
           <div class="field">
@@ -7048,6 +7050,8 @@ document.addEventListener('click', function(e){
       feeHarian: pe.feeHarian,
       jumlahVisit: pe.jumlahVisit,
       jumlahKunjungan: pe.jumlahKunjungan,
+      jumlahVisitENTRY: pe.jumlahVisitENTRY,
+      kunjunganDalamVisit: pe.kunjunganDalamVisit,
       koreksiItems: pe.koreksiItems || [],
       jumlahHari: pe.jumlahHari,
       harianRate: pe.harianRate,
@@ -8136,6 +8140,7 @@ document.addEventListener('submit', function(e){
       // dikoreksi Owner) -- supaya slip TETAP bisa tampilkan formula asal
       // perhitungannya, walau angka akhirnya dikoreksi manual.
       jumlahVisit: ctx.jumlahVisit, jumlahKunjungan: ctx.jumlahKunjungan,
+      jumlahVisitENTRY: ctx.jumlahVisitENTRY, kunjunganDalamVisit: ctx.kunjunganDalamVisit,
       jumlahHari: ctx.jumlahHari, harianRate: ctx.harianRate,
       komisiScope: ctx.feeScope
     }).then(result => {
