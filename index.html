@@ -5918,8 +5918,14 @@ function modalHTML(){
   }
 
   // BARU (2026-11-01): modal Koreksi Visit/Kunjungan
+  // DIUBAH: kolom langsung berisi DATA TERKINI; Owner mengubahnya ke angka yang
+  // BENAR, selisihnya dihitung otomatis (tidak perlu mikir "tambah 1 atau tulis 1").
   if (mode === 'koreksiGaji') {
     const kc = state.koreksiGajiContext || {};
+    const dr = kc.draft || {};
+    const vVal = dr.visit != null ? dr.visit : (kc.visit || 0);
+    const kVal = dr.kunjungan != null ? dr.kunjungan : (kc.kunjungan || 0);
+    const sg = n => (n > 0 ? '+' : '') + n;
     return `
     <div class="sheet-overlay" data-action="overlay-close">
       <div class="sheet" data-stop="1">
@@ -5928,19 +5934,21 @@ function modalHTML(){
           <h3>✏️ Koreksi Kunjungan</h3>
           <button class="sheet-close" data-action="close-modal">✕</button>
         </div>
-        <div class="faint" style="font-size:11.5px; margin-bottom:12px;">${escapeHTML(kc.name || '')} · ${escapeHTML(kc.monthName || '')}<br>Pakai kalau ada kunjungan yang lupa diisi (isi angka positif) atau tercatat dobel (isi angka negatif, mis. -1). Kalau yang lupa diisi adalah visit yang ada kunjungannya, isi +1 di KUNJUNGAN saja (jangan di Visit juga), karena sudah bernilai 2x. Koreksi langsung masuk ke Fee Harian dan slip gaji, dan catatannya ikut tercetak di slip. Tidak mengubah data ENTRY/Kunjungan asli.</div>
+        <div class="faint" style="font-size:11.5px; margin-bottom:10px;">${escapeHTML(kc.name || '')} · ${escapeHTML(kc.monthName || '')}<br>Kolom di bawah <b>sudah berisi data sekarang</b>. Ubah jadi <b>angka yang benar</b>: naikkan kalau ada yang lupa diisi, turunkan kalau ada yang dobel. Kunjungan (demo/meeting) sudah termasuk 1 visit, jadi kalau yang lupa diisi adalah kunjungan, naikkan angka <b>Kunjungan</b> saja, Visit jangan ikut dinaikkan.</div>
+        <div class="faint" style="font-size:11px; margin-bottom:12px;">Otomatis dari ENTRY/Kunjungan: Visit ${kc.visitOtomatis || 0}, Kunjungan ${kc.kunjunganOtomatis || 0}${(kc.koreksiVisit || kc.koreksiKunjungan) ? ` · Koreksi aktif: Visit ${sg(kc.koreksiVisit || 0)}, Kunjungan ${sg(kc.koreksiKunjungan || 0)}` : ''} · Fee Harian sekarang ${fmtRupiah(kc.feeHarian || 0)}</div>
         <form id="form-koreksi-gaji">
           <div class="field">
-            <label>Tambah / kurang Visit biasa (bobot 1x, tanpa kunjungan)</label>
-            <input type="number" name="kg-visit" placeholder="0" step="1">
+            <label>Visit biasa (bobot 1x, tanpa kunjungan) &mdash; sekarang ${kc.visit || 0}</label>
+            <input type="number" name="kg-visit" value="${vVal}" min="0" step="1" inputmode="numeric" data-koreksi-live="1">
           </div>
           <div class="field">
-            <label>Tambah / kurang Kunjungan (bobot 2x = visit + bukti kunjungan)</label>
-            <input type="number" name="kg-kunjungan" placeholder="0" step="1">
+            <label>Kunjungan (bobot 2x = visit + demo/meeting) &mdash; sekarang ${kc.kunjungan || 0}</label>
+            <input type="number" name="kg-kunjungan" value="${kVal}" min="0" step="1" inputmode="numeric" data-koreksi-live="1">
           </div>
+          <div id="kg-preview" class="hint" style="margin-bottom:12px; font-weight:600;">Belum ada perubahan.</div>
           <div class="field">
             <label>Catatan (wajib)</label>
-            <textarea name="kg-catatan" rows="3" required minlength="5" placeholder="Contoh: lupa isi kunjungan Kopi X tgl 12 Okt & Cafe Y tgl 14 Okt, dilaporkan staff via WA"></textarea>
+            <textarea name="kg-catatan" rows="3" required minlength="5" placeholder="Contoh: lupa isi kunjungan Kopi X tgl 12 Okt & Cafe Y tgl 14 Okt, dilaporkan staff via WA">${escapeHTML(dr.catatan || '')}</textarea>
           </div>
           <button type="submit" class="btn btn-primary btn-block" ${state.koreksiGajiSaving ? 'disabled' : ''}>${state.koreksiGajiSaving ? 'Menyimpan...' : 'Simpan Koreksi'}</button>
         </form>
@@ -7065,7 +7073,15 @@ document.addEventListener('click', function(e){
     const id = el.dataset.id;
     const pe = (state.payrollData && state.payrollData.employees || []).find(e => e.id === id);
     if (!pe) { showToast('Data karyawan tidak ditemukan, muat ulang laporan Gaji & Bonus.'); return; }
-    state.koreksiGajiContext = { employeeId: pe.id, name: pe.name, month: state.payrollData.month, year: state.payrollData.year, monthName: state.payrollData.monthName };
+    state.koreksiGajiContext = {
+      employeeId: pe.id, name: pe.name, month: state.payrollData.month, year: state.payrollData.year, monthName: state.payrollData.monthName,
+      // Data TERKINI (sudah termasuk koreksi yang aktif) -- jadi isi awal kolom, user tinggal mengubah ke angka yang benar
+      visit: Number(pe.jumlahVisit) || 0, kunjungan: Number(pe.jumlahKunjungan) || 0,
+      visitOtomatis: Number(pe.jumlahVisitOtomatis) || 0, kunjunganOtomatis: Number(pe.jumlahKunjunganOtomatis) || 0,
+      koreksiVisit: Number(pe.koreksiVisit) || 0, koreksiKunjungan: Number(pe.koreksiKunjungan) || 0,
+      harianRate: Number(pe.harianRate) || 0, feeHarian: Number(pe.feeHarian) || 0,
+      draft: null
+    };
     openModal('koreksiGaji', null);
   }
   else if (el.dataset.action === 'cancel-koreksi-gaji'){
@@ -7459,8 +7475,28 @@ document.addEventListener('click', function(e){
 // (TANPA memanggil render() -- itu justru boros & bisa bikin kursor
 // lompat), supaya kalau render() lain terpicu di tengah proses, hasil
 // render itu pakai draft TERBARU, bukan yang sudah basi.
+// BARU (2026-11-01): ringkasan perubahan LIVE di modal Koreksi Kunjungan
+// (tanpa render() ulang supaya kursor tidak lompat).
+function updateKoreksiPreview_(){
+  const kc = state.koreksiGajiContext || {};
+  const form = document.getElementById('form-koreksi-gaji');
+  const box = document.getElementById('kg-preview');
+  if (!form || !box) return;
+  const nv = parseInt(form.elements['kg-visit'].value, 10);
+  const nk = parseInt(form.elements['kg-kunjungan'].value, 10);
+  if (isNaN(nv) || isNaN(nk) || nv < 0 || nk < 0) { box.textContent = 'Isi angka bulat 0 atau lebih.'; return; }
+  const dv = nv - (kc.visit || 0), dk = nk - (kc.kunjungan || 0);
+  if (!dv && !dk) { box.textContent = 'Belum ada perubahan.'; return; }
+  const sg = n => (n > 0 ? '+' : '') + n;
+  const fee = Math.round(((nv * 1 + nk * 2) / 5) * (kc.harianRate || 0));
+  box.textContent = 'Visit ' + (kc.visit || 0) + ' → ' + nv + ' (' + sg(dv) + ') · Kunjungan ' + (kc.kunjungan || 0) + ' → ' + nk + ' (' + sg(dk) + ') · Fee Harian ' + fmtRupiah(kc.feeHarian || 0) + ' → ' + fmtRupiah(fee);
+}
+
 document.addEventListener('input', function(e){
-  if (e.target.dataset && e.target.dataset.action === 'wabot-sync-prompt-draft'){
+  if (e.target.dataset && e.target.dataset.koreksiLive){
+    updateKoreksiPreview_();
+  }
+  else if (e.target.dataset && e.target.dataset.action === 'wabot-sync-prompt-draft'){
     const field = e.target.dataset.field;
     if (field) state[field] = e.target.value;
   }
@@ -8174,14 +8210,23 @@ document.addEventListener('submit', function(e){
     e.preventDefault();
     const fd = new FormData(e.target);
     const kc = state.koreksiGajiContext || {};
+    // Kolom berisi ANGKA AKHIR yang benar; yang disimpan ke server = selisihnya dari data sekarang.
+    const nv = parseInt(String(fd.get('kg-visit') || '').trim(), 10);
+    const nk = parseInt(String(fd.get('kg-kunjungan') || '').trim(), 10);
+    const catatan = String(fd.get('kg-catatan') || '').trim();
+    if (isNaN(nv) || isNaN(nk) || nv < 0 || nk < 0) { showToast('Isi angka bulat 0 atau lebih untuk Visit dan Kunjungan.'); return; }
+    const dV = nv - (kc.visit || 0), dK = nk - (kc.kunjungan || 0);
+    if (!dV && !dK) { showToast('Belum ada perubahan: ubah angka Visit atau Kunjungan dulu.'); return; }
+    kc.draft = { visit: nv, kunjungan: nk, catatan: catatan }; // supaya isian tidak hilang kalau gagal
     state.koreksiGajiSaving = true;
     renderModal();
+    updateKoreksiPreview_();
     apiCall('saveKoreksiGaji', {
       requestingUserId: state.currentUser,
       employeeId: kc.employeeId, month: kc.month, year: kc.year,
-      tambahVisit: Number(String(fd.get('kg-visit') || '').trim()) || 0,
-      tambahKunjungan: Number(String(fd.get('kg-kunjungan') || '').trim()) || 0,
-      catatan: String(fd.get('kg-catatan') || '').trim()
+      tambahVisit: dV,
+      tambahKunjungan: dK,
+      catatan: catatan
     }).then(result => {
       state.koreksiGajiSaving = false;
       if (result && result.success) {
@@ -8191,11 +8236,13 @@ document.addEventListener('submit', function(e){
       } else {
         showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
         renderModal();
+        updateKoreksiPreview_();
       }
     }).catch(err => {
       state.koreksiGajiSaving = false;
       showToast('Gagal menyimpan koreksi: ' + (err.message || 'coba lagi'));
       renderModal();
+      updateKoreksiPreview_();
     });
   }
   else if (e.target.id === 'form-pin'){
