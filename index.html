@@ -2148,7 +2148,7 @@ function qtaskSettingsHTML(){
 
       ${state.payrollData ? `
         <div style="font-weight:700; font-size:13px; margin-bottom:2px;">${escapeHTML(state.payrollData.monthName)}</div>
-        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-visit-kunjungan-tidak-dobel' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
+        <div class="faint" style="font-size:10px; margin-bottom:8px;">Versi script: ${escapeHTML(state.payrollData.codeVersion || 'LAMA (tidak ada info versi)')}${state.payrollData.codeVersion === '2026-11-01-slip-klien-revenue' ? ' ✓' : ' — BUKAN versi terbaru, Komisi/Koreksi belum sesuai'}</div>
         <div class="faint" style="font-size:11px; margin-bottom:8px;">Komisi Penjualan Canvaser = tagihan akhir invoice bulan ini saja, dibayar maupun belum (tidak ada sisa dari bulan lalu). Komisi Rizky Syahdinar &amp; Fahmi Maulana bersifat KUMULATIF (Fee Marketing + Fee Roasting yang belum dibayar dari bulan-bulan sebelumnya ikut terbawa) -- Gaji dibayar penuh tiap bulan, tidak menunggak.</div>
         ${!state.payrollData.glReady ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" tidak ditemukan -- Komisi Penjualan tidak bisa dihitung (akan tampil 0 untuk semua orang).</div>` : ''}
         ${state.payrollData.glReady && !state.payrollData.glHasSalesColumn ? `<div style="font-size:11.5px; color:var(--danger); margin-bottom:8px;">⚠ Sheet "GL" belum punya kolom "sales" -- Komisi Penjualan tidak bisa dihitung per orang.</div>` : ''}
@@ -2175,6 +2175,7 @@ function qtaskSettingsHTML(){
                     ${renderKoreksiPayrollBlock(pe)}
                     ${pe.visitDates.length > 0 ? `<div style="margin-bottom:6px;" class="faint"><b>Tanggal visit bulan ini:</b> ${pe.visitDates.map(d=>fmtDate(d)).join(', ')}</div>` : ''}
                     ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;">${pe.feeScope === 'monthly' ? `<b>Fee Marketing bulan ini:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (tagihan akhir invoice bulan ini) = ${fmtRupiah(pe.feeMarketing)}` : `<b>Fee Marketing kumulatif:</b> ${pe.feeMarketingPct}% x ${fmtRupiah(pe.totalSalesValue)} (tagihan akhir invoice sepanjang waktu) = ${fmtRupiah(pe.feeMarketing)}`}</div>` : ''}
+                    ${pe.feeMarketingPct > 0 ? `<div style="margin-bottom:6px;"><b>Klien bertransaksi bulan ini:</b> ${pe.klienBertransaksi || 0} klien (${pe.jumlahInvoiceBulanIni || 0} invoice) &middot; <b>Revenue sesuai invoice:</b> ${fmtRupiah(pe.revenueInvoiceBulanIni || 0)}</div>` : ''}
                     ${pe.feeRoastRate > 0 ? `<div style="margin-bottom:6px;"><b>Fee Roasting ${pe.feeScope === 'monthly' ? 'bulan ini' : 'kumulatif'}:</b> ${pe.roastKg.toFixed(2)} kg hasil roasting (dari ${pe.roastBatchCount} batch unik RB+GB) x ${fmtRupiah(pe.feeRoastRate)}/kg = ${fmtRupiah(pe.bonusRoasting)}</div>` : ''}
                     ${pe.bonusBulananRate > 0 ? `<div style="margin-bottom:6px;"><b>Bonus Bulanan (rate ${fmtRupiah(pe.bonusBulananRate)}):</b> Gross margin bulan ini ${fmtRupiah(pe.grossMarginBulanIni)} (revenue ${fmtRupiah(pe.revenueBulanIni)} − HPP ${fmtRupiah(pe.hppBulanIni)}) dibanding 2x cost bulan ini (2 x ${fmtRupiah(pe.costSebelumBonus)} = ${fmtRupiah(2 * pe.costSebelumBonus)}) -- ${pe.bonusBulananTriggered ? `<span style="color:var(--success); font-weight:700;">TERPENUHI, bonus ${fmtRupiah(pe.bonusBulanan)} ditambahkan</span>` : `<span class="faint">belum terpenuhi, bonus tidak ditambahkan</span>`}</div>` : ''}
                     ${pe.paymentHistory && pe.paymentHistory.length > 0 ? `<div><b>Riwayat pembayaran Komisi (${pe.paymentHistory.length}):</b><br>${pe.paymentHistory.map(p=>`${escapeHTML(p.date)} — ${fmtRupiah(p.jumlah)} <span class="faint">(${escapeHTML(p.keterangan)})</span>`).join('<br>')}</div>` : ''}
@@ -5905,6 +5906,7 @@ function modalHTML(){
           <div class="field">
             <label>Komisi Penjualan</label>
             <input type="number" name="sg-komisi" placeholder="${Math.round(ctx.komisiPenjualan || 0)}" step="1">
+            ${(ctx.feeMarketingPct > 0 || ctx.jumlahInvoiceBulanIni > 0) ? `<div class="hint">Klien bertransaksi bulan ini: ${ctx.klienBertransaksi || 0} klien (${ctx.jumlahInvoiceBulanIni || 0} invoice) · Revenue sesuai invoice ${fmtRupiah(ctx.revenueInvoiceBulanIni || 0)} (ikut tercetak di slip)</div>` : ''}
           </div>
           <div class="field">
             <label>Bonus Bulanan</label>
@@ -7065,6 +7067,10 @@ document.addEventListener('click', function(e){
       harianRate: pe.harianRate,
       komisiPenjualan: pe.komisiPenjualan,
       feeScope: pe.feeScope,
+      feeMarketingPct: pe.feeMarketingPct,
+      klienBertransaksi: pe.klienBertransaksi,
+      jumlahInvoiceBulanIni: pe.jumlahInvoiceBulanIni,
+      revenueInvoiceBulanIni: pe.revenueInvoiceBulanIni,
       bonusBulanan: pe.bonusBulanan
     };
     openModal('slipGaji', null);
