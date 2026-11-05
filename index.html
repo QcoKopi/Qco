@@ -303,6 +303,11 @@
   .konf-hist{margin-top:10px; font-size:11.5px; color:var(--ink-soft);}
   .konf-hist summary{cursor:pointer; font-weight:600;}
   .konf-card{margin-bottom:12px;}
+  .pd-badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:10.5px; font-weight:600; white-space:nowrap;}
+  .pd-late{background:var(--danger-soft); color:var(--danger);}
+  .pd-soon{background:var(--warning-soft); color:var(--warning);}
+  .pd-ok{background:var(--success-soft); color:var(--success);}
+  .pd-none{background:var(--surface-alt); color:var(--ink-soft);}
   .hint{font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
   .segmented{display:flex; gap:8px;}
   .segmented input{position:absolute; opacity:0; pointer-events:none;}
@@ -896,6 +901,9 @@ let state = {
   slipGajiGenerating: false,
   koreksiGajiContext: null,
   koreksiGajiSaving: false,
+  piutangDeadlineFilter: 'all',
+  deadlineContext: null,
+  deadlineSaving: false,
   konfData: null,
   konfLoading: false,
   konfError: null,
@@ -1020,6 +1028,7 @@ let state = {
   followupModal: { open: false, customerName: null, salesName: null },
   followupHistory: {},
   followupSaving: false,
+  fuTerminatedOpen: false,
   mnExpandedIds: [], // id notes yang lagi di-expand (baca selengkapnya)
 };
 
@@ -3483,6 +3492,46 @@ function qsalesFollowupHTML(){
   `;
 }
 
+/* ---------- Follow Up: status & Terminated (BARU 2026-11-05) ---------- */
+const FU_STATUS_FALLBACK = ['Sudah Order Lagi', 'Akan Order', 'Masih Pertimbangkan', 'Belum Ada Respon', 'Ada Kendala / Komplain', 'Terminated'];
+function fuStatusOptions_(){
+  const f = state.followupData;
+  return (f && Array.isArray(f.statusOptions) && f.statusOptions.length) ? f.statusOptions : FU_STATUS_FALLBACK;
+}
+function fuBadgeHTML_(st){
+  if (!st) return '';
+  const C = {
+    'Sudah Order Lagi': ['#E3F4E6', '#1B5E20'], 'Akan Order': ['#E1F0FA', '#0D47A1'],
+    'Masih Pertimbangkan': ['#FFF3D6', '#7A5200'], 'Belum Ada Respon': ['#ECECEC', '#444444'],
+    'Ada Kendala / Komplain': ['#FDE4E1', '#A02015'], 'Terminated': ['#4A1F1F', '#FFFFFF'],
+    'Diaktifkan Kembali': ['#E8E0F8', '#4527A0']
+  };
+  const c = C[st] || ['#ECECEC', '#444444'];
+  return `<span style="display:inline-block; padding:1px 7px; border-radius:999px; font-size:10px; font-weight:700; background:${c[0]}; color:${c[1]}; white-space:nowrap;">${escapeHTML(st)}</span>`;
+}
+// Dipanggil tiap kali isian form Follow Up berubah: simpan ke draft (supaya tidak hilang kalau modal digambar ulang) + atur tampilan Terminated.
+function fuSetDraft_(field, value){
+  const fm = state.followupModal;
+  if (!fm || !fm.open) return;
+  fm.draft = fm.draft || {};
+  fm.draft[field] = value;
+  if (field === 'status') fuApplyStatusUI_();
+}
+function fuApplyStatusUI_(){
+  const fm = state.followupModal;
+  if (!fm || !fm.open) return;
+  const reaktif = fm.mode === 'reaktif';
+  const isTerm = !reaktif && fm.draft && fm.draft.status === 'Terminated';
+  const wrap = document.getElementById('followup-terminate-wrap');
+  if (wrap) wrap.style.display = isTerm ? 'block' : 'none';
+  const btn = document.getElementById('followup-submit-btn');
+  if (btn) {
+    btn.style.background = isTerm ? '#C62828' : '';
+    btn.style.borderColor = isTerm ? '#C62828' : '';
+    btn.textContent = state.followupSaving ? 'Menyimpan...' : (reaktif ? '♻ Aktifkan Kembali' : (isTerm ? '🚫 Terminate Klien' : 'Simpan'));
+  }
+}
+
 function followupSectionHTML(){
   if (!state.followupData) {
     fetchFollowupData();
@@ -3497,6 +3546,7 @@ function followupSectionHTML(){
     `;
   }
   const f = state.followupData;
+  const terminated = Array.isArray(f.terminatedCustomers) ? f.terminatedCustomers : [];
   return `
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex; gap:16px; margin-bottom:4px;">
@@ -3513,20 +3563,40 @@ function followupSectionHTML(){
           <div class="faint" style="font-size:10.5px;">Belum Follow Up</div>
         </div>
       </div>
+      ${f.terminatedCount > 0 ? `<div class="faint" style="font-size:10.5px; margin-top:6px;">🚫 ${f.terminatedCount} klien Terminated tidak ikut dihitung dan tidak ditampilkan di daftar.</div>` : ''}
     </div>
     <div class="card">
       ${f.customers.length === 0 ? `<div class="faint" style="font-size:12px;">Belum ada data customer.</div>` : f.customers.map(c => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
-          <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+          <div style="min-width:0;">
             <div style="font-size:12.5px; font-weight:600;">${escapeHTML(c.customerName)}</div>
-            <div class="faint" style="font-size:10.5px;">${c.sudahFollowup ? '✅ Terakhir: ' + escapeHTML(String(c.lastFollowupDate)) : '⚠ Belum pernah di-follow up'}</div>
+            <div class="faint" style="font-size:10.5px;">${c.sudahFollowup ? '✅ Terakhir: ' + escapeHTML(String(c.lastFollowupDate)) : '⚠ Belum pernah di-follow up'} ${fuBadgeHTML_(c.lastStatus)}</div>
           </div>
-          <button class="btn btn-ghost btn-sm" data-action="open-followup-modal" data-customer="${escapeHTML(c.customerName)}" data-sales="${escapeHTML(c.salesName)}" style="padding:3px 10px; font-size:10.5px;">
+          <button class="btn btn-ghost btn-sm" data-action="open-followup-modal" data-customer="${escapeHTML(c.customerName)}" data-sales="${escapeHTML(c.salesName)}" style="padding:3px 10px; font-size:10.5px; flex-shrink:0;">
             📞 Follow Up
           </button>
         </div>
       `).join('')}
     </div>
+    ${terminated.length ? `
+      <div class="card" style="margin-top:12px;">
+        <button class="btn btn-ghost btn-sm" data-action="fu-toggle-terminated" style="width:100%; text-align:left; font-weight:700;">
+          🚫 Klien Terminated (${terminated.length}) ${state.fuTerminatedOpen ? '▲' : '▼'}
+        </button>
+        ${state.fuTerminatedOpen ? terminated.map(t => `
+          <div style="padding:8px 0; border-bottom:1px solid var(--line);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+              <div style="min-width:0;">
+                <div style="font-size:12.5px; font-weight:600;">${escapeHTML(t.customerName)}</div>
+                <div style="font-size:11px; margin-top:2px;"><b>Alasan:</b> ${escapeHTML(t.alasanTerminate || '-')}</div>
+                <div class="faint" style="font-size:10.5px; margin-top:2px;">Oleh ${escapeHTML(t.diterminateOleh || '-')} · ${escapeHTML(String(t.tanggalTerminate || ''))}</div>
+              </div>
+              ${f.canReactivate ? `<button class="btn btn-ghost btn-sm" data-action="open-followup-reaktif" data-customer="${escapeHTML(t.customerName)}" data-sales="${escapeHTML(t.salesName || '')}" style="padding:3px 10px; font-size:10.5px; flex-shrink:0;">♻ Aktifkan Kembali</button>` : ''}
+            </div>
+          </div>
+        `).join('') : ''}
+      </div>
+    ` : ''}
   `;
 }
 
@@ -4174,6 +4244,129 @@ function qsalesKPIHTML(){
    "Hutang_Piutang", "Stock" via backend qfin_getDashboard(),
    lihat 08_QFinance.gs)
    ============================================================ */
+/* ============================================================
+   BARU (2026-11-05): DEADLINE per invoice di QFinance > Piutang Per Sales
+   (lewat deadline / belum lewat / belum ada deadline) + atur deadline manual.
+   Data dari backend: invoice.deadline ('yyyy-MM-dd' | null), deadlineSource ('invoice'|'manual'|null).
+   Status dihitung di sini dari tanggal HARI INI; deadline hari ini belum dianggap lewat.
+   ============================================================ */
+function pdTodayKey_(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function pdDayDiff_(aKey, bKey){
+  const pa = String(aKey).split('-').map(Number), pb = String(bKey).split('-').map(Number);
+  return Math.round((Date.UTC(pa[0], pa[1] - 1, pa[2]) - Date.UTC(pb[0], pb[1] - 1, pb[2])) / 86400000);
+}
+function pdFmtKey_(key){
+  const p = String(key).split('-').map(Number);
+  return p[2] + ' ' + MONTHS[p[1] - 1] + ' ' + p[0];
+}
+function deadlineStatus_(inv){
+  if (!inv || !inv.deadline) return { kind: 'none', days: null };
+  const diff = pdDayDiff_(inv.deadline, pdTodayKey_()); // negatif = sudah lewat
+  if (diff < 0) return { kind: 'lewat', days: -diff };
+  if (diff === 0) return { kind: 'hari-ini', days: 0 };
+  if (diff <= 7) return { kind: 'segera', days: diff };
+  return { kind: 'belum', days: diff };
+}
+function pdGroupOf_(st){ return st.kind === 'lewat' ? 'lewat' : (st.kind === 'none' ? 'none' : 'belum'); }
+function pdCompare_(a, b){
+  const ra = pdGroupOf_(a.st) === 'lewat' ? 0 : (pdGroupOf_(a.st) === 'belum' ? 1 : 2);
+  const rb = pdGroupOf_(b.st) === 'lewat' ? 0 : (pdGroupOf_(b.st) === 'belum' ? 1 : 2);
+  if (ra !== rb) return ra - rb;
+  if (ra === 0) return b.st.days - a.st.days;   // yang paling lama lewat di atas
+  if (ra === 1) return a.st.days - b.st.days;   // yang paling dekat jatuh tempo di atas
+  return String(a.inv.ref).localeCompare(String(b.inv.ref));
+}
+function pdBadgeHTML_(st){
+  const map = {
+    'lewat':    ['pd-late', '🔴 Lewat ' + st.days + ' hari'],
+    'hari-ini': ['pd-soon', '🟠 Jatuh tempo hari ini'],
+    'segera':   ['pd-soon', '🟡 Sisa ' + st.days + ' hari'],
+    'belum':    ['pd-ok',   '🟢 Sisa ' + st.days + ' hari'],
+    'none':     ['pd-none', '⚪ Belum ada deadline']
+  };
+  const m = map[st.kind];
+  return '<span class="pd-badge ' + m[0] + '">' + m[1] + '</span>';
+}
+function pdCustomerSummaryHTML_(cnt){
+  const parts = [];
+  if (cnt.lewat) parts.push('<span class="pd-badge pd-late">🔴 ' + cnt.lewat + ' invoice lewat deadline (terlama ' + cnt.maxLate + ' hari)</span>');
+  if (cnt.belum) parts.push('<span class="pd-badge pd-ok">🟢 ' + cnt.belum + ' belum lewat</span>');
+  if (cnt.none) parts.push('<span class="pd-badge pd-none">⚪ ' + cnt.none + ' belum ada deadline</span>');
+  return parts.length ? '<div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">' + parts.join('') + '</div>' : '';
+}
+/* ---------- Piutang: follow up terakhir + janji bayar per customer (BARU 2026-11-05) ---------- */
+function pnJanjiBadgeHTML_(janjiKey){
+  if (!janjiKey) return '<span class="pd-badge pd-none">Belum ada janji bayar</span>';
+  const d = pdDayDiff_(janjiKey, pdTodayKey_()); // negatif = janji sudah lewat
+  const tgl = pdFmtKey_(janjiKey);
+  if (d < 0) return '<span class="pd-badge pd-late">🤝 Janji bayar ' + escapeHTML(tgl) + ' · lewat ' + (-d) + ' hari</span>';
+  if (d === 0) return '<span class="pd-badge pd-soon">🤝 Janji bayar HARI INI (' + escapeHTML(tgl) + ')</span>';
+  return '<span class="pd-badge ' + (d <= 7 ? 'pd-soon' : 'pd-ok') + '">🤝 Janji bayar ' + escapeHTML(tgl) + ' · sisa ' + d + ' hari</span>';
+}
+function pnFollowupLineHTML_(c, ready){
+  if (!ready) return '';
+  const f = c.followup;
+  if (!f) return '<div style="margin-top:4px;"><span class="pd-badge pd-soon">⚠ Belum pernah di-follow up</span></div>';
+  const ago = pdDayDiff_(pdTodayKey_(), f.tanggal);
+  const agoTxt = ago <= 0 ? 'hari ini' : ago + ' hari lalu';
+  const hasil = String(f.hasil || '');
+  const hasilShort = hasil.length > 160 ? hasil.slice(0, 160) + '…' : hasil;
+  return '<div style="margin-top:4px; font-size:10.5px; color:var(--ink-faint);">'
+    + '<div>📞 Follow up terakhir <b style="color:var(--ink);">' + escapeHTML(pdFmtKey_(f.tanggal)) + '</b> (' + agoTxt + ')'
+    +   (f.oleh ? ' · oleh ' + escapeHTML(f.oleh) : '')
+    +   (ago > 7 ? ' <span class="pd-badge pd-soon">lebih dari 7 hari</span>' : '') + '</div>'
+    + '<div style="margin-top:2px;" title="' + escapeHTML(hasil) + '">“' + escapeHTML(hasilShort) + '”</div>'
+    + '<div style="margin-top:3px;">' + pnJanjiBadgeHTML_(f.janjiBayar) + '</div>'
+    + '</div>';
+}
+// Isian form Catat Penagihan -> draft (tahan digambar ulang) + batas minimal tanggal janji bayar.
+function pnSetDraft_(field, value){
+  const pm = state.penagihanModal;
+  if (!pm || !pm.open) return;
+  pm.draft = pm.draft || {};
+  pm.draft[field] = value;
+  if (field === 'tanggal') {
+    const j = document.getElementById('penagihan-janji');
+    if (j) j.min = value || '';
+  }
+}
+
+function pdInvoiceRowHTML_(x, customerName, salesName, pdOn){
+  const inv = x.inv;
+  let dlText = '';
+  if (pdOn) {
+    if (!inv.deadline) dlText = 'Belum ada deadline';
+    else if (inv.deadlineSource === 'manual') dlText = 'Deadline ' + pdFmtKey_(inv.deadline) + ' · diatur manual' + (inv.deadlineOleh ? ' oleh ' + inv.deadlineOleh : '') + (inv.deadlineCatatan ? ' — ' + inv.deadlineCatatan : '');
+    else dlText = 'Deadline ' + pdFmtKey_(inv.deadline) + ' · dari invoice';
+  }
+  return '<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11px; color:var(--ink-faint); padding:4px 0;">'
+    + '<div style="min-width:0;">'
+    +   '<div><span style="color:var(--ink); font-weight:600;">' + escapeHTML(inv.ref) + '</span>' + (pdOn ? ' ' + pdBadgeHTML_(x.st) : '') + '</div>'
+    +   (pdOn ? '<div style="font-size:10.5px; margin-top:1px;">' + escapeHTML(dlText) + '</div>' : '')
+    + '</div>'
+    + '<div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">'
+    +   '<span>' + (inv.total > 0 ? escapeHTML(fmtRupiah(inv.total)) : '-') + '</span>'
+    +   (pdOn ? '<button class="btn btn-ghost btn-sm" data-action="open-deadline-modal" data-ref="' + escapeHTML(inv.ref) + '" data-customer="' + escapeHTML(customerName) + '" data-sales="' + escapeHTML(salesName) + '" style="padding:3px 8px; font-size:10.5px;">📅 ' + (inv.deadline ? 'Ubah' : 'Atur') + '</button>' : '')
+    + '</div>'
+    + '</div>';
+}
+function pdFindInvoice_(ref){
+  const list = (state.qfinData && state.qfinData.piutangPerSales && state.qfinData.piutangPerSales.salesList) || [];
+  for (const s of list) for (const c of (s.customers || [])) for (const inv of (c.invoices || [])) {
+    if (inv.ref === ref) return { inv: inv, customerName: c.customerName, salesName: s.salesName };
+  }
+  return null;
+}
+// Muat ulang dashboard QFinance tanpa mengosongkan layar (supaya posisi scroll & bagian yang terbuka tetap).
+function refreshQFinQuiet_(){
+  return apiCall('qfin_getDashboard').then(result => {
+    if (result && typeof result === 'object') { state.qfinData = result; render(); }
+  }).catch(() => {});
+}
+
 async function fetchQFinData(){
   if (state.qfinLoading || state.qfinFetchAttempted) return;
   state.qfinFetchAttempted = true;
@@ -4725,6 +4918,28 @@ function qfinDashboardHTML(){
       .filter(s => s.customers.length > 0)
   };
 
+  // BARU (2026-11-05): tampilan Piutang Per Sales dgn deadline -- dihitung sekali di sini.
+  const pdOn = piutangPerSalesRaw.deadlineReady === true;
+  const pdFilter = pdOn ? (state.piutangDeadlineFilter || 'all') : 'all';
+  const pdCounts = { all: 0, lewat: 0, belum: 0, none: 0 };
+  const pdSalesView = piutangPerSales.salesList.map(s => {
+    let sOverdue = 0;
+    const customers = (s.customers || []).map(c => {
+      const invs = (c.invoices || []).map(inv => ({ inv: inv, st: deadlineStatus_(inv) }));
+      if (pdOn) invs.sort(pdCompare_);
+      const cnt = { lewat: 0, belum: 0, none: 0, maxLate: 0 };
+      invs.forEach(x => {
+        const g = pdGroupOf_(x.st);
+        cnt[g]++; pdCounts[g]++; pdCounts.all++;
+        if (g === 'lewat' && x.st.days > cnt.maxLate) cnt.maxLate = x.st.days;
+      });
+      sOverdue += cnt.lewat;
+      const shown = pdFilter === 'all' ? invs : invs.filter(x => pdGroupOf_(x.st) === pdFilter);
+      return { c: c, cnt: cnt, shown: shown };
+    }).filter(v => pdFilter === 'all' || v.shown.length > 0);
+    return { s: s, customers: customers, sOverdue: sOverdue };
+  }).filter(v => v.customers.length > 0);
+
   const kasBankTabBody = `
     <div class="section-title">💰 Kas & Bank Saat Ini</div>
     <div class="card card-hero" style="margin-bottom:12px;">
@@ -4872,22 +5087,38 @@ function qfinDashboardHTML(){
           <div style="font-weight:600; font-size:13px;">Total Piutang (semua sales)</div>
           <div style="font-weight:800; font-size:15px; color:var(--danger);">${fmtRupiah(piutangPerSales.grandTotal)}</div>
         </div>
-        ${piutangPerSales.salesList.map(s => {
+        ${!pdOn ? `
+          <div class="faint" style="font-size:11px; margin-bottom:10px; padding:8px 10px; border-radius:8px; background:var(--warning-soft); color:var(--warning);">
+            ${piutangPerSalesRaw.deadlineReady === false
+              ? '⚠ Deadline gagal dibaca: ' + escapeHTML(piutangPerSalesRaw.deadlineError || 'sebab tidak diketahui')
+              : '⚠ Fitur deadline belum aktif: deploy versi baru 08_QFinance.gs dan 05_WebApp_penagihan.gs di Apps Script.'}
+          </div>
+        ` : `
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            ${[['all', 'Semua', pdCounts.all], ['lewat', '🔴 Lewat deadline', pdCounts.lewat], ['belum', '🟢 Belum lewat', pdCounts.belum], ['none', '⚪ Belum ada deadline', pdCounts.none]].map(f => `
+              <button class="btn btn-sm ${pdFilter === f[0] ? 'btn-primary' : 'btn-ghost'}" data-action="set-piutang-deadline-filter" data-filter="${f[0]}" style="font-size:11.5px; padding:5px 9px;">${f[1]} (${f[2]})</button>
+            `).join('')}
+          </div>
+          <div class="faint" style="font-size:10.5px; margin-bottom:8px;">Hitungan per invoice. Deadline diambil dari jatuh tempo invoice, atau diatur manual lewat tombol 📅 (invoice tanpa jatuh tempo tampil sebagai "Belum ada deadline").</div>
+        `}
+        ${pdSalesView.map(v => {
+          const s = v.s;
           const key = 'qfin-piutang-sales-' + s.salesName;
-          const isOpen = !!state.expanded[key];
+          const isOpen = pdFilter !== 'all' || !!state.expanded[key];
           return `
           <div style="border-bottom:1px solid var(--line); padding:8px 0;">
             <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-action="toggle-qfin" data-key="${escapeHTML(key)}">
-              <div style="display:flex; align-items:center; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <span class="chev" style="color:var(--ink-faint); font-size:11px;">${isOpen ? '⌃' : '⌄'}</span>
                 <div style="font-weight:600; font-size:12.5px;">${escapeHTML(s.salesName)}</div>
                 <span class="faint" style="font-size:10.5px;">(${s.customers.length} customer)</span>
+                ${pdOn && v.sOverdue > 0 ? `<span class="pd-badge pd-late">🔴 ${v.sOverdue} invoice lewat deadline</span>` : ''}
               </div>
               <div style="font-weight:700; font-size:13px;">${fmtRupiah(s.total)}</div>
             </div>
             ${isOpen ? `
               <div style="margin-top:8px; margin-left:19px;">
-                ${s.customers.map(c => `
+                ${v.customers.map(cv => { const c = cv.c; return `
                   <div style="padding:6px 0; border-top:1px dashed var(--line);">
                     <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
                       <div>${escapeHTML(c.customerName)}</div>
@@ -4904,18 +5135,15 @@ function qfinDashboardHTML(){
                         </button>
                       </div>
                     </div>
-                    ${c.invoices.length ? `
+                    ${pdOn ? pdCustomerSummaryHTML_(cv.cnt) : ''}
+                    ${pnFollowupLineHTML_(c, piutangPerSalesRaw.followupReady === true)}
+                    ${cv.shown.length ? `
                       <div style="margin-top:4px; margin-left:12px;">
-                        ${c.invoices.map(inv => `
-                          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--ink-faint); padding:2px 0;">
-                            <div>${escapeHTML(inv.ref)}</div>
-                            <div>${inv.total > 0 ? fmtRupiah(inv.total) : '-'}</div>
-                          </div>
-                        `).join('')}
+                        ${cv.shown.map(x => pdInvoiceRowHTML_(x, c.customerName, s.salesName, pdOn)).join('')}
                       </div>
                     ` : ''}
                   </div>
-                `).join('')}
+                `; }).join('')}
               </div>
             ` : ''}
           </div>
@@ -6226,6 +6454,39 @@ function modalHTML(){
     </div>`;
   }
 
+  // BARU (2026-11-05): modal atur deadline piutang per invoice
+  if (mode === 'deadlinePiutang') {
+    const dc = state.deadlineContext || {};
+    const dr = dc.draft || {};
+    const curText = dc.deadline
+      ? pdFmtKey_(dc.deadline) + (dc.source === 'manual' ? ' (diatur manual' + (dc.oleh ? ' oleh ' + dc.oleh : '') + ')' : ' (dari invoice)')
+      : 'belum ada';
+    return `
+    <div class="sheet-overlay" data-action="overlay-close">
+      <div class="sheet" data-stop="1">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3>📅 Atur Deadline Piutang</h3>
+          <button class="sheet-close" data-action="close-modal">✕</button>
+        </div>
+        <div class="faint" style="font-size:11.5px; margin-bottom:10px;"><b>${escapeHTML(dc.ref || '')}</b> · ${escapeHTML(dc.customerName || '')}${dc.salesName ? ' (Sales: ' + escapeHTML(dc.salesName) + ')' : ''}<br>Deadline sekarang: ${escapeHTML(curText)}</div>
+        <form id="form-deadline-piutang">
+          <div class="field">
+            <label>Deadline pembayaran (jatuh tempo)</label>
+            <input type="date" name="dl-date" value="${escapeHTML(dr.date != null ? dr.date : (dc.deadline || ''))}" required>
+            <div class="hint">Invoice dianggap lewat deadline kalau tanggal ini sudah terlewati (deadline hari ini belum lewat). Deadline yang diatur di sini dipakai juga oleh tombol ⏰ Reminder.</div>
+          </div>
+          <div class="field">
+            <label>Catatan (opsional)</label>
+            <textarea name="dl-catatan" rows="2" maxlength="200" placeholder="Contoh: Disepakati dengan pemilik kafe lewat WA, bayar setelah gajian">${escapeHTML(dr.catatan != null ? dr.catatan : (dc.source === 'manual' ? (dc.catatan || '') : ''))}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" ${state.deadlineSaving ? 'disabled' : ''}>${state.deadlineSaving ? 'Menyimpan...' : 'Simpan Deadline'}</button>
+          ${dc.source === 'manual' ? `<button type="button" class="btn btn-danger-ghost btn-block" data-action="delete-deadline-piutang" style="margin-top:8px;" ${state.deadlineSaving ? 'disabled' : ''}>Hapus deadline manual</button>` : ''}
+        </form>
+      </div>
+    </div>`;
+  }
+
   // BARU (2026-11-01): modal Konfirmasi Bulanan (revisi Canvaser, keputusan Rizky/Owner, buka kembali, revenue selesai)
   if (mode === 'konf') {
     const kc = state.konfContext || {};
@@ -6595,30 +6856,40 @@ function restoreFocusedTextInput_(saved){
 
 function penagihanModalHTML(){
   if (!state.penagihanModal.open) return '';
-  const cust = state.penagihanModal.customerName;
-  const today = new Date().toISOString().split('T')[0];
+  const pm = state.penagihanModal;
+  const cust = pm.customerName;
+  const d = pm.draft || {};
+  const tanggal = d.tanggal || pdTodayKey_();
   const history = state.penagihanHistory[cust] || [];
+  const lbl = 'display:block; font-size:11.5px; font-weight:600; color:#333333; margin-bottom:4px;';
+  const fld = 'width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #BBBBBB; border-radius:8px; font-family:inherit; font-size:13px; background:#FFFFFF; color:#111111;';
+  const star = '<span style="color:#C62828;">*</span>';
   return `
     <div class="modal-overlay" data-action="close-penagihan-modal" style="position:fixed !important; inset:0 !important; background:rgba(20,20,20,0.75) !important; z-index:9999 !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:16px !important;">
       <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);">
-        <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">📝 Catat Penagihan</div>
+        <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">📝 Catat Follow Up Penagihan</div>
         <div style="font-size:12px; margin-bottom:14px; color:#666666;">${escapeHTML(cust)}</div>
 
         <div style="margin-bottom:10px;">
-          <label class="label-field">Tanggal Penagihan</label>
-          <input type="date" id="penagihan-tanggal" class="input-field" value="${today}">
+          <label style="${lbl}" for="penagihan-tanggal">Tanggal Follow Up ${star}</label>
+          <input type="date" id="penagihan-tanggal" data-pn-field="tanggal" style="${fld}" value="${escapeHTML(tanggal)}">
         </div>
         <div style="margin-bottom:10px;">
-          <label class="label-field">Nama PIC yang Dikontak</label>
-          <input type="text" id="penagihan-pic" class="input-field" placeholder="Nama PIC">
+          <label style="${lbl}" for="penagihan-pic">Nama PIC yang Dikontak</label>
+          <input type="text" id="penagihan-pic" data-pn-field="pic" maxlength="100" style="${fld}" placeholder="Nama PIC" value="${escapeHTML(d.pic || '')}">
         </div>
         <div style="margin-bottom:10px;">
-          <label class="label-field">No. yang Dikontak</label>
-          <input type="text" id="penagihan-no" class="input-field" placeholder="08xx...">
+          <label style="${lbl}" for="penagihan-no">No. yang Dikontak</label>
+          <input type="text" id="penagihan-no" data-pn-field="no" maxlength="50" style="${fld}" placeholder="08xx..." value="${escapeHTML(d.no || '')}">
         </div>
-        <div style="margin-bottom:14px;">
-          <label class="label-field">Hasil Penagihan</label>
-          <textarea id="penagihan-hasil" class="input-field" rows="3" placeholder="Mis. Janji bayar tanggal 20, belum bisa dihubungi, dll."></textarea>
+        <div style="margin-bottom:10px;">
+          <label style="${lbl}" for="penagihan-hasil">Hasil Follow Up ${star}</label>
+          <textarea id="penagihan-hasil" data-pn-field="hasil" maxlength="500" rows="3" style="${fld}" placeholder="Tulis apa kata klien. Mis. Bu Ani bilang transfer setelah gajian, atau belum bisa dihubungi.">${escapeHTML(d.hasil || '')}</textarea>
+        </div>
+        <div style="margin-bottom:14px; background:#EAF3FB; border-radius:8px; padding:10px;">
+          <label style="${lbl}" for="penagihan-janji">🤝 Tanggal Janji Bayar (isi kalau klien berjanji bayar)</label>
+          <input type="date" id="penagihan-janji" data-pn-field="janji" min="${escapeHTML(tanggal)}" style="${fld}" value="${escapeHTML(d.janji || '')}">
+          <div style="font-size:10.5px; color:#555555; margin-top:4px;">Kosongkan kalau belum ada janji tanggal. Tanggal ini hanya dicatat dan ditampilkan, tidak mengubah deadline invoice.</div>
         </div>
         <button class="btn btn-primary" style="width:100%;" data-action="submit-penagihan" ${state.penagihanSaving ? 'disabled' : ''}>
           ${state.penagihanSaving ? 'Menyimpan...' : 'Simpan'}
@@ -6626,15 +6897,16 @@ function penagihanModalHTML(){
 
         ${history.length ? `
           <div style="margin-top:18px; border-top:1px solid #DDDDDD; padding-top:12px;">
-            <div style="font-weight:600; font-size:12px; margin-bottom:8px; color:#111111;">Riwayat Penagihan</div>
+            <div style="font-weight:600; font-size:12px; margin-bottom:8px; color:#111111;">Riwayat Follow Up Penagihan</div>
             ${history.map(h => `
               <div style="font-size:11px; padding:6px 0; border-bottom:1px dashed #DDDDDD; color:#111111;">
                 <b>${escapeHTML(String(h.tanggalPenagihan))}</b> — PIC: ${escapeHTML(h.namaPIC || '-')} (${escapeHTML(h.noKontak || '-')})<br>
                 <span style="color:#777777;">${escapeHTML(h.hasilPenagihan)}</span>
+                ${h.tanggalJanjiBayar ? `<div style="margin-top:2px; color:#0D47A1;"><b>🤝 Janji bayar ${escapeHTML(String(h.tanggalJanjiBayar))}</b></div>` : ''}
               </div>
             `).join('')}
           </div>
-        ` : (history.length === 0 && cust ? `<div style="font-size:11px; margin-top:14px; color:#777777;">Belum ada riwayat penagihan untuk customer ini.</div>` : '')}
+        ` : (history.length === 0 && cust ? `<div style="font-size:11px; margin-top:14px; color:#777777;">Belum ada riwayat follow up penagihan untuk customer ini.</div>` : '')}
       </div>
     </div>
   `;
@@ -6642,25 +6914,55 @@ function penagihanModalHTML(){
 
 function followupModalHTML(){
   if (!state.followupModal.open) return '';
-  const cust = state.followupModal.customerName;
-  const today = new Date().toISOString().split('T')[0];
+  const fm = state.followupModal;
+  const cust = fm.customerName;
+  const reaktif = fm.mode === 'reaktif';
+  const d = fm.draft || {};
+  const isTerm = !reaktif && d.status === 'Terminated';
   const history = state.followupHistory[cust] || [];
+  const lbl = 'display:block; font-size:11.5px; font-weight:600; color:#333333; margin-bottom:4px;';
+  const fld = 'width:100%; box-sizing:border-box; padding:9px 10px; border:1px solid #BBBBBB; border-radius:8px; font-family:inherit; font-size:13px; background:#FFFFFF; color:#111111;';
+  const star = '<span style="color:#C62828;">*</span>';
   return `
     <div class="modal-overlay" data-action="close-followup-modal" style="position:fixed !important; inset:0 !important; background:rgba(20,20,20,0.75) !important; z-index:9999 !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:16px !important;">
       <div style="background-color:#FFFFFF !important; opacity:1 !important; border-radius:14px; max-width:440px; width:100%; max-height:85vh; overflow-y:auto; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.35);">
-        <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">📞 Follow Up Customer</div>
+        <div style="font-weight:700; font-size:15px; margin-bottom:4px; color:#111111;">${reaktif ? '♻ Aktifkan Kembali Klien' : '📞 Follow Up Customer'}</div>
         <div style="font-size:12px; margin-bottom:14px; color:#666666;">${escapeHTML(cust)}</div>
 
+        ${reaktif ? `
+          <div style="background:#EDE7F6; color:#4527A0; border-radius:8px; padding:8px 10px; font-size:11.5px; margin-bottom:12px;">Klien ini sedang Terminated. Setelah diaktifkan kembali, dia muncul lagi di Follow Up Klien.</div>
+        ` : ''}
+
         <div style="margin-bottom:10px;">
-          <label class="label-field">Tanggal Kontak</label>
-          <input type="date" id="followup-tanggal" class="input-field" value="${today}">
+          <label style="${lbl}" for="followup-tanggal">Tanggal Kontak ${star}</label>
+          <input type="date" id="followup-tanggal" data-fu-field="tanggal" style="${fld}" value="${escapeHTML(d.tanggal || pdTodayKey_())}">
         </div>
-        <div style="margin-bottom:14px;">
-          <label class="label-field">Hasil Kontak</label>
-          <textarea id="followup-hasil" class="input-field" rows="3" placeholder="Mis. Tertarik order, minta dihubungi lagi minggu depan, tidak diangkat, dll."></textarea>
+
+        ${reaktif ? '' : `
+          <div style="margin-bottom:10px;">
+            <label style="${lbl}" for="followup-status">Status ${star}</label>
+            <select id="followup-status" data-fu-field="status" style="${fld}">
+              <option value="">— Pilih status —</option>
+              ${fuStatusOptions_().map(o => `<option value="${escapeHTML(o)}" ${d.status === o ? 'selected' : ''}>${escapeHTML(o)}</option>`).join('')}
+            </select>
+          </div>
+        `}
+
+        <div style="margin-bottom:10px;">
+          <label style="${lbl}" for="followup-hasil">${reaktif ? 'Alasan diaktifkan kembali' : 'Catatan / Hasil Kontak'} ${star}</label>
+          <textarea id="followup-hasil" data-fu-field="hasil" maxlength="500" rows="3" style="${fld}" placeholder="${reaktif ? 'Mis. Salah terminate, klien ternyata masih order bulan ini.' : 'Mis. Sudah dihubungi lewat WA, minta dikirim sample minggu depan.'}">${escapeHTML(d.hasil || '')}</textarea>
         </div>
-        <button class="btn btn-primary" style="width:100%;" data-action="submit-followup" ${state.followupSaving ? 'disabled' : ''}>
-          ${state.followupSaving ? 'Menyimpan...' : 'Simpan'}
+
+        ${reaktif ? '' : `
+          <div id="followup-terminate-wrap" style="display:${isTerm ? 'block' : 'none'}; background:#FDECEA; border:1px solid #F5B7B1; border-radius:8px; padding:10px; margin-bottom:10px;">
+            <div style="font-size:11.5px; color:#A02015; margin-bottom:8px;"><b>⚠ Terminated</b> = sudah BUKAN klien lagi. Klien ini tidak akan muncul lagi di Follow Up Klien (hanya Owner / SPV yang bisa mengaktifkannya kembali).</div>
+            <label style="${lbl}" for="followup-alasan">Alasan Terminate ${star}</label>
+            <textarea id="followup-alasan" data-fu-field="alasan" maxlength="500" rows="2" style="${fld}" placeholder="Jelaskan kenapa dia sudah bukan klien. Mis. Kafe tutup permanen.">${escapeHTML(d.alasan || '')}</textarea>
+          </div>
+        `}
+
+        <button id="followup-submit-btn" class="btn btn-primary" style="width:100%; ${isTerm ? 'background:#C62828; border-color:#C62828;' : ''}" data-action="submit-followup" ${state.followupSaving ? 'disabled' : ''}>
+          ${state.followupSaving ? 'Menyimpan...' : (reaktif ? '♻ Aktifkan Kembali' : (isTerm ? '🚫 Terminate Klien' : 'Simpan'))}
         </button>
 
         ${history.length ? `
@@ -6668,8 +6970,9 @@ function followupModalHTML(){
             <div style="font-weight:600; font-size:12px; margin-bottom:8px; color:#111111;">Riwayat Follow Up</div>
             ${history.map(h => `
               <div style="font-size:11px; padding:6px 0; border-bottom:1px dashed #DDDDDD; color:#111111;">
-                <b>${escapeHTML(String(h.tanggalKontak))}</b><br>
+                <b>${escapeHTML(String(h.tanggalKontak))}</b> ${fuBadgeHTML_(h.status)}<br>
                 <span style="color:#777777;">${escapeHTML(h.hasilKontak)}</span>
+                ${h.alasanTerminate ? `<div style="color:#A02015; margin-top:2px;"><b>Alasan terminate:</b> ${escapeHTML(h.alasanTerminate)}</div>` : ''}
               </div>
             `).join('')}
           </div>
@@ -7295,16 +7598,15 @@ document.addEventListener('click', function(e){
   else if (el.dataset.action === 'open-penagihan-modal'){
     const customerName = el.dataset.customer;
     const salesName = el.dataset.sales;
-    state.penagihanModal = { open: true, customerName, salesName };
+    state.penagihanModal = { open: true, customerName, salesName, draft: { tanggal: pdTodayKey_(), pic: '', no: '', hasil: '', janji: '' } };
     renderModal();
-    if (!state.penagihanHistory[customerName]) {
-      apiCall('getPenagihanHistory', { customerName }).then(result => {
-        if (result && result.success) {
-          state.penagihanHistory[customerName] = result.data || [];
-          renderModal();
-        }
-      }).catch(() => {});
-    }
+    // riwayat lama (kalau ada) langsung tampil, lalu diganti yang terbaru dari server
+    apiCall('getPenagihanHistory', { customerName }).then(result => {
+      if (result && result.success) {
+        state.penagihanHistory[customerName] = result.data || [];
+        renderModal();
+      }
+    }).catch(() => {});
   }
   else if (el.dataset.action === 'close-penagihan-modal'){
     if (e.target !== el) return; // klik di dalam kotak form (bukan langsung di backdrop) -- jangan tutup
@@ -7312,21 +7614,27 @@ document.addEventListener('click', function(e){
     renderModal();
   }
   else if (el.dataset.action === 'submit-penagihan'){
+    if (state.penagihanSaving) return;
     const { customerName, salesName } = state.penagihanModal;
-    const tanggalPenagihan = document.getElementById('penagihan-tanggal').value;
-    const namaPIC = document.getElementById('penagihan-pic').value.trim();
-    const noKontak = document.getElementById('penagihan-no').value.trim();
-    const hasilPenagihan = document.getElementById('penagihan-hasil').value.trim();
-    if (!tanggalPenagihan) { showToast('Tanggal penagihan wajib diisi'); return; }
-    if (!hasilPenagihan) { showToast('Hasil penagihan wajib diisi'); return; }
+    const val = id => { const x = document.getElementById(id); return x ? String(x.value || '').trim() : ''; };
+    const tanggalPenagihan = val('penagihan-tanggal');
+    const namaPIC = val('penagihan-pic');
+    const noKontak = val('penagihan-no');
+    const hasilPenagihan = val('penagihan-hasil');
+    const tanggalJanjiBayar = val('penagihan-janji');
+    if (!tanggalPenagihan) { showToast('Tanggal follow up wajib diisi'); return; }
+    if (hasilPenagihan.length < 5) { showToast('Hasil follow up wajib diisi (minimal 5 huruf): tulis apa kata klien'); return; }
+    if (tanggalJanjiBayar && tanggalJanjiBayar < tanggalPenagihan) { showToast('Tanggal janji bayar tidak boleh sebelum tanggal follow up'); return; }
+    if (tanggalJanjiBayar && pdDayDiff_(tanggalJanjiBayar, tanggalPenagihan) > 365) { showToast('Tanggal janji bayar terlalu jauh (maksimal 1 tahun). Cek tahunnya'); return; }
     state.penagihanSaving = true;
     renderModal();
-    apiCall('savePenagihanLog', { customerName, salesName, tanggalPenagihan, namaPIC, noKontak, hasilPenagihan, requestingUserId: state.currentUser }).then(result => {
+    apiCall('savePenagihanLog', { customerName, salesName, tanggalPenagihan, namaPIC, noKontak, hasilPenagihan, tanggalJanjiBayar, requestingUserId: state.currentUser }).then(result => {
       state.penagihanSaving = false;
       if (result && result.success) {
-        showToast('Catatan penagihan tersimpan');
+        showToast(result.message || 'Catatan follow up tersimpan');
         state.penagihanModal = { open: false, customerName: null, salesName: null };
         delete state.penagihanHistory[customerName]; // paksa reload riwayat kali berikutnya dibuka
+        refreshQFinQuiet_(); // supaya "follow up terakhir" & janji bayar di daftar langsung ikut berubah
       } else {
         showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
       }
@@ -7337,19 +7645,26 @@ document.addEventListener('click', function(e){
       renderModal();
     });
   }
-  else if (el.dataset.action === 'open-followup-modal'){
+  else if (el.dataset.action === 'open-followup-modal' || el.dataset.action === 'open-followup-reaktif'){
     const customerName = el.dataset.customer;
     const salesName = el.dataset.sales;
-    state.followupModal = { open: true, customerName, salesName };
+    const reaktif = el.dataset.action === 'open-followup-reaktif';
+    state.followupModal = {
+      open: true, customerName, salesName, mode: reaktif ? 'reaktif' : 'followup',
+      draft: { tanggal: pdTodayKey_(), status: '', hasil: '', alasan: '' }
+    };
     renderModal();
-    if (!state.followupHistory[customerName]) {
-      apiCall('getFollowupHistory', { customerName }).then(result => {
-        if (result && result.success) {
-          state.followupHistory[customerName] = result.data || [];
-          renderModal();
-        }
-      }).catch(() => {});
-    }
+    // riwayat lama (kalau ada) langsung tampil, lalu diganti yang terbaru dari server
+    apiCall('getFollowupHistory', { customerName }).then(result => {
+      if (result && result.success) {
+        state.followupHistory[customerName] = result.data || [];
+        renderModal();
+      }
+    }).catch(() => {});
+  }
+  else if (el.dataset.action === 'fu-toggle-terminated'){
+    state.fuTerminatedOpen = !state.fuTerminatedOpen;
+    render();
   }
   else if (el.dataset.action === 'close-followup-modal'){
     if (e.target !== el) return; // klik di dalam kotak form (bukan langsung di backdrop) -- jangan tutup
@@ -7357,17 +7672,26 @@ document.addEventListener('click', function(e){
     renderModal();
   }
   else if (el.dataset.action === 'submit-followup'){
-    const { customerName, salesName } = state.followupModal;
-    const tanggalKontak = document.getElementById('followup-tanggal').value;
-    const hasilKontak = document.getElementById('followup-hasil').value.trim();
+    if (state.followupSaving) return;
+    const fm = state.followupModal;
+    const { customerName, salesName } = fm;
+    const reaktif = fm.mode === 'reaktif';
+    const val = id => { const x = document.getElementById(id); return x ? String(x.value || '').trim() : ''; };
+    const tanggalKontak = val('followup-tanggal');
+    const status = reaktif ? 'Diaktifkan Kembali' : val('followup-status');
+    const hasilKontak = val('followup-hasil');
+    const alasanTerminate = (!reaktif && status === 'Terminated') ? val('followup-alasan') : '';
     if (!tanggalKontak) { showToast('Tanggal kontak wajib diisi'); return; }
-    if (!hasilKontak) { showToast('Hasil kontak wajib diisi'); return; }
+    if (!status) { showToast('Pilih status follow up dulu'); return; }
+    if (hasilKontak.length < 5) { showToast(reaktif ? 'Alasan diaktifkan kembali wajib diisi (minimal 5 huruf)' : 'Catatan hasil kontak wajib diisi (minimal 5 huruf)'); return; }
+    if (status === 'Terminated' && alasanTerminate.length < 10) { showToast('Alasan terminate wajib diisi (minimal 10 huruf)'); return; }
+    if (status === 'Terminated' && !confirm('Terminate "' + customerName + '"?\n\nDia dianggap sudah BUKAN klien lagi dan tidak akan muncul di Follow Up Klien.\n\nAlasan: ' + alasanTerminate)) return;
     state.followupSaving = true;
     renderModal();
-    apiCall('saveFollowupLog', { customerName, salesName, tanggalKontak, hasilKontak, requestingUserId: state.currentUser }).then(result => {
+    apiCall('saveFollowupLog', { customerName, salesName, tanggalKontak, hasilKontak, status, alasanTerminate, requestingUserId: state.currentUser }).then(result => {
       state.followupSaving = false;
       if (result && result.success) {
-        showToast('Catatan follow up tersimpan');
+        showToast(result.message || 'Catatan follow up tersimpan');
         state.followupModal = { open: false, customerName: null, salesName: null };
         delete state.followupHistory[customerName];
         state.followupData = null; // paksa reload statistik
@@ -7415,6 +7739,42 @@ document.addEventListener('click', function(e){
       state.qsalesData.piutangReminders = prevList; // rollback
       showToast('Gagal: ' + (err.message || 'coba lagi'));
       render();
+    });
+  }
+  else if (el.dataset.action === 'set-piutang-deadline-filter'){
+    state.piutangDeadlineFilter = el.dataset.filter || 'all';
+    render();
+  }
+  else if (el.dataset.action === 'open-deadline-modal'){
+    const found = pdFindInvoice_(el.dataset.ref);
+    if (!found) { showToast('Invoice tidak ditemukan, muat ulang QFinance.'); return; }
+    state.deadlineContext = {
+      ref: found.inv.ref, customerName: found.customerName, salesName: found.salesName,
+      deadline: found.inv.deadline || '', source: found.inv.deadlineSource || null,
+      catatan: found.inv.deadlineCatatan || '', oleh: found.inv.deadlineOleh || '', draft: null
+    };
+    openModal('deadlinePiutang', null);
+  }
+  else if (el.dataset.action === 'delete-deadline-piutang'){
+    const dc = state.deadlineContext || {};
+    if (state.deadlineSaving || !dc.ref) return;
+    if (!confirm('Hapus deadline manual ' + dc.ref + '?')) return;
+    state.deadlineSaving = true;
+    renderModal();
+    apiCall('setDeadlinePiutang', { requestingUserId: state.currentUser, noInvoice: dc.ref, deadline: '', catatan: '' }).then(result => {
+      state.deadlineSaving = false;
+      if (result && result.success) {
+        closeModal();
+        showToast(result.message || 'Deadline manual dihapus');
+        refreshQFinQuiet_();
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+        renderModal();
+      }
+    }).catch(err => {
+      state.deadlineSaving = false;
+      showToast('Gagal menghapus deadline: ' + (err.message || 'coba lagi'));
+      renderModal();
     });
   }
   else if (el.dataset.action === 'konf-refresh'){
@@ -7944,6 +8304,12 @@ document.addEventListener('input', function(e){
   if (e.target.dataset && e.target.dataset.koreksiLive){
     updateKoreksiPreview_();
   }
+  else if (e.target.dataset && e.target.dataset.fuField){
+    fuSetDraft_(e.target.dataset.fuField, e.target.value);
+  }
+  else if (e.target.dataset && e.target.dataset.pnField){
+    pnSetDraft_(e.target.dataset.pnField, e.target.value);
+  }
   else if (e.target.dataset && e.target.dataset.action === 'wabot-sync-prompt-draft'){
     const field = e.target.dataset.field;
     if (field) state[field] = e.target.value;
@@ -8194,6 +8560,8 @@ document.addEventListener('focusout', function(e){
 });
 
 document.addEventListener('change', function(e){
+  if (e.target.dataset && e.target.dataset.fuField) { fuSetDraft_(e.target.dataset.fuField, e.target.value); }
+  if (e.target.dataset && e.target.dataset.pnField) { pnSetDraft_(e.target.dataset.pnField, e.target.value); }
   // FIX BUG NYATA (2026-09-06): SEBELUMNYA state.poFormTanggalPO/
   // poFormTanggalKirim TIDAK PERNAH di-update saat user mengetik/memilih
   // tanggal secara langsung utk PO BARU (cuma ke-set saat mode edit atau
@@ -8599,6 +8967,33 @@ document.addEventListener('submit', function(e){
       showToast('Staff ' + emp.name + ' ditambahkan (PIN: 1234)');
     }).catch(err=>{
       showToast('Gagal: ' + (err.message || 'ID mungkin sudah ada'));
+    });
+  }
+  else if (e.target.id === 'form-deadline-piutang'){
+    e.preventDefault();
+    if (state.deadlineSaving) return;
+    const fd = new FormData(e.target);
+    const dc = state.deadlineContext || {};
+    const date = String(fd.get('dl-date') || '').trim();
+    const catatan = String(fd.get('dl-catatan') || '').trim();
+    dc.draft = { date: date, catatan: catatan };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('Pilih tanggal deadline dulu.'); return; }
+    state.deadlineSaving = true;
+    renderModal();
+    apiCall('setDeadlinePiutang', { requestingUserId: state.currentUser, noInvoice: dc.ref, deadline: date, catatan: catatan }).then(result => {
+      state.deadlineSaving = false;
+      if (result && result.success) {
+        closeModal();
+        showToast(result.message || 'Deadline tersimpan');
+        refreshQFinQuiet_();
+      } else {
+        showToast('Gagal: ' + ((result && result.error) || 'coba lagi'));
+        renderModal();
+      }
+    }).catch(err => {
+      state.deadlineSaving = false;
+      showToast('Gagal menyimpan deadline: ' + (err.message || 'coba lagi'));
+      renderModal();
     });
   }
   else if (e.target.id === 'form-konf'){
